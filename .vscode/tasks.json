@@ -1,0 +1,77 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "PIO: Upload Firmware (matrix_R4)",
+            "type": "process",
+            "command": "${env:USERPROFILE}\\.platformio\\penv\\Scripts\\pio.exe",
+            "args": [
+                "run",
+                "-e",
+                "uno_r4_wifi",
+                "-t",
+                "upload"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            },
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "PIO: Upload & Monitor (matrix_R4)",
+            "type": "process",
+            "command": "${env:USERPROFILE}\\.platformio\\penv\\Scripts\\pio.exe",
+            "args": [
+                "run",
+                "-e",
+                "uno_r4_wifi",
+                "-t",
+                "upload",
+                "-t",
+                "monitor"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            },
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "PIO: Build (matrix_R4)",
+            "type": "process",
+            "command": "${env:USERPROFILE}\\.platformio\\penv\\Scripts\\pio.exe",
+            "args": [
+                "run",
+                "-e",
+                "uno_r4_wifi"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            },
+            "problemMatcher": "$gcc"
+        }
+    ]
+}
