@@ -43,9 +43,31 @@ constexpr bool     kMotorLeftReverseInit   = false;   // Inverted from MATRIX de
 constexpr bool     kMotorRightReverseInit  = true;
 constexpr int16_t  kMotorMinPower          = -100;
 constexpr int16_t  kMotorMaxPower          = 100;
-constexpr int16_t  kPrecisionMaxPower      = 55;      // Slow/precision mode limit
+constexpr int16_t  kPrecisionMaxPower          = 55;   // Slow/precision mode full-stick speed limit (%)
+constexpr uint8_t  kPrecisionThrottleExpoPct   = 55U;  // Gentler cubic expo on throttle in precision mode
+constexpr uint8_t  kPrecisionTurnExpoPct       = 60U;  // Gentler cubic expo on steering in precision mode
+constexpr int16_t  kPrecisionMicroTurnPower    = 18;   // D-Pad Left/Right fine alignment pivot in precision mode (%)
 constexpr int16_t  kMotorAccelSlewStep     = 25;      // 0 -> 100% in ~100 ms
 constexpr int16_t  kMotorDecelSlewStep     = 50;      // 100% -> 0 in ~50 ms
+
+// --- Physics Kinodynamic & Electromechanical Parameters --------------------
+constexpr uint8_t  kThrottleExpoPct        = 35U;     // 35% cubic jerk-reducing curve on throttle
+constexpr uint8_t  kTurnExpoPct            = 45U;     // 45% cubic curve on steering
+constexpr uint8_t  kTurnMaxRatioPct        = 80U;     // Max turn authority ratio at normal speed (%)
+constexpr int16_t  kMaxCentripetalLatAccel = 52;      // Traction circle limit |v * w| / 100 <= 52
+constexpr int16_t  kMotorStictionMinPower  = 12;      // Coulomb static friction threshold (%)
+constexpr int16_t  kAngularAccelSlewStep   = 35;      // Rotational 2-DOF slew step
+constexpr int16_t  kAngularDecelSlewStep   = 60;      // Rotational 2-DOF braking slew step
+constexpr uint8_t  kCoMHighMinScalePct     = 65U;     // Min accel/centripetal scale when arm raised (RC2->0)
+constexpr int16_t  kMicroTurnPower         = 26;      // D-Pad Left/Right fine alignment pivot power (%)
+constexpr bool     kEnableSmartHoldBrake   = true;    // Lock M1/M2 with H-bridge brake when stationary (0,0)
+constexpr int8_t   kMaxMotorTrimPct        = 15;      // Max straight-line L/R balance trim (+/-15%)
+
+// --- Non-Volatile EEPROM Config Storage (avoids IMU cal at 50..73) ----------
+constexpr uint16_t kEepromConfigAddr       = 128U;    // Safe offset 0x80 in Renesas RA4M1 data flash
+constexpr uint8_t  kEepromMagic0           = 'M';
+constexpr uint8_t  kEepromMagic1           = 'R';
+constexpr uint8_t  kEepromVersion          = 1U;
 
 // --- PS2 / MJ2 Wireless Controller (D2 + D3) --------------------------------
 constexpr uint8_t  kPs2ClkPin              = 11U;     // D3 Right
@@ -69,25 +91,35 @@ constexpr uint8_t  kPs2PacketGapUs         = 50U;     // CS high gap between tra
 constexpr uint8_t  kPs2AttSettleUs         = 12U;     // CS low setup time before first clock
 constexpr uint32_t kPs2InitRetryGapMs      = 12U;     // Delay between init burst attempts
 
-// --- Servos (RC1..RC4; RC3+RC4 paired on L1=Front Down, R1=Front Up) ----------
+// --- Servos (RC1..RC4; RC3+RC4 paired on L1=Down, R1=Up, Square=Push Ground) ---
 constexpr int16_t  kServoMinDeg            = 0;
 constexpr int16_t  kServoMaxDeg            = 180;
-constexpr int16_t  kRc1InitDeg             = 0;       // Aux servo default
-constexpr int16_t  kRc1L2Deg               = 0;
-constexpr int16_t  kRc1R2Deg               = 180;
+constexpr int16_t  kRc1InitDeg             = 180;       // Aux servo default
+constexpr int16_t  kRc1L2Deg               = 180;
+constexpr int16_t  kRc1R2Deg               = 0;
+constexpr int16_t  kRc1PresetHoldDeg       = 75;      // Circle preset A: Gripper hold/carry (matches Auto)
+constexpr int16_t  kRc1PresetDropDeg       = 145;     // Circle preset B: Gripper open/release (matches Auto)
 constexpr int16_t  kRc2InitDeg             = 90;      // Spare/Arm RC2 (D-Pad UP/DOWN)
 constexpr int16_t  kRc2MinDeg              = 0;
 constexpr int16_t  kRc2MaxDeg              = 180;
 constexpr int16_t  kRc2StepDeg             = 10;      // 10 deg / 50 ms (~200 deg/s)
 constexpr bool     kRc2InvertDir           = true;    // Invert RC2: UP/Fwd decreases deg, DOWN/Back increases deg
+constexpr int16_t  kRc2PresetHoldDeg       = 70;      // Circle preset A: Arm raised carry pose (matches Auto)
+constexpr int16_t  kRc2PresetDropDeg       = 140;     // Circle preset B: Arm lowered place pose (matches Auto)
+constexpr int16_t  kRc2SmoothStepDeg       = 6;       // RC2 slew step per 25ms tick (6 deg/25ms = 240 deg/s)
+constexpr bool     kRc2SmoothDefault       = true;    // Smooth trajectory enabled by default for RC2 only
 constexpr uint32_t kArmStepIntervalMs      = 50UL;
-constexpr int16_t  kRc3InitDeg             = 158;     // Front L arm stowed/up (mirror of RC4; clamped 0..180)
-constexpr int16_t  kRc3L1Deg               = 5;       // L1 Push down (lower deg = deeper; min 0)
-constexpr int16_t  kRc3R1Deg               = 160;     // R1 Lift / stow up
-constexpr int16_t  kRc4InitDeg             = 140;      // Front R arm stowed/up
-constexpr int16_t  kRc4L1Deg               = 175;     // L1 Push down (higher deg = deeper; max 180)
-constexpr int16_t  kRc4R1Deg               = 140;      // R1 Lift / stow up
+constexpr int16_t  kRc3InitDeg             = 30;     // Front L arm stowed/up (paired with RC4; clamped 0..180)
+constexpr int16_t  kRc3L1Deg               = 30;      // L1 Push down (70 deg; lower deg = deeper; min 0)
+constexpr int16_t  kRc3R1Deg               = 140;     // R1 Lift / mid stow up (140 deg)
+constexpr int16_t  kRc3SquareDeg           = 30;      // Square Push ground toggle (30 deg)
+constexpr bool     kRc3InvertDir           = false;   // Invert RC3 hardware output angle (deg -> 180 - deg)
+constexpr int16_t  kRc4InitDeg             = 30;     // Front R arm stowed/up (paired with RC3)
+constexpr int16_t  kRc4L1Deg               = 30;      // L1 Push down (70 deg; paired with RC3)
+constexpr int16_t  kRc4R1Deg               = 140;     // R1 Lift / mid stow up (140 deg)
+constexpr int16_t  kRc4SquareDeg           = 30;      // Square Push ground toggle (30 deg)
 constexpr uint32_t kServoBootStaggerMs     = 60UL;    // Reduce startup current spike
+constexpr bool     kRc4InvertDir           = true;   // Invert RC4 hardware output angle (deg -> 180 - deg)
 
 // --- Power / DC Adapter (Supports 9V-18V DC Adapter or 2S-4S Pack) ----------
 constexpr float    kPowerFullVolt          = 19.5f;   // <= 25.5V (uint8 tenths)
@@ -119,16 +151,23 @@ constexpr int16_t  kBattEmergDecelSlew     = 18;
 constexpr uint8_t  kBattCompMaxPct         = 115U;    // Bounded torque compensation cap
 
 // --- Serial Backup Manual Control -------------------------------------------
-constexpr int16_t  kSerialDefaultSpeed     = 65;      // Safe bench speed (15..100%)
+constexpr int16_t  kSerialDefaultSpeed     = 100;     // Full 100% speed by default (15..100%)
 constexpr int16_t  kSerialMinSpeed         = 20;
 constexpr int16_t  kSerialSpeedStep        = 15;
 constexpr uint32_t kSerialKeyHoldMs        = 650UL;   // Bridges OS key-repeat gap
 constexpr uint32_t kSerialDirectHoldMs     = 2500UL;  // Safety window for `m L R`
 constexpr uint32_t kLineTimeoutMs          = 1500UL;  // Expiration window for line commands
 
-// --- Onboard Upload Combo (BTN_UP + BTN_DOWN) -------------------------------
+// --- Onboard Upload Combo (BTN_UP + BTN_DOWN) & Auto Start Hold ------------
 constexpr uint32_t kButtonDebounceMs       = 30UL;
 constexpr uint32_t kUploadComboHoldMs      = 2500UL;
+constexpr uint32_t kAutoStartBtnHoldMs     = 1200UL;  // Single BTN_UP hold to start Auto without PS2
+constexpr uint32_t kAutoMaxDurationMs      = 60000UL; // Max Auto safety duration (60s; 0 = unlimited)
+constexpr uint32_t kAutoOledRefreshMs      = 250UL;   // Live stopwatch OLED refresh during Auto
+constexpr uint32_t kAutoStallGraceMs       = 1250UL;  // Initial grace window per Auto command before stall check
+constexpr uint32_t kAutoStallPollMs        = 200UL;   // Encoder progress poll period during blocking DriveDC
+constexpr uint32_t kAutoStallTimeoutMs     = 1600UL;  // Continuous stall window with < kAutoStallMinDeltaDeg
+constexpr int32_t  kAutoStallMinDeltaDeg   = 3L;      // Minimum encoder delta to reset stall timer
 
 // --- Live Stability Probability Index (0..100%) ----------------------------
 constexpr uint8_t  kStabilityLinkMaxPen      = 35U;

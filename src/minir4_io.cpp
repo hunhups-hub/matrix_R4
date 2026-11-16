@@ -1,6 +1,7 @@
 #include "minir4_io.h"
 
 #include <Arduino.h>
+#include <EEPROM.h>
 #include <MatrixMiniR4.h>
 #include "Modules/MMLower.h"
 
@@ -22,12 +23,12 @@ bool MiniR4IO::begin() {
 
     const bool cfgOk = applyLowerMcuConfig(true);
 
-    // Zero M1/M2 immediately at boot for safety.
-    const bool m1Ok = MiniR4.M1.setPower(0);
-    const bool m2Ok = MiniR4.M2.setPower(0);
+    // Zero M1/M2 immediately at boot for safety (engage hold-brake if enabled).
+    const bool m1Ok = Config::kEnableSmartHoldBrake ? MiniR4.M1.setBrake(true) : MiniR4.M1.setPower(0);
+    const bool m2Ok = Config::kEnableSmartHoldBrake ? MiniR4.M2.setBrake(true) : MiniR4.M2.setPower(0);
     lastLeftPower_    = 0;
     lastRightPower_   = 0;
-    lastBrakeEngaged_ = false;
+    lastBrakeEngaged_ = Config::kEnableSmartHoldBrake && m1Ok && m2Ok;
     motorsSynced_     = m1Ok && m2Ok;
     if (!motorsSynced_ || !cfgOk) {
         commHealthy_   = false;
@@ -105,6 +106,29 @@ void MiniR4IO::setMotorPolarity(bool leftReverse, bool rightReverse) {
     }
 }
 
+void MiniR4IO::syncServoCache(const ServoTargets& current) {
+    lastServos_ = RobotLogic::clampServoTargets(current);
+}
+
+bool MiniR4IO::loadConfigFromEeprom(PersistentConfig& outCfg) {
+    uint8_t raw[8];
+    for (uint8_t i = 0U; i < 8U; ++i) {
+        raw[i] = EEPROM.read(static_cast<int>(Config::kEepromConfigAddr + i));
+    }
+    return RobotLogic::unpackPersistentConfig(raw, outCfg);
+}
+
+void MiniR4IO::saveConfigToEeprom(const PersistentConfig& cfg) {
+    uint8_t raw[8];
+    RobotLogic::packPersistentConfig(cfg, raw);
+    for (uint8_t i = 0U; i < 8U; ++i) {
+        const int addr = static_cast<int>(Config::kEepromConfigAddr + i);
+        if (EEPROM.read(addr) != raw[i]) {
+            EEPROM.write(addr, raw[i]);
+        }
+    }
+}
+
 bool MiniR4IO::configureServoRanges() {
     servoRangeErr_ = 0U;
     bool allOk     = true;
@@ -125,13 +149,15 @@ bool MiniR4IO::configureServoRanges() {
 
 void MiniR4IO::staggerBootServos() {
     const ServoTargets safeInit = RobotLogic::clampServoTargets(ServoTargets{});
+    const int16_t      hwRc3    = RobotLogic::applyServoDirection(safeInit.rc3Deg, Config::kRc3InvertDir);
+    const int16_t      hwRc4    = RobotLogic::applyServoDirection(safeInit.rc4Deg, Config::kRc4InvertDir);
     const bool ok1 = MiniR4.RC1.setAngle(static_cast<uint16_t>(safeInit.rc1Deg));
     delay(Config::kServoBootStaggerMs);
     const bool ok2 = MiniR4.RC2.setAngle(static_cast<uint16_t>(safeInit.rc2Deg));
     delay(Config::kServoBootStaggerMs);
-    const bool ok3 = MiniR4.RC3.setAngle(static_cast<uint16_t>(safeInit.rc3Deg));
+    const bool ok3 = MiniR4.RC3.setAngle(static_cast<uint16_t>(hwRc3));
     delay(Config::kServoBootStaggerMs);
-    const bool ok4 = MiniR4.RC4.setAngle(static_cast<uint16_t>(safeInit.rc4Deg));
+    const bool ok4 = MiniR4.RC4.setAngle(static_cast<uint16_t>(hwRc4));
 
     lastServos_   = safeInit;
     servosSynced_ = ok1 && ok2 && ok3 && ok4;
@@ -226,6 +252,8 @@ void MiniR4IO::pollButtons(uint32_t nowMs, ButtonEvents& outEvents) {
         // Prevent single-button release actions after releasing an upload combo.
         btnUp_.pressLatched   = false;
         btnDown_.pressLatched = false;
+        upHoldPrevActive_     = false;
+        upHoldFired_          = false;
 
         if (!comboPrevActive_) {
             comboPrevActive_ = true;
@@ -250,6 +278,32 @@ void MiniR4IO::pollButtons(uint32_t nowMs, ButtonEvents& outEvents) {
 
     comboPrevActive_ = false;
     comboFired_      = false;
+
+    // Single BTN_UP hold (1.2s) triggers Auto mode without requiring PS2 controller
+    if (btnUp_.stableState && !btnDown_.stableState) {
+        if (!upHoldPrevActive_) {
+            upHoldPrevActive_ = true;
+            upHoldFired_      = false;
+            upHoldStartMs_    = nowMs;
+        }
+        const uint32_t elapsed = static_cast<uint32_t>(nowMs - upHoldStartMs_);
+        if (elapsed >= 250UL) {
+            outEvents.autoHolding = true;
+            float ratio           = static_cast<float>(elapsed) / static_cast<float>(Config::kAutoStartBtnHoldMs);
+            if (ratio > 1.0f) {
+                ratio = 1.0f;
+            }
+            outEvents.autoHoldRatio = ratio;
+        }
+        if (!upHoldFired_ && elapsed >= Config::kAutoStartBtnHoldMs) {
+            upHoldFired_                 = true;
+            btnUp_.pressLatched          = false; // Suppress shortUp release action after hold fires
+            outEvents.autoStartRequested = true;
+        }
+    } else {
+        upHoldPrevActive_ = false;
+        upHoldFired_      = false;
+    }
 
     if (pollRan) {
         outEvents.shortUp   = shortUp;
@@ -352,7 +406,7 @@ void MiniR4IO::applyMotors(int16_t leftPower, int16_t rightPower, bool forceBrak
     bool okR = true;
 
     if (updateL) {
-        if (clampedL == 0 && forceBrake) {
+        if (wantBrake) {
             okL = MiniR4.M1.setBrake(true);
         } else {
             okL = MiniR4.M1.setPower(clampedL);
@@ -363,7 +417,7 @@ void MiniR4IO::applyMotors(int16_t leftPower, int16_t rightPower, bool forceBrak
     }
 
     if (updateR) {
-        if (clampedR == 0 && forceBrake) {
+        if (wantBrake) {
             okR = MiniR4.M2.setBrake(true);
         } else {
             okR = MiniR4.M2.setPower(clampedR);
@@ -431,14 +485,60 @@ void MiniR4IO::forceMotorsStop(bool engageBrake, uint32_t nowMs) {
     }
 }
 
+void MiniR4IO::restoreAfterAuto(uint32_t nowMs) {
+    // Stop any DriveDC task started by Auto block code and brake/zero all 4 DC channels.
+    (void)MiniR4.DriveDC.brake(true);
+    MiniR4.M1.setBrake(true);
+    MiniR4.M2.setBrake(true);
+    MiniR4.M3.setPower(0);
+    MiniR4.M4.setPower(0);
+
+    // Restore deterministic PS2 bit-bang SPI pins & DAT pull-up in case D2/D3 or MiniR4.PS2 ran.
+    digitalWrite(Config::kPs2ClkPin, HIGH);
+    digitalWrite(Config::kPs2CmdPin, HIGH);
+    digitalWrite(Config::kPs2AttPin, HIGH);
+    pinMode(Config::kPs2ClkPin, OUTPUT);
+    pinMode(Config::kPs2CmdPin, OUTPUT);
+    pinMode(Config::kPs2AttPin, OUTPUT);
+    pinMode(Config::kPs2DatPin, INPUT_PULLUP);
+
+    auxMotorsZeroed_    = false;
+    (void)mmL.SetDCMotorSpeedRange(Config::kMotorLeftId, 0U, 100U);
+    (void)mmL.SetDCMotorSpeedRange(Config::kMotorRightId, 0U, 100U);
+    const bool cfgOk    = applyLowerMcuConfig(true);
+    const bool ok1      = MiniR4.M1.setBrake(true);
+    const bool ok2      = MiniR4.M2.setBrake(true);
+    lastConfigResyncMs_ = nowMs;
+
+    invalidateActuatorCaches();
+    lastLeftPower_      = 0;
+    lastRightPower_     = 0;
+    lastBrakeEngaged_   = true;
+    lastMotorAttemptMs_ = nowMs;
+    lastMotorSendMs_    = nowMs;
+    lastStopRefreshMs_  = nowMs;
+    motorsSynced_       = cfgOk && ok1 && ok2;
+    if (!motorsSynced_) {
+        commHealthy_   = false;
+        commNeedsHeal_ = true;
+    }
+}
+
 void MiniR4IO::applyServos(const ServoTargets& targets, uint32_t nowMs) {
     const ServoTargets safe = RobotLogic::clampServoTargets(targets);
+
+    // Smooth trajectory slew is applied ONLY to arm RC2; RC1, RC3, RC4 actuate immediately.
+    const int16_t cmdRc2 = rc2SmoothEnabled_
+                               ? RobotLogic::slewServoAngle(lastServos_.rc2Deg,
+                                                            safe.rc2Deg,
+                                                            Config::kRc2SmoothStepDeg)
+                               : safe.rc2Deg;
 
     const bool keepaliveDue =
         static_cast<uint32_t>(nowMs - lastServoSendMs_) >= Config::kServoKeepaliveMs;
 
     const bool send1 = !servosSynced_ || (safe.rc1Deg != lastServos_.rc1Deg) || keepaliveDue;
-    const bool send2 = !servosSynced_ || (safe.rc2Deg != lastServos_.rc2Deg) || keepaliveDue;
+    const bool send2 = !servosSynced_ || (cmdRc2 != lastServos_.rc2Deg) || keepaliveDue;
     const bool send3 = !servosSynced_ || (safe.rc3Deg != lastServos_.rc3Deg) || keepaliveDue;
     const bool send4 = !servosSynced_ || (safe.rc4Deg != lastServos_.rc4Deg) || keepaliveDue;
 
@@ -464,21 +564,23 @@ void MiniR4IO::applyServos(const ServoTargets& targets, uint32_t nowMs) {
         }
     }
     if (send2) {
-        if (MiniR4.RC2.setAngle(static_cast<uint16_t>(safe.rc2Deg))) {
-            lastServos_.rc2Deg = safe.rc2Deg;
+        if (MiniR4.RC2.setAngle(static_cast<uint16_t>(cmdRc2))) {
+            lastServos_.rc2Deg = cmdRc2;
         } else {
             allOk = false;
         }
     }
     if (send3) {
-        if (MiniR4.RC3.setAngle(static_cast<uint16_t>(safe.rc3Deg))) {
+        const int16_t hwRc3 = RobotLogic::applyServoDirection(safe.rc3Deg, Config::kRc3InvertDir);
+        if (MiniR4.RC3.setAngle(static_cast<uint16_t>(hwRc3))) {
             lastServos_.rc3Deg = safe.rc3Deg;
         } else {
             allOk = false;
         }
     }
     if (send4) {
-        if (MiniR4.RC4.setAngle(static_cast<uint16_t>(safe.rc4Deg))) {
+        const int16_t hwRc4 = RobotLogic::applyServoDirection(safe.rc4Deg, Config::kRc4InvertDir);
+        if (MiniR4.RC4.setAngle(static_cast<uint16_t>(hwRc4))) {
             lastServos_.rc4Deg = safe.rc4Deg;
         } else {
             allOk = false;

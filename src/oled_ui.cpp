@@ -39,6 +39,9 @@ const char* headerTag(const SystemSnapshot& snap) {
     if (snap.sysState == SystemState::Estop) {
         return "ESTOP!";
     }
+    if (snap.activeSource == ControlSource::Auto) {
+        return "AUTO RUN";
+    }
     if (snap.ps2Link == LinkState::Operational) {
         return "PS2 OK";
     }
@@ -255,6 +258,9 @@ void OledUI::updateRgbLeds(const SystemSnapshot& snap, uint32_t nowMs) {
         const bool blinkOn = ((nowMs / 120UL) % 2UL) == 0UL;
         c1 = blinkOn ? packRgb(180, 0, 0) : packRgb(0, 0, 0);
         c2 = c1;
+    } else if (snap.activeSource == ControlSource::Auto) {
+        c1 = packRgb(140, 0, 180);
+        c2 = packRgb(0, 140, 180);
     } else if (snap.ps2Link == LinkState::Operational) {
         c1 = snap.precisionMode ? packRgb(0, 120, 80) : packRgb(0, 140, 0);
     } else if (snap.ps2Link == LinkState::Stabilizing) {
@@ -325,17 +331,29 @@ void OledUI::render(const SystemSnapshot& snap, uint32_t nowMs, bool force) {
              stabFlagChar(snap.commStabState),
              stabFlagChar(snap.loopStabState));
 
+    const char idleBrakeChar =
+        (snap.drive.left == 0 && snap.drive.right == 0 && snap.holdBrakeActive) ? 'H' : ' ';
+    const char modeChar = (snap.precisionMode && snap.reverseDrive)
+                              ? 'B'
+                              : (snap.precisionMode ? 'S' : (snap.reverseDrive ? 'R' : idleBrakeChar));
     snprintf(line3, sizeof(line3), "M1:%+04d M2:%+04d %c%c",
              static_cast<int>(snap.drive.left),
              static_cast<int>(snap.drive.right),
-             snap.precisionMode ? 'S' : ' ',
+             modeChar,
              batteryTierChar(snap.batTier));
 
     if (snap.comboHolding) {
         snprintf(line4, sizeof(line4), "Upload in %3d%%",
                  static_cast<int>(snap.uploadHoldPct * 100.0f));
+    } else if (snap.autoHolding && snap.sysState == SystemState::Ready) {
+        snprintf(line4, sizeof(line4), "Hold UP->AUTO %3d%%",
+                 static_cast<int>(snap.autoHoldPct * 100.0f));
     } else if (!snap.commHealthy) {
         snprintf(line4, sizeof(line4), "!STM32 COMM RETRY!");
+    } else if (snap.activeSource == ControlSource::Auto) {
+        const unsigned sec    = static_cast<unsigned>((snap.autoElapsedMs / 1000UL) % 100UL);
+        const unsigned tenths = static_cast<unsigned>((snap.autoElapsedMs / 100UL) % 10UL);
+        snprintf(line4, sizeof(line4), "AUTO %2u.%1us X:Exit", sec, tenths);
     } else if (snap.ps2Link == LinkState::Disconnected &&
                snap.activeSource == ControlSource::None) {
         snprintf(line4, sizeof(line4), "D2+D3:PS2 | USB:WASD");
@@ -353,6 +371,8 @@ void OledUI::render(const SystemSnapshot& snap, uint32_t nowMs, bool force) {
     h          = fnv1aHash(line4, h);
     if (snap.comboHolding) {
         h ^= static_cast<uint32_t>(snap.uploadHoldPct * 32.0f);
+    } else if (snap.autoHolding) {
+        h ^= static_cast<uint32_t>(snap.autoHoldPct * 32.0f);
     }
 
     if (!force && h == lastDisplayHash_) {
@@ -370,10 +390,11 @@ void OledUI::render(const SystemSnapshot& snap, uint32_t nowMs, bool force) {
     MiniR4.OLED.setCursor(0, 8);
     MiniR4.OLED.print(line2);
 
-    if (snap.comboHolding) {
+    if (snap.comboHolding || (snap.autoHolding && snap.sysState == SystemState::Ready)) {
+        const float holdPct = snap.comboHolding ? snap.uploadHoldPct : snap.autoHoldPct;
         MiniR4.OLED.setCursor(0, 17);
         MiniR4.OLED.print(line4);
-        const int barW = static_cast<int>(snap.uploadHoldPct * 124.0f);
+        const int barW = static_cast<int>(holdPct * 124.0f);
         MiniR4.OLED.drawRect(0, 27, 126, 4, SSD1306_WHITE);
         if (barW > 0) {
             MiniR4.OLED.fillRect(1, 28, barW, 2, SSD1306_WHITE);

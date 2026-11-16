@@ -7,6 +7,14 @@ struct SerialActions {
     bool               uploadRequested     = false;
     bool               estopRequested      = false;
     bool               resumeRequested     = false;
+    bool               autoStartRequested  = false;
+    bool               togglePrecision     = false;
+    bool               toggleReverseDrive  = false;
+    bool               togglePosePreset    = false;
+    bool               toggleRc2Smooth     = false;
+    bool               trimLeftStep        = false;
+    bool               trimRightStep       = false;
+    bool               trimReset           = false;
     bool               toggleLeftReverse   = false;
     bool               toggleRightReverse  = false;
     bool               i2cScanRequested    = false;

@@ -462,6 +462,113 @@ void test_servo_bounds_and_ps2_presets(void) {
     TEST_ASSERT_EQUAL_INT16(Config::kRc1L2Deg, servos.rc1Deg);
 }
 
+void test_square_push_ground_toggle_and_l1_r1_override(void) {
+    TEST_ASSERT_EQUAL_INT16(30, Config::kRc3SquareDeg);
+    TEST_ASSERT_EQUAL_INT16(30, Config::kRc4SquareDeg);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT16(Config::kServoMinDeg, Config::kRc3SquareDeg);
+    TEST_ASSERT_LESS_OR_EQUAL_INT16(Config::kServoMaxDeg, Config::kRc3SquareDeg);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT16(Config::kServoMinDeg, Config::kRc4SquareDeg);
+    TEST_ASSERT_LESS_OR_EQUAL_INT16(Config::kServoMaxDeg, Config::kRc4SquareDeg);
+
+    ServoTargets      servos{};
+    FrontArmPushState push{};
+
+    // Raw PS2 packet for Square pressed (buttons2 bit 7 active-low = 0x7F)
+    uint8_t rawSq[9] = {0xFFU, 0x73U, 0x5AU, 0xFFU, 0x7FU, 128U, 128U, 128U, 128U};
+    Ps2Frame fSquare{};
+    RobotLogic::decodePs2Payload(rawSq, fSquare);
+    TEST_ASSERT_TRUE(RobotLogic::isPs2FrameValid(fSquare));
+    TEST_ASSERT_TRUE(fSquare.square);
+
+    Ps2Frame idle = makeValidFrame();
+
+    // 1. From boot init (180, 180): 1st Square press activates push-ground (30, 30)
+    RobotLogic::updateServoTargetsFromPs2(fSquare, servos, true, &push);
+    TEST_ASSERT_TRUE(push.active);
+    TEST_ASSERT_TRUE(push.prevSquare);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc3InitDeg, push.savedRc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4InitDeg, push.savedRc4Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc3SquareDeg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4SquareDeg, servos.rc4Deg);
+
+    // Holding Square across additional ticks must NOT re-toggle
+    RobotLogic::updateServoTargetsFromPs2(fSquare, servos, true, &push);
+    TEST_ASSERT_TRUE(push.active);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc3SquareDeg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4SquareDeg, servos.rc4Deg);
+
+    // Releasing Square latches (30, 30)
+    RobotLogic::updateServoTargetsFromPs2(idle, servos, true, &push);
+    TEST_ASSERT_TRUE(push.active);
+    TEST_ASSERT_FALSE(push.prevSquare);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc3SquareDeg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4SquareDeg, servos.rc4Deg);
+
+    // 2. 2nd Square press cancels and restores previous (180, 180)
+    RobotLogic::updateServoTargetsFromPs2(fSquare, servos, true, &push);
+    TEST_ASSERT_FALSE(push.active);
+    TEST_ASSERT_TRUE(push.prevSquare);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc3InitDeg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4InitDeg, servos.rc4Deg);
+
+    RobotLogic::updateServoTargetsFromPs2(idle, servos, true, &push);
+    TEST_ASSERT_FALSE(push.prevSquare);
+
+    // 3. From L1 (70, 70): 1st Square -> (30, 30), 2nd Square -> (70, 70)
+    Ps2Frame fL1 = makeValidFrame();
+    fL1.l1 = true;
+    RobotLogic::updateServoTargetsFromPs2(fL1, servos, true, &push);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc3L1Deg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4L1Deg, servos.rc4Deg);
+
+    RobotLogic::updateServoTargetsFromPs2(fSquare, servos, true, &push);
+    TEST_ASSERT_TRUE(push.active);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc3SquareDeg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4SquareDeg, servos.rc4Deg);
+
+    RobotLogic::updateServoTargetsFromPs2(idle, servos, true, &push);
+    RobotLogic::updateServoTargetsFromPs2(fSquare, servos, true, &push);
+    TEST_ASSERT_FALSE(push.active);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc3L1Deg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4L1Deg, servos.rc4Deg);
+    RobotLogic::updateServoTargetsFromPs2(idle, servos, true, &push);
+
+    // 4. R1 override while push is active clears active state cleanly
+    Ps2Frame fR1 = makeValidFrame();
+    fR1.r1 = true;
+    RobotLogic::updateServoTargetsFromPs2(fSquare, servos, true, &push);
+    TEST_ASSERT_TRUE(push.active);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc3SquareDeg, servos.rc3Deg);
+
+    RobotLogic::updateServoTargetsFromPs2(fR1, servos, true, &push);
+    TEST_ASSERT_FALSE(push.active);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc3R1Deg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4R1Deg, servos.rc4Deg);
+
+    // Next Square press is a fresh 1st press: saves R1 (140, 140) and goes to (30, 30)
+    RobotLogic::updateServoTargetsFromPs2(fSquare, servos, true, &push);
+    TEST_ASSERT_TRUE(push.active);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc3R1Deg, push.savedRc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4R1Deg, push.savedRc4Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc3SquareDeg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4SquareDeg, servos.rc4Deg);
+    RobotLogic::updateServoTargetsFromPs2(idle, servos, true, &push);
+
+    // 5. Simultaneous L1 + Square: L1 wins, active cleared, and releasing L1 while holding Square does not re-trigger
+    Ps2Frame fBoth = fL1;
+    fBoth.square = true;
+    RobotLogic::updateServoTargetsFromPs2(fBoth, servos, true, &push);
+    TEST_ASSERT_FALSE(push.active);
+    TEST_ASSERT_TRUE(push.prevSquare);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc3L1Deg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4L1Deg, servos.rc4Deg);
+
+    RobotLogic::updateServoTargetsFromPs2(fSquare, servos, true, &push);
+    TEST_ASSERT_FALSE(push.active);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc3L1Deg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4L1Deg, servos.rc4Deg);
+}
+
 // ============================================================================
 // 4. Battery Sag & Hysteresis Tests
 // ============================================================================
@@ -1220,6 +1327,408 @@ void test_serial_speed_batching_timeout_and_estop_interrupt(void) {
     sc.printSnapshot(snap);
     TEST_ASSERT_NOT_NULL(strstr(NativeSerial::output(), "[STAT] READY"));
     TEST_ASSERT_NOT_NULL(strstr(NativeSerial::output(), "oled=0x3D(ok=1"));
+
+    snap.activeSource = ControlSource::Auto;
+    NativeSerial::reset();
+    sc.printSnapshot(snap);
+    TEST_ASSERT_NOT_NULL(strstr(NativeSerial::output(), "src=AUTO"));
+}
+
+void test_auto_mode_triangle_start_and_cross_exit(void) {
+    // Starts ONLY on a rising Triangle press while Ready, PS2 Operational, valid frame, and X clear.
+    TEST_ASSERT_TRUE(RobotLogic::shouldStartAutoMode(true, true, true, true, false, false));
+
+    // Must NOT start if held from previous tick (edge trigger), ESTOP, disconnected/sync, invalid, or X held.
+    TEST_ASSERT_FALSE(RobotLogic::shouldStartAutoMode(true, true, true, true, true, false));
+    TEST_ASSERT_FALSE(RobotLogic::shouldStartAutoMode(false, true, true, true, false, false));
+    TEST_ASSERT_FALSE(RobotLogic::shouldStartAutoMode(true, false, true, true, false, false));
+    TEST_ASSERT_FALSE(RobotLogic::shouldStartAutoMode(true, true, false, true, false, false));
+    TEST_ASSERT_FALSE(RobotLogic::shouldStartAutoMode(true, true, true, false, false, false));
+    TEST_ASSERT_FALSE(RobotLogic::shouldStartAutoMode(true, true, true, true, false, true));
+
+    // Auto exit aborts ONLY on a valid frame with Cross (X) pressed.
+    TEST_ASSERT_TRUE(RobotLogic::shouldAbortAutoMode(true, true));
+    TEST_ASSERT_FALSE(RobotLogic::shouldAbortAutoMode(false, true));
+    TEST_ASSERT_FALSE(RobotLogic::shouldAbortAutoMode(true, false));
+
+    // End-to-end PS2 active-low raw packet decoding for Triangle (bit 4 = 0xEF) & Cross (bit 6 = 0xBF).
+    uint8_t rawTri[9] = {0xFF, 0x73, 0x5A, 0xFF, 0xEF, 0x80, 0x80, 0x80, 0x80};
+    Ps2Frame fTri{};
+    RobotLogic::decodePs2Payload(rawTri, fTri);
+    TEST_ASSERT_TRUE(RobotLogic::isPs2FrameValid(fTri));
+    TEST_ASSERT_TRUE(fTri.triangle);
+    TEST_ASSERT_FALSE(fTri.cross);
+    TEST_ASSERT_TRUE(RobotLogic::shouldStartAutoMode(true, true, true, fTri.triangle, false, fTri.cross));
+    TEST_ASSERT_FALSE(RobotLogic::shouldAbortAutoMode(true, fTri.cross));
+
+    uint8_t rawCross[9] = {0xFF, 0x73, 0x5A, 0xFF, 0xBF, 0x80, 0x80, 0x80, 0x80};
+    Ps2Frame fCross{};
+    RobotLogic::decodePs2Payload(rawCross, fCross);
+    TEST_ASSERT_TRUE(RobotLogic::isPs2FrameValid(fCross));
+    TEST_ASSERT_TRUE(fCross.cross);
+    TEST_ASSERT_FALSE(fCross.triangle);
+    TEST_ASSERT_TRUE(RobotLogic::shouldAbortAutoMode(true, fCross.cross));
+
+    // Simultaneous Triangle + Cross: Cross wins (never enter Auto).
+    uint8_t rawBoth[9] = {0xFF, 0x73, 0x5A, 0xFF, 0xAF, 0x80, 0x80, 0x80, 0x80};
+    Ps2Frame fBoth{};
+    RobotLogic::decodePs2Payload(rawBoth, fBoth);
+    TEST_ASSERT_TRUE(RobotLogic::isPs2FrameValid(fBoth));
+    TEST_ASSERT_FALSE(RobotLogic::shouldStartAutoMode(true, true, true, fBoth.triangle, false, fBoth.cross));
+    TEST_ASSERT_TRUE(RobotLogic::shouldAbortAutoMode(true, fBoth.cross));
+}
+
+// ============================================================================
+// 9. Physics Kinodynamic & Electromechanical Models + Competition Controls
+// ============================================================================
+
+void test_cubic_expo_shaping_symmetry_and_bounds(void) {
+    // Zero and full +/-100% fixed points for any expo percentage
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::applyCubicExpo(0, 0U));
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::applyCubicExpo(0, 50U));
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::applyCubicExpo(0, 100U));
+    TEST_ASSERT_EQUAL_INT16(100, RobotLogic::applyCubicExpo(100, 35U));
+    TEST_ASSERT_EQUAL_INT16(-100, RobotLogic::applyCubicExpo(-100, 35U));
+    TEST_ASSERT_EQUAL_INT16(100, RobotLogic::applyCubicExpo(100, 100U));
+    TEST_ASSERT_EQUAL_INT16(-100, RobotLogic::applyCubicExpo(-100, 100U));
+
+    // 0% expo is pure linear identity
+    TEST_ASSERT_EQUAL_INT16(42, RobotLogic::applyCubicExpo(42, 0U));
+    TEST_ASSERT_EQUAL_INT16(-42, RobotLogic::applyCubicExpo(-42, 0U));
+
+    // At 40% expo and x = 50: 0.6*50 + 0.4*(125000/10000) = 30 + 5 = 35 (< 50 -> softer center)
+    TEST_ASSERT_EQUAL_INT16(35, RobotLogic::applyCubicExpo(50, 40U));
+    TEST_ASSERT_EQUAL_INT16(-35, RobotLogic::applyCubicExpo(-50, 40U));
+
+    // Strict odd symmetry and monotonicity across [-100, 100]
+    int16_t prev = -100;
+    for (int16_t x = -100; x <= 100; ++x) {
+        const int16_t yPos = RobotLogic::applyCubicExpo(x, Config::kThrottleExpoPct);
+        const int16_t yNeg = RobotLogic::applyCubicExpo(static_cast<int16_t>(-x), Config::kThrottleExpoPct);
+        TEST_ASSERT_EQUAL_INT16(yPos, static_cast<int16_t>(-yNeg));
+        TEST_ASSERT_GREATER_OR_EQUAL_INT16(prev, yPos);
+        prev = yPos;
+    }
+}
+
+void test_centripetal_traction_limiter_and_pivot_authority(void) {
+    // Standstill (v = 0) preserves 100% pivot turn authority
+    TEST_ASSERT_EQUAL_INT16(100, RobotLogic::limitCentripetalTurn(0, 100, 50));
+    TEST_ASSERT_EQUAL_INT16(-100, RobotLogic::limitCentripetalTurn(0, -100, 50));
+
+    // Low speed within traction circle (|v * w| / 100 = 40 * 80 / 100 = 32 <= 50) -> unthrottled
+    TEST_ASSERT_EQUAL_INT16(80, RobotLogic::limitCentripetalTurn(40, 80, 50));
+    TEST_ASSERT_EQUAL_INT16(-80, RobotLogic::limitCentripetalTurn(-40, -80, 50));
+
+    // High speed exceeding traction circle (v = 100, w = 80 -> a_c = 80 > 50) -> capped to 50
+    TEST_ASSERT_EQUAL_INT16(50, RobotLogic::limitCentripetalTurn(100, 80, 50));
+    TEST_ASSERT_EQUAL_INT16(-50, RobotLogic::limitCentripetalTurn(100, -80, 50));
+    TEST_ASSERT_EQUAL_INT16(62, RobotLogic::limitCentripetalTurn(80, 90, 50)); // 5000 / 80 = 62
+
+    // Zero or negative maxLatAccel safely zeroes turn
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::limitCentripetalTurn(50, 50, 0));
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::limitCentripetalTurn(50, 50, -10));
+}
+
+void test_com_elevation_dynamic_scaling(void) {
+    // Lowered arm (140..180 deg) has lowest CoM -> 100% full dynamic scale
+    TEST_ASSERT_EQUAL_UINT8(100U, RobotLogic::computeCoMDynamicScale(180));
+    TEST_ASSERT_EQUAL_UINT8(100U, RobotLogic::computeCoMDynamicScale(140));
+
+    // Fully raised arm (0 deg) has highest CoM -> kCoMHighMinScalePct (65%)
+    TEST_ASSERT_EQUAL_UINT8(Config::kCoMHighMinScalePct, RobotLogic::computeCoMDynamicScale(0));
+
+    // Mid-height arm (70 deg) scales halfway between 65% and 100% (~83%)
+    const uint8_t midScale = RobotLogic::computeCoMDynamicScale(70);
+    TEST_ASSERT_GREATER_THAN_UINT8(Config::kCoMHighMinScalePct, midScale);
+    TEST_ASSERT_LESS_THAN_UINT8(100U, midScale);
+}
+
+void test_2dof_kinodynamic_slew_and_coulomb_stiction(void) {
+    // Coulomb stiction feedforward: 0 stays 0, +/-1 jumps immediately to +/-12%, +/-100 stays +/-100%
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::applyCoulombStiction(0, 12, 100));
+    TEST_ASSERT_EQUAL_INT16(12, RobotLogic::applyCoulombStiction(1, 12, 100));
+    TEST_ASSERT_EQUAL_INT16(-12, RobotLogic::applyCoulombStiction(-1, 12, 100));
+    TEST_ASSERT_EQUAL_INT16(100, RobotLogic::applyCoulombStiction(100, 12, 100));
+    TEST_ASSERT_EQUAL_INT16(-100, RobotLogic::applyCoulombStiction(-100, 12, 100));
+    TEST_ASSERT_EQUAL_INT16(55, RobotLogic::applyCoulombStiction(55, 12, 55));
+
+    // 2-DOF Slew: pure straight acceleration (linAccel=25, angAccel=35) steps both wheels by 25
+    const DriveOutput fwdStep = RobotLogic::apply2DofKinodynamicSlew(100, 100, 0, 0, 25, 50, 35, 60);
+    TEST_ASSERT_EQUAL_INT16(25, fwdStep.left);
+    TEST_ASSERT_EQUAL_INT16(25, fwdStep.right);
+
+    // 2-DOF Slew: pure pivot turn (v=0, w=+100) uses rotational slew step (angAccel=35)
+    const DriveOutput rotStep = RobotLogic::apply2DofKinodynamicSlew(100, -100, 0, 0, 25, 50, 35, 60);
+    TEST_ASSERT_EQUAL_INT16(35, rotStep.left);
+    TEST_ASSERT_EQUAL_INT16(-35, rotStep.right);
+
+    // 2-DOF Slew: turning while holding constant forward velocity v=60 (from 60,60 to 90,30 -> v=60, w=30)
+    // preserves exact forward speed v=60 while slewing angular rate w!
+    const DriveOutput curveStep = RobotLogic::apply2DofKinodynamicSlew(90, 30, 60, 60, 20, 40, 15, 30);
+    TEST_ASSERT_EQUAL_INT16(60, static_cast<int16_t>((curveStep.left + curveStep.right) / 2));
+    TEST_ASSERT_EQUAL_INT16(75, curveStep.left);
+    TEST_ASSERT_EQUAL_INT16(45, curveStep.right);
+}
+
+void test_kinodynamic_drive_reverse_front_and_dpad_micro_turn(void) {
+    // Normal front vs Reverse front (R3 toggle): pushing stick UP (lyRaw=0) drives forward (+,+),
+    // while reverseDrive=true drives backward (-,-) so rear gripper acts as the front!
+    const DriveOutput normFwd = RobotLogic::computeKinodynamicDrive(
+        0U, 128U, 0, 0, 100, 100, 100, 100U, 140, false, false, false);
+    const DriveOutput revFwd = RobotLogic::computeKinodynamicDrive(
+        0U, 128U, 0, 0, 100, 100, 100, 100U, 140, true, false, false);
+    TEST_ASSERT_EQUAL_INT16(100, normFwd.left);
+    TEST_ASSERT_EQUAL_INT16(100, normFwd.right);
+    TEST_ASSERT_EQUAL_INT16(-100, revFwd.left);
+    TEST_ASSERT_EQUAL_INT16(-100, revFwd.right);
+
+    // D-Pad Left/Right micro-turn alignment when stick is centered (lyRaw=128, rxRaw=128)
+    const DriveOutput nudgeRight = RobotLogic::computeKinodynamicDrive(
+        128U, 128U, 0, 0, 100, 100, 100, 100U, 140, false, false, true);
+    const DriveOutput nudgeLeft = RobotLogic::computeKinodynamicDrive(
+        128U, 128U, 0, 0, 100, 100, 100, 100U, 140, false, true, false);
+    TEST_ASSERT_EQUAL_INT16(Config::kMicroTurnPower, nudgeRight.left);
+    TEST_ASSERT_EQUAL_INT16(static_cast<int16_t>(-Config::kMicroTurnPower), nudgeRight.right);
+    TEST_ASSERT_EQUAL_INT16(static_cast<int16_t>(-Config::kMicroTurnPower), nudgeLeft.left);
+    TEST_ASSERT_EQUAL_INT16(Config::kMicroTurnPower, nudgeLeft.right);
+}
+
+void test_precision_mode_full_stick_scaling_and_micro_turn(void) {
+    // 1. Full stick throw (lyRaw=0) in Precision Mode scales smoothly to kPrecisionMaxPower (55%)
+    const DriveOutput precFull = RobotLogic::computeKinodynamicDrive(
+        0U, 128U, 0, 0, Config::kMotorMaxPower, 100, 100, 100U, 140, false, false, false, 0, true);
+    TEST_ASSERT_EQUAL_INT16(Config::kPrecisionMaxPower, precFull.left);
+    TEST_ASSERT_EQUAL_INT16(Config::kPrecisionMaxPower, precFull.right);
+
+    // 2. Full-range proportional scaling: outer stick travel remains responsive (50% < 80% < 100%),
+    //    avoiding early flat-top saturation, and mid-stick is gentler than Normal mode.
+    const DriveOutput normMid = RobotLogic::computeKinodynamicDrive(
+        64U, 128U, 0, 0, Config::kMotorMaxPower, 100, 100, 100U, 140, false, false, false, 0, false);
+    const DriveOutput precMid = RobotLogic::computeKinodynamicDrive(
+        64U, 128U, 0, 0, Config::kMotorMaxPower, 100, 100, 100U, 140, false, false, false, 0, true);
+    const DriveOutput precHigh = RobotLogic::computeKinodynamicDrive(
+        22U, 128U, 0, 0, Config::kMotorMaxPower, 100, 100, 100U, 140, false, false, false, 0, true);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT16(Config::kMotorStictionMinPower, precMid.left);
+    TEST_ASSERT_LESS_THAN_INT16(normMid.left, precMid.left);
+    TEST_ASSERT_GREATER_THAN_INT16(precMid.left, precHigh.left);
+    TEST_ASSERT_GREATER_THAN_INT16(precHigh.left, precFull.left);
+
+    // 3. Pure pivot turn at full stick (rxRaw=255) steps by angular slew (35) then reaches +/-55%
+    const DriveOutput precPivot1 = RobotLogic::computeKinodynamicDrive(
+        128U, 255U, 0, 0, Config::kMotorMaxPower, 100, 100, 100U, 140, false, false, false, 0, true);
+    TEST_ASSERT_EQUAL_INT16(Config::kAngularAccelSlewStep, precPivot1.left);
+    TEST_ASSERT_EQUAL_INT16(static_cast<int16_t>(-Config::kAngularAccelSlewStep), precPivot1.right);
+    const DriveOutput precPivot2 = RobotLogic::computeKinodynamicDrive(
+        128U, 255U, precPivot1.left, precPivot1.right, Config::kMotorMaxPower, 100, 100, 100U, 140, false, false, false, 0, true);
+    TEST_ASSERT_EQUAL_INT16(Config::kPrecisionMaxPower, precPivot2.left);
+    TEST_ASSERT_EQUAL_INT16(static_cast<int16_t>(-Config::kPrecisionMaxPower), precPivot2.right);
+
+    // 4. Precision Micro-Turn (D-Pad Left/Right) pivots at exact +/-18% (finer than 26% normal)
+    const DriveOutput precNudgeR = RobotLogic::computeKinodynamicDrive(
+        128U, 128U, 0, 0, Config::kMotorMaxPower, 100, 100, 100U, 140, false, false, true, 0, true);
+    const DriveOutput precNudgeL = RobotLogic::computeKinodynamicDrive(
+        128U, 128U, 0, 0, Config::kMotorMaxPower, 100, 100, 100U, 140, false, true, false, 0, true);
+    TEST_ASSERT_EQUAL_INT16(Config::kPrecisionMicroTurnPower, precNudgeR.left);
+    TEST_ASSERT_EQUAL_INT16(static_cast<int16_t>(-Config::kPrecisionMicroTurnPower), precNudgeR.right);
+    TEST_ASSERT_EQUAL_INT16(static_cast<int16_t>(-Config::kPrecisionMicroTurnPower), precNudgeL.left);
+    TEST_ASSERT_EQUAL_INT16(Config::kPrecisionMicroTurnPower, precNudgeL.right);
+
+    // 5. Lower battery sag cap (e.g. 35%) overrides Precision Mode's 55% ceiling safely
+    const DriveOutput sagCapped = RobotLogic::computeKinodynamicDrive(
+        0U, 128U, 0, 0, 35, 100, 100, 100U, 140, false, false, false, 0, true);
+    TEST_ASSERT_EQUAL_INT16(35, sagCapped.left);
+    TEST_ASSERT_EQUAL_INT16(35, sagCapped.right);
+
+    // 6. Telemetry snapshot reports prec=1 when active
+    SystemSnapshot snap{};
+    snap.precisionMode = true;
+    SerialControl sc;
+    NativeSerial::reset();
+    sc.printSnapshot(snap);
+    TEST_ASSERT_NOT_NULL(strstr(NativeSerial::output(), "prec=1"));
+}
+
+void test_circle_pose_preset_and_serial_competition_shortcuts(void) {
+    ServoTargets      servos{};
+    FrontArmPushState pushState{};
+    ArmPosePresetState poseState{};
+
+    // First Circle rising edge -> Drop/Place preset (RC1=145, RC2=140)
+    Ps2Frame fCircle = makeValidFrame();
+    fCircle.circle   = true;
+    RobotLogic::updateServoTargetsFromPs2(fCircle, servos, false, &pushState, &poseState);
+    TEST_ASSERT_TRUE(poseState.dropActive);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc1PresetDropDeg, servos.rc1Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc2PresetDropDeg, servos.rc2Deg);
+
+    // Holding Circle does not re-toggle
+    RobotLogic::updateServoTargetsFromPs2(fCircle, servos, false, &pushState, &poseState);
+    TEST_ASSERT_TRUE(poseState.dropActive);
+
+    // Release and press Circle again -> Hold/Carry preset (RC1=75, RC2=70)
+    Ps2Frame fIdle = makeValidFrame();
+    RobotLogic::updateServoTargetsFromPs2(fIdle, servos, false, &pushState, &poseState);
+    RobotLogic::updateServoTargetsFromPs2(fCircle, servos, false, &pushState, &poseState);
+    TEST_ASSERT_FALSE(poseState.dropActive);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc1PresetHoldDeg, servos.rc1Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc2PresetHoldDeg, servos.rc2Deg);
+
+    // Verify new Serial competition shortcuts: 'g' (Auto), 'z' (Precision), 'b' (Reverse), 'q' (Pose)
+    SerialControl sc;
+    SerialActions act{};
+    NativeSerial::feed("gzbq");
+    sc.poll(5000UL, 65, act);
+    TEST_ASSERT_TRUE(act.autoStartRequested);
+    TEST_ASSERT_TRUE(act.togglePrecision);
+    TEST_ASSERT_TRUE(act.toggleReverseDrive);
+    TEST_ASSERT_TRUE(act.togglePosePreset);
+}
+
+void test_rc2_smooth_servo_slew(void) {
+    // Slewing from 70 deg (Hold preset) toward 140 deg (Drop preset) at 6 deg/tick
+    int16_t cur = 70;
+    cur = RobotLogic::slewServoAngle(cur, 140, 6);
+    TEST_ASSERT_EQUAL_INT16(76, cur);
+
+    for (int i = 0; i < 11; ++i) {
+        cur = RobotLogic::slewServoAngle(cur, 140, 6);
+    }
+    TEST_ASSERT_EQUAL_INT16(140, cur);
+
+    // Slewing downward from 140 deg back to 70 deg
+    cur = RobotLogic::slewServoAngle(140, 70, 6);
+    TEST_ASSERT_EQUAL_INT16(134, cur);
+
+    // Clamping to [0, 180] and instant jump when maxStepDeg <= 0
+    TEST_ASSERT_EQUAL_INT16(180, RobotLogic::slewServoAngle(178, 220, 6));
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::slewServoAngle(3, -20, 6));
+    TEST_ASSERT_EQUAL_INT16(140, RobotLogic::slewServoAngle(70, 140, 0));
+}
+
+void test_motor_balance_trim_and_stepping(void) {
+    // Trim stepping clamps strictly to [-15, +15]%
+    int8_t trim = 0;
+    for (int i = 0; i < 25; ++i) {
+        trim = RobotLogic::stepMotorTrim(trim, 1);
+    }
+    TEST_ASSERT_EQUAL_INT8(Config::kMaxMotorTrimPct, trim);
+
+    for (int i = 0; i < 50; ++i) {
+        trim = RobotLogic::stepMotorTrim(trim, -1);
+    }
+    TEST_ASSERT_EQUAL_INT8(static_cast<int8_t>(-Config::kMaxMotorTrimPct), trim);
+
+    // Positive trim (+10%) attenuates Right wheel by 10% (100 -> 90)
+    int16_t l = 100;
+    int16_t r = 100;
+    RobotLogic::applyMotorBalanceTrim(l, r, 10);
+    TEST_ASSERT_EQUAL_INT16(100, l);
+    TEST_ASSERT_EQUAL_INT16(90, r);
+
+    // Negative trim (-10%) attenuates Left wheel by 10% (-100 -> -90)
+    l = -100;
+    r = -100;
+    RobotLogic::applyMotorBalanceTrim(l, r, -10);
+    TEST_ASSERT_EQUAL_INT16(-90, l);
+    TEST_ASSERT_EQUAL_INT16(-100, r);
+
+    // Verify integration in computeKinodynamicDrive at full forward throttle
+    const DriveOutput trimmedDrive = RobotLogic::computeKinodynamicDrive(
+        0U, 128U, 100, 100, 100, 100, 100, 100U, 140, false, false, false, 10);
+    TEST_ASSERT_EQUAL_INT16(100, trimmedDrive.left);
+    TEST_ASSERT_LESS_THAN_INT16(100, trimmedDrive.right);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT16(90, trimmedDrive.right);
+}
+
+void test_persistent_config_crc16_pack_unpack(void) {
+    PersistentConfig src{};
+    src.leftReversed     = true;
+    src.rightReversed    = false;
+    src.precisionMode    = true;
+    src.rc2SmoothEnabled = false;
+    src.motorTrimPct     = -7;
+
+    uint8_t raw[8]{};
+    RobotLogic::packPersistentConfig(src, raw);
+
+    PersistentConfig dst{};
+    TEST_ASSERT_TRUE(RobotLogic::unpackPersistentConfig(raw, dst));
+    TEST_ASSERT_TRUE(dst.leftReversed);
+    TEST_ASSERT_FALSE(dst.rightReversed);
+    TEST_ASSERT_TRUE(dst.precisionMode);
+    TEST_ASSERT_FALSE(dst.rc2SmoothEnabled);
+    TEST_ASSERT_EQUAL_INT8(-7, dst.motorTrimPct);
+
+    // Corrupt 1 bit in CRC -> must reject
+    uint8_t badCrc[8];
+    memcpy(badCrc, raw, 8U);
+    badCrc[6] ^= 0x01U;
+    TEST_ASSERT_FALSE(RobotLogic::unpackPersistentConfig(badCrc, dst));
+
+    // Corrupt magic byte -> must reject
+    uint8_t badMagic[8];
+    memcpy(badMagic, raw, 8U);
+    badMagic[0] = 'X';
+    TEST_ASSERT_FALSE(RobotLogic::unpackPersistentConfig(badMagic, dst));
+
+    // Blank/uninitialized EEPROM (all 0xFF) -> must reject
+    const uint8_t blank[8] = {0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU};
+    TEST_ASSERT_FALSE(RobotLogic::unpackPersistentConfig(blank, dst));
+}
+
+void test_auto_encoder_stall_progress_logic(void) {
+    // Delta < 3 deg/counts -> stalled (false)
+    TEST_ASSERT_FALSE(RobotLogic::hasEncoderProgressed(100, 100, 3));
+    TEST_ASSERT_FALSE(RobotLogic::hasEncoderProgressed(100, 102, 3));
+    TEST_ASSERT_FALSE(RobotLogic::hasEncoderProgressed(100, 98, 3));
+
+    // Delta >= 3 deg/counts (forward or reverse) -> progressing (true)
+    TEST_ASSERT_TRUE(RobotLogic::hasEncoderProgressed(100, 103, 3));
+    TEST_ASSERT_TRUE(RobotLogic::hasEncoderProgressed(100, 97, 3));
+    TEST_ASSERT_TRUE(RobotLogic::hasEncoderProgressed(-500, -510, 3));
+}
+
+void test_serial_phase2_trim_and_rc2_smooth_keys(void) {
+    SerialControl sc;
+    SerialActions act{};
+
+    NativeSerial::feed(",.0y");
+    sc.poll(6000UL, 65, act);
+    TEST_ASSERT_TRUE(act.trimLeftStep);
+    TEST_ASSERT_TRUE(act.trimRightStep);
+    TEST_ASSERT_TRUE(act.trimReset);
+    TEST_ASSERT_TRUE(act.toggleRc2Smooth);
+}
+
+void test_servo_direction_inversion(void) {
+    // Non-inverted preserves logical angle and clamps out-of-range inputs
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::applyServoDirection(0, false));
+    TEST_ASSERT_EQUAL_INT16(30, RobotLogic::applyServoDirection(30, false));
+    TEST_ASSERT_EQUAL_INT16(70, RobotLogic::applyServoDirection(70, false));
+    TEST_ASSERT_EQUAL_INT16(140, RobotLogic::applyServoDirection(140, false));
+    TEST_ASSERT_EQUAL_INT16(180, RobotLogic::applyServoDirection(180, false));
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::applyServoDirection(-20, false));
+    TEST_ASSERT_EQUAL_INT16(180, RobotLogic::applyServoDirection(220, false));
+
+    // Inverted mirrors deg -> (180 - deg) after clamping
+    TEST_ASSERT_EQUAL_INT16(180, RobotLogic::applyServoDirection(0, true));
+    TEST_ASSERT_EQUAL_INT16(150, RobotLogic::applyServoDirection(30, true));
+    TEST_ASSERT_EQUAL_INT16(110, RobotLogic::applyServoDirection(70, true));
+    TEST_ASSERT_EQUAL_INT16(40, RobotLogic::applyServoDirection(140, true));
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::applyServoDirection(180, true));
+    TEST_ASSERT_EQUAL_INT16(180, RobotLogic::applyServoDirection(-20, true));
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::applyServoDirection(220, true));
+
+    // Round-trip involution (used when syncing Auto hardware angle back to Manual logical target)
+    TEST_ASSERT_EQUAL_INT16(70, RobotLogic::applyServoDirection(RobotLogic::applyServoDirection(70, true), true));
+    TEST_ASSERT_EQUAL_INT16(180, RobotLogic::applyServoDirection(RobotLogic::applyServoDirection(180, true), true));
+
+    // Config constants remain within valid servo range after direction mapping
+    const int16_t rc3InitHw = RobotLogic::applyServoDirection(Config::kRc3InitDeg, Config::kRc3InvertDir);
+    const int16_t rc4InitHw = RobotLogic::applyServoDirection(Config::kRc4InitDeg, Config::kRc4InvertDir);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc3InvertDir ? 0 : 180, rc3InitHw);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4InvertDir ? 0 : 180, rc4InitHw);
 }
 
 // ============================================================================
@@ -1246,6 +1755,7 @@ int main(int argc, char** argv) {
     RUN_TEST(test_failsafe_burst_glitch_absorption_and_trip);
     RUN_TEST(test_failsafe_persistent_loss_disconnect_and_reinit_cooldown);
     RUN_TEST(test_servo_bounds_and_ps2_presets);
+    RUN_TEST(test_square_push_ground_toggle_and_l1_r1_override);
 
     // 4. Battery Sag & Hysteresis
     RUN_TEST(test_battery_stabilizer_multiprofile_baselines);
@@ -1265,6 +1775,26 @@ int main(int argc, char** argv) {
     RUN_TEST(test_serial_direct_motor_bounds_and_garbage_rejection);
     RUN_TEST(test_serial_servo_commands_and_flip_exact_match);
     RUN_TEST(test_serial_speed_batching_timeout_and_estop_interrupt);
+
+    // 8. Auto Mode Trigger & Abort Logic
+    RUN_TEST(test_auto_mode_triangle_start_and_cross_exit);
+
+    // 9. Physics Kinodynamic & Electromechanical Models + Competition Controls
+    RUN_TEST(test_cubic_expo_shaping_symmetry_and_bounds);
+    RUN_TEST(test_centripetal_traction_limiter_and_pivot_authority);
+    RUN_TEST(test_com_elevation_dynamic_scaling);
+    RUN_TEST(test_2dof_kinodynamic_slew_and_coulomb_stiction);
+    RUN_TEST(test_kinodynamic_drive_reverse_front_and_dpad_micro_turn);
+    RUN_TEST(test_precision_mode_full_stick_scaling_and_micro_turn);
+    RUN_TEST(test_circle_pose_preset_and_serial_competition_shortcuts);
+
+    // 10. Phase 2: RC2 Smooth Trajectory, Motor Trim, EEPROM CRC-16, Auto Stall Detection
+    RUN_TEST(test_rc2_smooth_servo_slew);
+    RUN_TEST(test_motor_balance_trim_and_stepping);
+    RUN_TEST(test_persistent_config_crc16_pack_unpack);
+    RUN_TEST(test_auto_encoder_stall_progress_logic);
+    RUN_TEST(test_serial_phase2_trim_and_rc2_smooth_keys);
+    RUN_TEST(test_servo_direction_inversion);
 
     return UNITY_END();
 }

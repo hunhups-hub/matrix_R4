@@ -13,7 +13,8 @@ enum class LinkState : uint8_t {
 enum class ControlSource : uint8_t {
     None = 0,
     Ps2,
-    SerialCmd
+    SerialCmd,
+    Auto
 };
 
 enum class SystemState : uint8_t {
@@ -77,14 +78,37 @@ struct ServoTargets {
     int16_t rc4Deg = Config::kRc4InitDeg;
 };
 
+struct FrontArmPushState {
+    bool    active      = false;
+    bool    prevSquare  = false;
+    int16_t savedRc3Deg = Config::kRc3InitDeg;
+    int16_t savedRc4Deg = Config::kRc4InitDeg;
+};
+
+struct ArmPosePresetState {
+    bool dropActive = false;
+    bool prevCircle = false;
+};
+
+struct PersistentConfig {
+    bool   leftReversed     = Config::kMotorLeftReverseInit;
+    bool   rightReversed    = Config::kMotorRightReverseInit;
+    bool   precisionMode    = false;
+    bool   rc2SmoothEnabled = Config::kRc2SmoothDefault;
+    int8_t motorTrimPct     = 0;
+};
+
 struct ButtonEvents {
-    bool  upPressed         = false;
-    bool  downPressed       = false;
-    bool  shortUp           = false;
-    bool  shortDown         = false;
-    bool  comboHolding      = false;
-    float uploadHoldRatio   = 0.0f;
-    bool  uploadRequested   = false;
+    bool  upPressed          = false;
+    bool  downPressed        = false;
+    bool  shortUp            = false;
+    bool  shortDown          = false;
+    bool  comboHolding       = false;
+    float uploadHoldRatio    = 0.0f;
+    bool  uploadRequested    = false;
+    bool  autoHolding        = false;
+    float autoHoldRatio      = 0.0f;
+    bool  autoStartRequested = false;
 };
 
 struct SerialDriveCommand {
@@ -104,11 +128,16 @@ struct SystemSnapshot {
     bool          ps2Glitching   = false;
     ControlSource activeSource   = ControlSource::None;
     bool          precisionMode  = false;
-    bool          leftReversed   = Config::kMotorLeftReverseInit;
-    bool          rightReversed  = Config::kMotorRightReverseInit;
-    int16_t       serialSpeedPct = Config::kSerialDefaultSpeed;
+    bool          reverseDrive   = false;
+    bool          leftReversed     = Config::kMotorLeftReverseInit;
+    bool          rightReversed    = Config::kMotorRightReverseInit;
+    int8_t        motorTrimPct     = 0;
+    bool          rc2SmoothEnabled = Config::kRc2SmoothDefault;
+    bool          holdBrakeActive  = false;
+    int16_t       serialSpeedPct   = Config::kSerialDefaultSpeed;
     DriveOutput   drive{};
     ServoTargets  servos{};
+    uint8_t       comScalePct    = 100U;
     float         battVolt       = 0.0f;
     uint8_t       battPct        = 0U;
     bool          extPower       = false;
@@ -129,5 +158,8 @@ struct SystemSnapshot {
     uint8_t       oledErr3c      = 0xFF;
     bool          comboHolding   = false;
     float         uploadHoldPct  = 0.0f;
+    bool          autoHolding    = false;
+    float         autoHoldPct    = 0.0f;
+    uint32_t      autoElapsedMs  = 0UL;
     uint8_t       servoRangeErr  = 0U;
 };

@@ -171,10 +171,11 @@ const char* linkStateStr(LinkState s) {
 
 const char* sourceStr(ControlSource s) {
     switch (s) {
-        case ControlSource::None:   return "IDLE";
-        case ControlSource::Ps2:    return "PS2";
+        case ControlSource::None:      return "IDLE";
+        case ControlSource::Ps2:       return "PS2";
         case ControlSource::SerialCmd: return "SERIAL";
-        default:                    return "?";
+        case ControlSource::Auto:      return "AUTO";
+        default:                       return "?";
     }
 }
 
@@ -210,11 +211,12 @@ void SerialControl::stopMotion() {
 void SerialControl::printHelp() {
     Serial.println(F("\n=== MATRIX Mini R4 Manual Control (115200) ==="));
     Serial.println(F("  w/s/a/d   : Drive Fwd/Back/Left/Right (auto-stops 650ms on release)"));
-    Serial.println(F("  Space / x : Instant STOP motors   | ! : ESTOP | r : Resume"));
-    Serial.println(F("  [ / ]     : Serial speed -/+ 15%  | f1 / f2 : Flip M1/M2 dir"));
-    Serial.println(F("  i / k     : Spare RC2 Up(-10)/Dn(+10) | j / l : Front RC3+RC4 L1(Dn)/R1(Up)"));
-    Serial.println(F("  o / p     : Aux RC1 180 / 120 deg | c <1..4> <deg> : Direct servo"));
-    Serial.println(F("  m <L> <R> : Direct M1/M2 (-100..100 for 2.5s)"));
+    Serial.println(F("  Space / x : Instant STOP motors   | ! : ESTOP | r : Resume | g : Run AUTO"));
+    Serial.println(F("  z / b     : Toggle Precision(55% session) / Reverse-Front | [ / ] : Speed -/+ 15%"));
+    Serial.println(F("  , / . / 0 : Motor Balance Trim L(-1%)/R(+1%)/Reset(0%) (saved to EEPROM)"));
+    Serial.println(F("  i / k / y : RC2 Up(-10)/Dn(+10)/Toggle Smooth RC2 | j / l : Front RC3+RC4"));
+    Serial.println(F("  o / p     : Aux RC1 0 / 180 deg | q : Toggle Hold/Drop | c <1..4> <deg>"));
+    Serial.println(F("  m <L> <R> : Direct M1/M2 (-100..100 for 2.5s) | f1 / f2 : Flip M1/M2 dir"));
     Serial.println(F("  t         : Toggle status stream | u : Enter Upload Bootloader | ? : Help\n"));
 }
 
@@ -222,7 +224,8 @@ void SerialControl::printBanner() {
     Serial.println(F("\n================================================"));
     Serial.println(F("  MATRIX Mini R4 Robot Firmware Ready"));
     Serial.println(F("  Drive: M1(L) + M2(R) | Servos: RC1..RC4"));
-    Serial.println(F("  PS2/MJ2: D2(4p) + D3(2p) | Upload: BTN UP+DOWN 2.5s or 'u'"));
+    Serial.println(F("  PS2/MJ2: D2(4p) + D3(2p) | Auto: Triangle=Start, X=Exit"));
+    Serial.println(F("  Upload: BTN UP+DOWN 2.5s or 'u'"));
     Serial.println(F("================================================"));
     printHelp();
 }
@@ -276,7 +279,15 @@ void SerialControl::printSnapshot(const SystemSnapshot& snap) {
     Serial.print(snap.leftReversed ? 1 : 0);
     Serial.print(',');
     Serial.print(snap.rightReversed ? 1 : 0);
-    Serial.print(F(") RC=("));
+    Serial.print(F(") trim="));
+    Serial.print(static_cast<int>(snap.motorTrimPct));
+    Serial.print(F("% prec="));
+    Serial.print(snap.precisionMode ? 1 : 0);
+    Serial.print(F(" brk="));
+    Serial.print(snap.holdBrakeActive ? 1 : 0);
+    Serial.print(F(" rc2Sm="));
+    Serial.print(snap.rc2SmoothEnabled ? 1 : 0);
+    Serial.print(F(" RC=("));
     Serial.print(snap.servos.rc1Deg);
     Serial.print(',');
     Serial.print(snap.servos.rc2Deg);
@@ -507,6 +518,38 @@ void SerialControl::poll(uint32_t nowMs, int16_t currentSpeedPct, SerialActions&
             case 'p':
             case 'P':
                 outActions.auxRetract = true;
+                break;
+            case 'q':
+            case 'Q':
+                outActions.togglePosePreset = true;
+                break;
+            case 'g':
+            case 'G':
+                activeMotion_                 = MotionMode::Stop;
+                outActions.autoStartRequested = true;
+                break;
+            case 'z':
+            case 'Z':
+                outActions.togglePrecision = true;
+                break;
+            case 'b':
+            case 'B':
+                outActions.toggleReverseDrive = true;
+                break;
+            case 'y':
+            case 'Y':
+                outActions.toggleRc2Smooth = true;
+                break;
+            case ',':
+            case '<':
+                outActions.trimLeftStep = true;
+                break;
+            case '.':
+            case '>':
+                outActions.trimRightStep = true;
+                break;
+            case '0':
+                outActions.trimReset = true;
                 break;
             case '[':
                 workingSpeedPct = RobotLogic::clamp16(

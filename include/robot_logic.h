@@ -39,16 +39,114 @@ DriveOutput computeDifferentialDrive(uint8_t lyRaw,
                                      int16_t decelSlewStep = Config::kMotorDecelSlewStep,
                                      uint8_t compPercent = 100U);
 
+/**
+ * Physics Model 1: Cubic polynomial input shaping u = (1 - a)*x + a*(x^3 / 100^2)
+ * Reduces jerk (da/dt) near stick center while preserving full +/-100% authority.
+ */
+int16_t applyCubicExpo(int16_t normVal, uint8_t expoPct = Config::kThrottleExpoPct);
+
+/**
+ * Physics Model 2: Unicycle centripetal traction circle limiter (|v * w| / 100 <= maxLatAccel).
+ * Prevents lateral wheel slip during high-speed cornering while keeping 100% pivot turn authority.
+ */
+int16_t limitCentripetalTurn(int16_t linearVel,
+                             int16_t angularVel,
+                             int16_t maxLatAccel = Config::kMaxCentripetalLatAccel);
+
+/**
+ * Physics Model 3: Center-of-Mass (CoM) dynamic pitch/anti-tip scale (65..100%)
+ * as lifting arm RC2 elevates from 140..180 deg (low CoM) toward 0 deg (high CoM).
+ */
+uint8_t computeCoMDynamicScale(int16_t rc2Deg);
+
+/**
+ * Physics Model 4: Coupled 2-DOF rigid-body slew limiter in translational (v) and
+ * rotational (w) state space so path curvature (w/v) is preserved during accel/braking.
+ */
+DriveOutput apply2DofKinodynamicSlew(int16_t targetLeft,
+                                     int16_t targetRight,
+                                     int16_t currentLeft,
+                                     int16_t currentRight,
+                                     int16_t linAccelStep = Config::kMotorAccelSlewStep,
+                                     int16_t linDecelStep = Config::kMotorDecelSlewStep,
+                                     int16_t angAccelStep = Config::kAngularAccelSlewStep,
+                                     int16_t angDecelStep = Config::kAngularDecelSlewStep);
+
+/**
+ * Physics Model 5: Brushed DC gearmotor Coulomb static friction (stiction) feedforward.
+ * Maps non-zero commands into [stictionMin, maxPower] to eliminate gearbox deadband lag.
+ */
+int16_t applyCoulombStiction(int16_t cmdPower,
+                             int16_t stictionMin = Config::kMotorStictionMinPower,
+                             int16_t maxPower = Config::kMotorMaxPower);
+
+/**
+ * Full physics-based kinodynamic differential drive pipeline combining all 5 models,
+ * plus reverse-front orientation toggle (R3), D-Pad Left/Right micro-turn alignment,
+ * straight-line left/right motor balance trim, and full-stick Precision Mode scaling.
+ */
+DriveOutput computeKinodynamicDrive(uint8_t lyRaw,
+                                    uint8_t rxRaw,
+                                    int16_t currentLeft,
+                                    int16_t currentRight,
+                                    int16_t maxSpeed = Config::kMotorMaxPower,
+                                    int16_t accelSlewStep = Config::kMotorAccelSlewStep,
+                                    int16_t decelSlewStep = Config::kMotorDecelSlewStep,
+                                    uint8_t compPercent = 100U,
+                                    int16_t rc2Deg = Config::kRc2InitDeg,
+                                    bool reverseDrive = false,
+                                    bool dpadLeft = false,
+                                    bool dpadRight = false,
+                                    int8_t motorTrimPct = 0,
+                                    bool precisionMode = false);
+
+/** Steps straight-line motor balance trim within [-kMaxMotorTrimPct, +kMaxMotorTrimPct]. */
+int8_t stepMotorTrim(int8_t currentTrim, int8_t delta);
+
+/**
+ * Applies straight-line left/right motor balance trim ([-15..+15]%).
+ * Positive trim attenuates Right wheel by (100 - trimPct)% to steer slightly Right;
+ * Negative trim attenuates Left wheel by (100 - |trimPct|)% to steer slightly Left.
+ */
+void applyMotorBalanceTrim(int16_t& left, int16_t& right, int8_t trimPct);
+
+/**
+ * Smoothly slews RC2 arm angle toward targetDeg by at most maxStepDeg per tick
+ * within [kRc2MinDeg, kRc2MaxDeg]. Used exclusively for arm RC2.
+ */
+int16_t slewServoAngle(int16_t currentDeg,
+                       int16_t targetDeg,
+                       int16_t maxStepDeg = Config::kRc2SmoothStepDeg);
+
+/** Computes CRC-16-CCITT (poly 0x1021, init 0xFFFF) over a byte buffer. */
+uint16_t computeCrc16(const uint8_t* data, uint8_t len);
+
+/** Packs PersistentConfig into an 8-byte EEPROM frame with magic header + CRC-16. */
+void packPersistentConfig(const PersistentConfig& cfg, uint8_t outBytes[8]);
+
+/** Validates magic, version, and CRC-16 of an 8-byte EEPROM frame and unpacks it. */
+bool unpackPersistentConfig(const uint8_t inBytes[8], PersistentConfig& outCfg);
+
+/** Returns true when absolute encoder movement |curCount - prevCount| >= minDelta. */
+bool hasEncoderProgressed(int32_t prevCount,
+                          int32_t curCount,
+                          int32_t minDelta = Config::kAutoStallMinDeltaDeg);
+
 /** Steps the D-pad (RC2) servo angle within safe mechanical bounds. */
 int16_t computeArmStep(int16_t currentDeg, bool upPressed, bool downPressed);
 
 /** Clamps all four servo targets into [kServoMinDeg, kServoMaxDeg]. */
 ServoTargets clampServoTargets(const ServoTargets& targets);
 
-/** Updates servo targets from PS2 D-pad/shoulder buttons without overwriting idle presets. */
+/** Clamps a logical servo angle to [kServoMinDeg, kServoMaxDeg] and mirrors it when invertDir is true. */
+int16_t applyServoDirection(int16_t angleDeg, bool invertDir);
+
+/** Updates servo targets from PS2 D-pad, shoulder, Square push-ground, and Circle preset buttons. */
 void updateServoTargetsFromPs2(const Ps2Frame& frame,
                                ServoTargets& targets,
-                               bool allowArmStep);
+                               bool allowArmStep,
+                               FrontArmPushState* pushState = nullptr,
+                               ArmPosePresetState* poseState = nullptr);
 
 /** Decodes a raw 9-byte Sony PS2 SPI response packet into a Ps2Frame. */
 void decodePs2Payload(const uint8_t raw[9], Ps2Frame& outFrame);
@@ -58,6 +156,17 @@ bool isPs2UnconfiguredMode(const Ps2Frame& frame);
 
 /** Validates PS2 frame mode/sync bytes and rejects impossible button/bus-short patterns. */
 bool isPs2FrameValid(const Ps2Frame& frame);
+
+/** Returns true on a rising Triangle press while Ready, PS2 Operational, and X not held. */
+bool shouldStartAutoMode(bool sysReady,
+                         bool ps2Operational,
+                         bool frameValid,
+                         bool trianglePressed,
+                         bool prevTrianglePressed,
+                         bool crossPressed);
+
+/** Returns true when a valid PS2 frame reports Cross (X) pressed to exit Auto mode. */
+bool shouldAbortAutoMode(bool frameValid, bool crossPressed);
 
 class FailsafeStateMachine {
 public:

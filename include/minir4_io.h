@@ -46,10 +46,29 @@ public:
     /** Immediately zeroes M1/M2 (and M3/M4 when unzeroed) with optional brake. */
     void forceMotorsStop(bool engageBrake, uint32_t nowMs);
 
+    /** True when M1/M2 H-bridge electromagnetic hold-brake is currently engaged. */
+    bool isBrakeEngaged() const { return lastBrakeEngaged_; }
+
+    /** Restores PS2 pins, STM32 motor polarity/ranges, and stops all motors after Auto exits. */
+    void restoreAfterAuto(uint32_t nowMs);
+
     /** Sends servo targets RC1..RC4 when changed, unsynced, or on periodic keepalive. */
     void applyServos(const ServoTargets& targets, uint32_t nowMs);
 
+    /** Enables or disables smooth trajectory slew limiting strictly for arm RC2. */
+    void setRc2SmoothEnabled(bool enabled) { rc2SmoothEnabled_ = enabled; }
+    bool rc2SmoothEnabled() const { return rc2SmoothEnabled_; }
+
+    /** Synchronizes cached servo angles (e.g. after Auto mode modifies servos directly). */
+    void syncServoCache(const ServoTargets& current);
+
     void setMotorPolarity(bool leftReverse, bool rightReverse);
+
+    /** Loads validated PersistentConfig from UNO R4 EEPROM at kEepromConfigAddr. */
+    bool loadConfigFromEeprom(PersistentConfig& outCfg);
+
+    /** Saves PersistentConfig to UNO R4 EEPROM (writes only changed bytes). */
+    void saveConfigToEeprom(const PersistentConfig& cfg);
 
     /** Non-zero MMLower::RESULT code from servo angle range config, or 0 if OK. */
     uint8_t servoRangeErr() const { return servoRangeErr_; }
@@ -78,6 +97,9 @@ private:
     bool         comboPrevActive_          = false;
     bool         comboFired_               = false;
     uint32_t     comboStartMs_             = 0;
+    bool         upHoldPrevActive_         = false;
+    bool         upHoldFired_              = false;
+    uint32_t     upHoldStartMs_            = 0;
 
     bool         leftReverse_              = Config::kMotorLeftReverseInit;
     bool         rightReverse_             = Config::kMotorRightReverseInit;
@@ -99,5 +121,6 @@ private:
     bool         motorsSynced_             = false;
     ServoTargets lastServos_               = {};
     bool         servosSynced_             = false;
+    bool         rc2SmoothEnabled_         = Config::kRc2SmoothDefault;
     uint8_t      servoRangeErr_            = 0U;
 };
