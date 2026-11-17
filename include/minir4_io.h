@@ -83,6 +83,7 @@ private:
 
     bool updateButtonDebounce(DebouncedBtn& btn, bool sample, uint32_t nowMs, bool& outShortRelease);
     bool applyLowerMcuConfig(bool zeroAuxMotors);
+    bool configureRc34PulseRange(uint8_t ch);
     bool configureServoRanges();
     void staggerBootServos();
 
@@ -121,6 +122,8 @@ private:
     bool         motorsSynced_             = false;
     ServoTargets lastServos_               = {};
     bool         servosSynced_             = false;
+    bool         rc34PulseSynced_          = false;
+    uint8_t      rc34PulseErr_             = 0U;
     bool         rc2SmoothEnabled_         = Config::kRc2SmoothDefault;
     uint8_t      servoRangeErr_            = 0U;
 };

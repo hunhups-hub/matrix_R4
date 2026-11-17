@@ -109,17 +109,20 @@ constexpr int16_t  kRc2PresetDropDeg       = 140;     // Circle preset B: Arm lo
 constexpr int16_t  kRc2SmoothStepDeg       = 6;       // RC2 slew step per 25ms tick (6 deg/25ms = 240 deg/s)
 constexpr bool     kRc2SmoothDefault       = true;    // Smooth trajectory enabled by default for RC2 only
 constexpr uint32_t kArmStepIntervalMs      = 50UL;
-constexpr int16_t  kRc3InitDeg             = 30;     // Front L arm stowed/up (paired with RC4; clamped 0..180)
-constexpr int16_t  kRc3L1Deg               = 30;      // L1 Push down (70 deg; lower deg = deeper; min 0)
+constexpr bool     kEnableRc34CustomPulse  = true;    // Apply SetServoPulseRange specifically to RC3 & RC4
+constexpr uint16_t kRc34PulseMinUs         = 500U;    // Wide standard min pulse (us) for RC3/RC4
+constexpr uint16_t kRc34PulseMaxUs         = 2500U;   // Wide standard max pulse (us) for RC3/RC4
+constexpr int16_t  kRc3InitDeg             = 30;      // Front L arm init (paired with RC4; clamped 0..180)
+constexpr int16_t  kRc3L1Deg               = 30;      // L1 Push down (30 deg; lower deg = deeper; min 0)
 constexpr int16_t  kRc3R1Deg               = 140;     // R1 Lift / mid stow up (140 deg)
 constexpr int16_t  kRc3SquareDeg           = 30;      // Square Push ground toggle (30 deg)
 constexpr bool     kRc3InvertDir           = false;   // Invert RC3 hardware output angle (deg -> 180 - deg)
-constexpr int16_t  kRc4InitDeg             = 30;     // Front R arm stowed/up (paired with RC3)
-constexpr int16_t  kRc4L1Deg               = 30;      // L1 Push down (70 deg; paired with RC3)
+constexpr int16_t  kRc4InitDeg             = 30;      // Front R arm init (paired with RC3)
+constexpr int16_t  kRc4L1Deg               = 30;      // L1 Push down (30 deg; paired with RC3)
 constexpr int16_t  kRc4R1Deg               = 140;     // R1 Lift / mid stow up (140 deg)
 constexpr int16_t  kRc4SquareDeg           = 30;      // Square Push ground toggle (30 deg)
 constexpr uint32_t kServoBootStaggerMs     = 60UL;    // Reduce startup current spike
-constexpr bool     kRc4InvertDir           = true;   // Invert RC4 hardware output angle (deg -> 180 - deg)
+constexpr bool     kRc4InvertDir           = true;    // Invert RC4 hardware output angle (deg -> 180 - deg)
 
 // --- Power / DC Adapter (Supports 9V-18V DC Adapter or 2S-4S Pack) ----------
 constexpr float    kPowerFullVolt          = 19.5f;   // <= 25.5V (uint8 tenths)

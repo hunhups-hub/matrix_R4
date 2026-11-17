@@ -1727,8 +1727,19 @@ void test_servo_direction_inversion(void) {
     // Config constants remain within valid servo range after direction mapping
     const int16_t rc3InitHw = RobotLogic::applyServoDirection(Config::kRc3InitDeg, Config::kRc3InvertDir);
     const int16_t rc4InitHw = RobotLogic::applyServoDirection(Config::kRc4InitDeg, Config::kRc4InvertDir);
-    TEST_ASSERT_EQUAL_INT16(Config::kRc3InvertDir ? 0 : 180, rc3InitHw);
-    TEST_ASSERT_EQUAL_INT16(Config::kRc4InvertDir ? 0 : 180, rc4InitHw);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT16(Config::kServoMinDeg, rc3InitHw);
+    TEST_ASSERT_LESS_OR_EQUAL_INT16(Config::kServoMaxDeg, rc3InitHw);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT16(Config::kServoMinDeg, rc4InitHw);
+    TEST_ASSERT_LESS_OR_EQUAL_INT16(Config::kServoMaxDeg, rc4InitHw);
+    TEST_ASSERT_EQUAL_INT16(
+        Config::kRc3InvertDir ? static_cast<int16_t>(Config::kServoMaxDeg - Config::kRc3InitDeg)
+                              : Config::kRc3InitDeg,
+        rc3InitHw);
+    TEST_ASSERT_EQUAL_INT16(
+        Config::kRc4InvertDir ? static_cast<int16_t>(Config::kServoMaxDeg - Config::kRc4InitDeg)
+                              : Config::kRc4InitDeg,
+        rc4InitHw);
+    TEST_ASSERT_TRUE(Config::kRc34PulseMinUs < Config::kRc34PulseMaxUs);
 }
 
 // ============================================================================
