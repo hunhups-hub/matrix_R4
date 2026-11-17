@@ -12,6 +12,27 @@
 
 namespace {
 
+// ============================================================================
+// Global state
+// ============================================================================
+
+/** Previous-tick state of PS2 buttons used for rising-edge (press) detection. */
+struct Ps2MenuEdges {
+    bool triangle  = false;
+    bool select    = false;
+    bool l3        = false;
+    bool r3        = false;
+    bool dpadLeft  = false;
+    bool dpadRight = false;
+};
+
+/** Latched drive request from the Serial command interface. */
+struct SerialDriveState {
+    bool    latched = false;
+    int16_t targetL = 0;
+    int16_t targetR = 0;
+};
+
 MiniR4IO                         g_io;
 SerialControl                    g_serial;
 OledUI                           g_oled;
@@ -19,24 +40,22 @@ RobotLogic::FailsafeStateMachine g_linkSm;
 RobotLogic::BatteryStabilizer    g_battStab;
 RobotLogic::StabilityMonitor     g_stabMon;
 
-SystemSnapshot g_snap{};
-Ps2Frame       g_lastPs2Frame{};
-bool           g_serialDriveLatched = false;
-int16_t        g_serialTargetL      = 0;
-int16_t        g_serialTargetR      = 0;
+SystemSnapshot   g_snap{};
+Ps2Frame         g_lastPs2Frame{};
+SerialDriveState g_serialDrive{};
+bool             g_serialAutoRequested = false;
 
-uint32_t           g_lastControlMs        = 0;
-uint32_t           g_lastArmStepMs        = 0;
-uint32_t           g_lastTelemetryMs      = 0;
-bool               g_prevTrianglePressed  = false;
-bool               g_prevSelectPressed    = false;
-bool               g_prevL3Pressed        = false;
-bool               g_prevR3Pressed        = false;
-bool               g_prevDpadLeftPressed  = false;
-bool               g_prevDpadRightPressed = false;
-bool               g_serialAutoRequested  = false;
+uint32_t g_lastControlMs   = 0;
+uint32_t g_lastArmStepMs   = 0;
+uint32_t g_lastTelemetryMs = 0;
+
+Ps2MenuEdges       g_prevPs2{};
 FrontArmPushState  g_armPushState{};
 ArmPosePresetState g_posePresetState{};
+
+// ============================================================================
+// Small helpers
+// ============================================================================
 
 void savePersistentConfig() {
     PersistentConfig cfg{};
@@ -58,6 +77,134 @@ void printTrimChanged(const char* src, int8_t trimPct) {
     Serial.print(static_cast<int>(trimPct));
     Serial.println(F("% (saved to EEPROM)"));
 }
+
+bool isDriving() {
+    return g_snap.drive.left != 0 || g_snap.drive.right != 0;
+}
+
+void applyDriveToMotors(uint32_t nowMs) {
+    g_io.applyMotors(g_snap.drive.left, g_snap.drive.right, Config::kEnableSmartHoldBrake, nowMs);
+}
+
+/** Effective max drive power = min(mode cap [precision/normal], battery power cap). */
+int16_t computeMaxDriveSpeed(const MotorPowerProfile& profile) {
+    const int16_t modeCap =
+        g_snap.precisionMode ? Config::kPrecisionMaxPower : Config::kMotorMaxPower;
+    return (modeCap < profile.maxPowerCap) ? modeCap : profile.maxPowerCap;
+}
+
+/** Drops any latched Serial drive request and stops the Serial motion timer. */
+void cancelSerialDrive() {
+    g_serialDrive = SerialDriveState{};
+    g_serial.stopMotion();
+}
+
+// --- PS2 edge latches ---------------------------------------------------------
+
+void latchMenuEdges(bool valid) {
+    g_prevPs2.triangle  = valid && g_lastPs2Frame.triangle;
+    g_prevPs2.select    = valid && g_lastPs2Frame.select;
+    g_prevPs2.l3        = valid && g_lastPs2Frame.l3;
+    g_prevPs2.r3        = valid && g_lastPs2Frame.r3;
+    g_prevPs2.dpadLeft  = valid && g_lastPs2Frame.left;
+    g_prevPs2.dpadRight = valid && g_lastPs2Frame.right;
+}
+
+void latchServoEdges(bool valid) {
+    g_armPushState.prevSquare    = valid && g_lastPs2Frame.square;
+    g_posePresetState.prevCircle = valid && g_lastPs2Frame.circle;
+}
+
+/** Seeds every edge latch from the current frame so held buttons don't fire on (re)entry. */
+void latchAllPs2Edges(bool valid) {
+    latchMenuEdges(valid);
+    latchServoEdges(valid);
+}
+
+void syncPs2Snapshot() {
+    g_snap.ps2Link      = g_linkSm.state();
+    g_snap.ps2Glitching = g_linkSm.isLinkGlitching();
+    g_snap.ps2Mode      = g_lastPs2Frame.modeId;
+    g_snap.ps2Sync      = g_lastPs2Frame.syncByte;
+    g_snap.ps2Ly        = g_lastPs2Frame.ly;
+    g_snap.ps2Rx        = g_lastPs2Frame.rx;
+}
+
+void initOled() {
+    g_snap.oledOk    = g_oled.begin();
+    g_snap.oledAddr  = g_oled.i2cAddr();
+    g_snap.oledErr3d = g_oled.err3d();
+    g_snap.oledErr3c = g_oled.err3c();
+}
+
+// --- Shared configuration actions (Serial + PS2) -------------------------------
+
+void togglePrecisionMode(const char* onMsg, const char* offMsg) {
+    g_snap.precisionMode = !g_snap.precisionMode;
+    g_oled.beepConfirm();
+    g_serial.printEvent("CFG", g_snap.precisionMode ? onMsg : offMsg);
+}
+
+void toggleReverseDrive(const char* onMsg, const char* offMsg) {
+    g_snap.reverseDrive = !g_snap.reverseDrive;
+    g_oled.beepConfirm();
+    g_serial.printEvent("CFG", g_snap.reverseDrive ? onMsg : offMsg);
+}
+
+void toggleRc2Smooth(const char* onMsg, const char* offMsg) {
+    g_snap.rc2SmoothEnabled = !g_snap.rc2SmoothEnabled;
+    g_io.setRc2SmoothEnabled(g_snap.rc2SmoothEnabled);
+    savePersistentConfig();
+    g_oled.beepConfirm();
+    g_serial.printEvent("CFG", g_snap.rc2SmoothEnabled ? onMsg : offMsg);
+}
+
+void setMotorTrim(int8_t trimPct, const char* src) {
+    g_snap.motorTrimPct = trimPct;
+    savePersistentConfig();
+    g_oled.beepConfirm();
+    printTrimChanged(src, g_snap.motorTrimPct);
+}
+
+void toggleMotorReverse(bool& reversed, const char* onMsg, const char* offMsg) {
+    reversed = !reversed;
+    g_io.setMotorPolarity(g_snap.leftReversed, g_snap.rightReversed);
+    savePersistentConfig();
+    g_serial.printEvent("CFG", reversed ? onMsg : offMsg);
+}
+
+// --- Servo target setters ------------------------------------------------------
+
+/** Manual RC1/RC2 moves cancel the Circle drop/hold preset toggle. */
+void setPoseServo(int16_t& targetDeg, int16_t deg) {
+    targetDeg                    = deg;
+    g_posePresetState.dropActive = false;
+}
+
+/** Manual RC3/RC4 moves cancel the Square push-ground hold. */
+void setGripServo(int16_t& targetDeg, int16_t deg) {
+    targetDeg             = deg;
+    g_armPushState.active = false;
+}
+
+void togglePosePreset() {
+    if (!g_posePresetState.dropActive) {
+        g_snap.servos.rc1Deg         = Config::kRc1PresetDropDeg;
+        g_snap.servos.rc2Deg         = Config::kRc2PresetDropDeg;
+        g_posePresetState.dropActive = true;
+        g_serial.printEvent("POSE", "Drop/Place preset (RC1=145, RC2=140)");
+    } else {
+        g_snap.servos.rc1Deg         = Config::kRc1PresetHoldDeg;
+        g_snap.servos.rc2Deg         = Config::kRc2PresetHoldDeg;
+        g_posePresetState.dropActive = false;
+        g_serial.printEvent("POSE", "Hold/Carry preset (RC1=75, RC2=70)");
+    }
+    g_oled.beepConfirm();
+}
+
+// ============================================================================
+// System state transitions
+// ============================================================================
 
 [[noreturn]] void enterUploadBootloader(const char* source) {
     WDT.refresh();
@@ -83,13 +230,10 @@ void printTrimChanged(const char* src, int8_t trimPct) {
 }
 
 void triggerEstop(const char* reason, uint32_t nowMs) {
-    g_serialDriveLatched = false;
-    g_serialTargetL      = 0;
-    g_serialTargetR      = 0;
-    g_serial.stopMotion();
+    cancelSerialDrive();
     if (g_snap.sysState != SystemState::Estop) {
-        g_snap.sysState      = SystemState::Estop;
-        g_snap.drive         = {0, 0};
+        g_snap.sysState = SystemState::Estop;
+        g_snap.drive    = {0, 0};
         g_io.invalidateActuatorCaches();
         g_io.forceMotorsStop(true, nowMs);
         g_oled.beepWarning();
@@ -128,6 +272,25 @@ void logLinkTransition(LinkState prev, LinkState next) {
     }
 }
 
+// ============================================================================
+// Power & health telemetry
+// ============================================================================
+
+const char* batteryTierEventMsg(BatteryTier tier) {
+    if (Config::kEnableBatterySagThrottle) {
+        switch (tier) {
+            case BatteryTier::Emergency: return "EMERGENCY sag cap (35%)";
+            case BatteryTier::Critical:  return "CRITICAL sag cap (50%)";
+            default:                     return "LOW sag cap (72%)";
+        }
+    }
+    switch (tier) {
+        case BatteryTier::Emergency: return "EMERGENCY low batt (100% full power)";
+        case BatteryTier::Critical:  return "CRITICAL low batt (100% full power)";
+        default:                     return "LOW batt warning (100% full power)";
+    }
+}
+
 void applyBatteryTelemetry(bool voltValid, uint16_t battMv, uint32_t nowMs) {
     const BatteryTier prevTier = g_battStab.tier();
     const BatteryTier nextTier = g_battStab.update(battMv, voltValid, nowMs);
@@ -151,170 +314,22 @@ void applyBatteryTelemetry(bool voltValid, uint16_t battMv, uint32_t nowMs) {
     g_snap.commHealthy = g_io.commHealthy();
 
     if (prevTier != nextTier && nextTier != BatteryTier::Normal) {
-        if (Config::kEnableBatterySagThrottle) {
-            g_serial.printEvent("PWR",
-                                nextTier == BatteryTier::Emergency ? "EMERGENCY sag cap (35%)"
-                                : (nextTier == BatteryTier::Critical ? "CRITICAL sag cap (50%)"
-                                                                     : "LOW sag cap (72%)"));
-        } else {
-            g_serial.printEvent("PWR",
-                                nextTier == BatteryTier::Emergency ? "EMERGENCY low batt (100% full power)"
-                                : (nextTier == BatteryTier::Critical ? "CRITICAL low batt (100% full power)"
-                                                                     : "LOW batt warning (100% full power)"));
-        }
+        g_serial.printEvent("PWR", batteryTierEventMsg(nextTier));
     }
 }
 
-void applySerialImmediateActions(const SerialActions& act, uint32_t nowMs) {
-    if (act.i2cScanRequested) {
-        g_oled.printI2cDiag();
+/**
+ * Runs the (rate-limited unless forced) STM32 health check and feeds the battery
+ * stabilizer. Returns true when a sample was actually taken this call.
+ */
+bool sampleLowerMcu(uint32_t nowMs, bool isMoving, bool force) {
+    bool     voltValid = false;
+    uint16_t battMv    = 0U;
+    if (!g_io.verifyAndHealLowerMcu(nowMs, isMoving, voltValid, battMv, force)) {
+        return false;
     }
-    if (act.uploadRequested) {
-        enterUploadBootloader("Serial command 'u'");
-    }
-    if (act.estopRequested) {
-        g_serialAutoRequested = false;
-        triggerEstop("Serial '!'", nowMs);
-    } else if (act.resumeRequested) {
-        clearEstop("Serial 'r'");
-    }
-
-    if (act.autoStartRequested && g_snap.sysState == SystemState::Ready) {
-        g_serialAutoRequested = true;
-    }
-    if (act.togglePrecision) {
-        g_snap.precisionMode = !g_snap.precisionMode;
-        g_oled.beepConfirm();
-        g_serial.printEvent("CFG", g_snap.precisionMode ? "Precision 55% ON (session)"
-                                                        : "Precision OFF 100%");
-    }
-    if (act.toggleReverseDrive) {
-        g_snap.reverseDrive = !g_snap.reverseDrive;
-        g_oled.beepConfirm();
-        g_serial.printEvent("CFG", g_snap.reverseDrive ? "Reverse-Front ON" : "Reverse-Front OFF");
-    }
-    if (act.toggleRc2Smooth) {
-        g_snap.rc2SmoothEnabled = !g_snap.rc2SmoothEnabled;
-        g_io.setRc2SmoothEnabled(g_snap.rc2SmoothEnabled);
-        savePersistentConfig();
-        g_oled.beepConfirm();
-        g_serial.printEvent("CFG", g_snap.rc2SmoothEnabled ? "RC2 Smooth Slew ON (saved)"
-                                                           : "RC2 Smooth Slew OFF (saved)");
-    }
-
-    if (act.trimLeftStep) {
-        g_snap.motorTrimPct = RobotLogic::stepMotorTrim(g_snap.motorTrimPct, -1);
-        savePersistentConfig();
-        g_oled.beepConfirm();
-        printTrimChanged("Serial", g_snap.motorTrimPct);
-    } else if (act.trimRightStep) {
-        g_snap.motorTrimPct = RobotLogic::stepMotorTrim(g_snap.motorTrimPct, 1);
-        savePersistentConfig();
-        g_oled.beepConfirm();
-        printTrimChanged("Serial", g_snap.motorTrimPct);
-    } else if (act.trimReset) {
-        g_snap.motorTrimPct = 0;
-        savePersistentConfig();
-        g_oled.beepConfirm();
-        printTrimChanged("Serial", g_snap.motorTrimPct);
-    }
-
-    if (act.toggleLeftReverse) {
-        g_snap.leftReversed = !g_snap.leftReversed;
-        g_io.setMotorPolarity(g_snap.leftReversed, g_snap.rightReversed);
-        savePersistentConfig();
-        g_serial.printEvent("CFG", g_snap.leftReversed ? "M1 reverse=ON (saved)"
-                                                       : "M1 reverse=OFF (saved)");
-    }
-    if (act.toggleRightReverse) {
-        g_snap.rightReversed = !g_snap.rightReversed;
-        g_io.setMotorPolarity(g_snap.leftReversed, g_snap.rightReversed);
-        savePersistentConfig();
-        g_serial.printEvent("CFG", g_snap.rightReversed ? "M2 reverse=ON (saved)"
-                                                        : "M2 reverse=OFF (saved)");
-    }
-
-    if (act.speedPctChanged) {
-        g_snap.serialSpeedPct = act.newSpeedPct;
-        Serial.print(F("[SER] Speed = "));
-        Serial.print(g_snap.serialSpeedPct);
-        Serial.println('%');
-    }
-
-    if (act.armUpStep) {
-        g_snap.servos.rc2Deg          = RobotLogic::computeArmStep(g_snap.servos.rc2Deg, true, false);
-        g_posePresetState.dropActive  = false;
-    } else if (act.armDownStep) {
-        g_snap.servos.rc2Deg          = RobotLogic::computeArmStep(g_snap.servos.rc2Deg, false, true);
-        g_posePresetState.dropActive  = false;
-    }
-
-    if (act.gripOpen) {
-        g_snap.servos.rc3Deg  = Config::kRc3L1Deg;
-        g_snap.servos.rc4Deg  = Config::kRc4L1Deg;
-        g_armPushState.active = false;
-    } else if (act.gripClose) {
-        g_snap.servos.rc3Deg  = Config::kRc3R1Deg;
-        g_snap.servos.rc4Deg  = Config::kRc4R1Deg;
-        g_armPushState.active = false;
-    }
-
-    if (act.auxExtend) {
-        g_snap.servos.rc1Deg         = Config::kRc1L2Deg;
-        g_posePresetState.dropActive = false;
-    } else if (act.auxRetract) {
-        g_snap.servos.rc1Deg         = Config::kRc1R2Deg;
-        g_posePresetState.dropActive = false;
-    } else if (act.togglePosePreset) {
-        if (!g_posePresetState.dropActive) {
-            g_snap.servos.rc1Deg         = Config::kRc1PresetDropDeg;
-            g_snap.servos.rc2Deg         = Config::kRc2PresetDropDeg;
-            g_posePresetState.dropActive = true;
-            g_serial.printEvent("POSE", "Drop/Place preset (RC1=145, RC2=140)");
-        } else {
-            g_snap.servos.rc1Deg         = Config::kRc1PresetHoldDeg;
-            g_snap.servos.rc2Deg         = Config::kRc2PresetHoldDeg;
-            g_posePresetState.dropActive = false;
-            g_serial.printEvent("POSE", "Hold/Carry preset (RC1=75, RC2=70)");
-        }
-        g_oled.beepConfirm();
-    }
-
-    if (act.hasDirectServo) {
-        switch (act.directServoCh) {
-            case 1:
-                g_snap.servos.rc1Deg         = act.directServoDeg;
-                g_posePresetState.dropActive = false;
-                break;
-            case 2:
-                g_snap.servos.rc2Deg         = act.directServoDeg;
-                g_posePresetState.dropActive = false;
-                break;
-            case 3:
-                g_snap.servos.rc3Deg  = act.directServoDeg;
-                g_armPushState.active = false;
-                break;
-            case 4:
-                g_snap.servos.rc4Deg  = act.directServoDeg;
-                g_armPushState.active = false;
-                break;
-            default: break;
-        }
-    }
-
-    g_snap.servos      = RobotLogic::clampServoTargets(g_snap.servos);
-    g_snap.comScalePct = RobotLogic::computeCoMDynamicScale(g_snap.servos.rc2Deg);
-
-    if (g_snap.sysState == SystemState::Estop) {
-        g_serialDriveLatched = false;
-        g_serialTargetL      = 0;
-        g_serialTargetR      = 0;
-        g_serial.stopMotion();
-    } else {
-        g_serialDriveLatched = act.driveCmd.active;
-        g_serialTargetL      = act.driveCmd.targetLeft;
-        g_serialTargetR      = act.driveCmd.targetRight;
-    }
+    applyBatteryTelemetry(voltValid, battMv, nowMs);
+    return true;
 }
 
 uint8_t classifyStabPenalty(uint8_t pen) {
@@ -345,12 +360,120 @@ void updateStabilityMetrics(bool frameValid, uint8_t compPercent, uint32_t loopD
     g_snap.loopStabState  = classifyStabPenalty(g_stabMon.loopPenalty());
 }
 
-void runAutoSession(uint32_t nowMs) {
+// ============================================================================
+// Serial command handling
+// ============================================================================
+
+void applySerialConfigActions(const SerialActions& act) {
+    if (act.togglePrecision) {
+        togglePrecisionMode("Precision 55% ON (session)", "Precision OFF 100%");
+    }
+    if (act.toggleReverseDrive) {
+        toggleReverseDrive("Reverse-Front ON", "Reverse-Front OFF");
+    }
+    if (act.toggleRc2Smooth) {
+        toggleRc2Smooth("RC2 Smooth Slew ON (saved)", "RC2 Smooth Slew OFF (saved)");
+    }
+
+    if (act.trimLeftStep) {
+        setMotorTrim(RobotLogic::stepMotorTrim(g_snap.motorTrimPct, -1), "Serial");
+    } else if (act.trimRightStep) {
+        setMotorTrim(RobotLogic::stepMotorTrim(g_snap.motorTrimPct, 1), "Serial");
+    } else if (act.trimReset) {
+        setMotorTrim(0, "Serial");
+    }
+
+    if (act.toggleLeftReverse) {
+        toggleMotorReverse(g_snap.leftReversed, "M1 reverse=ON (saved)", "M1 reverse=OFF (saved)");
+    }
+    if (act.toggleRightReverse) {
+        toggleMotorReverse(g_snap.rightReversed, "M2 reverse=ON (saved)", "M2 reverse=OFF (saved)");
+    }
+
+    if (act.speedPctChanged) {
+        g_snap.serialSpeedPct = act.newSpeedPct;
+        Serial.print(F("[SER] Speed = "));
+        Serial.print(g_snap.serialSpeedPct);
+        Serial.println('%');
+    }
+}
+
+void applySerialServoActions(const SerialActions& act) {
+    ServoTargets& servos = g_snap.servos;
+
+    if (act.armUpStep) {
+        setPoseServo(servos.rc2Deg, RobotLogic::computeArmStep(servos.rc2Deg, true, false));
+    } else if (act.armDownStep) {
+        setPoseServo(servos.rc2Deg, RobotLogic::computeArmStep(servos.rc2Deg, false, true));
+    }
+
+    if (act.gripOpen) {
+        setGripServo(servos.rc3Deg, Config::kRc3L1Deg);
+        setGripServo(servos.rc4Deg, Config::kRc4L1Deg);
+    } else if (act.gripClose) {
+        setGripServo(servos.rc3Deg, Config::kRc3R1Deg);
+        setGripServo(servos.rc4Deg, Config::kRc4R1Deg);
+    }
+
+    if (act.auxExtend) {
+        setPoseServo(servos.rc1Deg, Config::kRc1L2Deg);
+    } else if (act.auxRetract) {
+        setPoseServo(servos.rc1Deg, Config::kRc1R2Deg);
+    } else if (act.togglePosePreset) {
+        togglePosePreset();
+    }
+
+    if (act.hasDirectServo) {
+        switch (act.directServoCh) {
+            case 1: setPoseServo(servos.rc1Deg, act.directServoDeg); break;
+            case 2: setPoseServo(servos.rc2Deg, act.directServoDeg); break;
+            case 3: setGripServo(servos.rc3Deg, act.directServoDeg); break;
+            case 4: setGripServo(servos.rc4Deg, act.directServoDeg); break;
+            default: break;
+        }
+    }
+
+    g_snap.servos      = RobotLogic::clampServoTargets(g_snap.servos);
+    g_snap.comScalePct = RobotLogic::computeCoMDynamicScale(g_snap.servos.rc2Deg);
+}
+
+void applySerialImmediateActions(const SerialActions& act, uint32_t nowMs) {
+    if (act.i2cScanRequested) {
+        g_oled.printI2cDiag();
+    }
+    if (act.uploadRequested) {
+        enterUploadBootloader("Serial command 'u'");
+    }
+    if (act.estopRequested) {
+        g_serialAutoRequested = false;
+        triggerEstop("Serial '!'", nowMs);
+    } else if (act.resumeRequested) {
+        clearEstop("Serial 'r'");
+    }
+
+    if (act.autoStartRequested && g_snap.sysState == SystemState::Ready) {
+        g_serialAutoRequested = true;
+    }
+
+    applySerialConfigActions(act);
+    applySerialServoActions(act);
+
+    if (g_snap.sysState == SystemState::Estop) {
+        cancelSerialDrive();
+    } else {
+        g_serialDrive.latched = act.driveCmd.active;
+        g_serialDrive.targetL = act.driveCmd.targetLeft;
+        g_serialDrive.targetR = act.driveCmd.targetRight;
+    }
+}
+
+// ============================================================================
+// Autonomous session
+// ============================================================================
+
+void enterAutoSession(uint32_t nowMs) {
     g_serialAutoRequested = false;
-    g_serialDriveLatched  = false;
-    g_serialTargetL       = 0;
-    g_serialTargetR       = 0;
-    g_serial.stopMotion();
+    cancelSerialDrive();
     g_io.forceMotorsStop(true, nowMs);
 
     g_snap.activeSource  = ControlSource::Auto;
@@ -361,19 +484,52 @@ void runAutoSession(uint32_t nowMs) {
     g_oled.render(g_snap, nowMs, true);
     g_oled.beepConfirm();
     g_serial.printEvent("AUTO", "Started -> Press X / BTN_UP / 'x' to exit");
+}
 
-    const int16_t preAutoRc1 = g_snap.servos.rc1Deg;
-    const int16_t preAutoRc2 = g_snap.servos.rc2Deg;
-    const int16_t preAutoRc3 = g_snap.servos.rc3Deg;
-    const int16_t preAutoRc4 = g_snap.servos.rc4Deg;
+/** Re-reads the PS2 pad after Auto and seeds edge latches so held buttons don't re-fire. */
+void resyncPs2AfterAuto(uint32_t exitMs) {
+    bool validAfter = false;
+    if (g_linkSm.isConnected()) {
+        g_io.pollPs2(g_lastPs2Frame);
+        validAfter = RobotLogic::isPs2FrameValid(g_lastPs2Frame);
+        if (!g_linkSm.isOperational() && validAfter) {
+            g_linkSm.onFrame(true, exitMs, false);
+        }
+        syncPs2Snapshot();
+    } else {
+        g_lastPs2Frame = Ps2Frame{};
+    }
+    latchAllPs2Edges(validAfter);
+}
+
+void reportAutoExit(AutoExitReason reason, uint32_t exitMs) {
+    if (reason == AutoExitReason::BtnEstop || reason == AutoExitReason::SerialEstop) {
+        triggerEstop(AutoMode::exitReasonStr(reason), exitMs);
+        g_snap.activeSource = ControlSource::None;
+        return;
+    }
+    g_snap.activeSource = g_linkSm.isOperational() ? ControlSource::Ps2 : ControlSource::None;
+    if (reason == AutoExitReason::StallTimeout) {
+        g_oled.beepWarning();
+    } else {
+        g_oled.beepConfirm();
+    }
+    g_serial.printEvent("AUTO", AutoMode::exitReasonStr(reason));
+}
+
+void runAutoSession(uint32_t nowMs) {
+    enterAutoSession(nowMs);
+
+    const ServoTargets   preAuto = g_snap.servos;
     const AutoExitReason reason =
         AutoMode::execute(g_io, g_linkSm, g_snap, g_lastPs2Frame, &g_oled);
     const uint32_t exitMs = millis();
 
-    if (g_snap.servos.rc1Deg != preAutoRc1 || g_snap.servos.rc2Deg != preAutoRc2) {
+    // Auto moved servos directly: drop manual pose/push states that no longer match.
+    if (g_snap.servos.rc1Deg != preAuto.rc1Deg || g_snap.servos.rc2Deg != preAuto.rc2Deg) {
         g_posePresetState.dropActive = false;
     }
-    if (g_snap.servos.rc3Deg != preAutoRc3 || g_snap.servos.rc4Deg != preAutoRc4) {
+    if (g_snap.servos.rc3Deg != preAuto.rc3Deg || g_snap.servos.rc4Deg != preAuto.rc4Deg) {
         g_armPushState.active = false;
     }
 
@@ -390,54 +546,11 @@ void runAutoSession(uint32_t nowMs) {
         enterUploadBootloader(AutoMode::exitReasonStr(reason));
     }
 
-    bool validAfter = false;
-    if (g_linkSm.isConnected()) {
-        g_io.pollPs2(g_lastPs2Frame);
-        validAfter = RobotLogic::isPs2FrameValid(g_lastPs2Frame);
-        if (!g_linkSm.isOperational() && validAfter) {
-            g_linkSm.onFrame(true, exitMs, false);
-        }
-        g_snap.ps2Link      = g_linkSm.state();
-        g_snap.ps2Glitching = g_linkSm.isLinkGlitching();
-        g_snap.ps2Mode      = g_lastPs2Frame.modeId;
-        g_snap.ps2Sync      = g_lastPs2Frame.syncByte;
-        g_snap.ps2Ly        = g_lastPs2Frame.ly;
-        g_snap.ps2Rx        = g_lastPs2Frame.rx;
-    } else {
-        g_lastPs2Frame = Ps2Frame{};
-    }
-    g_prevTrianglePressed        = validAfter && g_lastPs2Frame.triangle;
-    g_prevSelectPressed          = validAfter && g_lastPs2Frame.select;
-    g_prevL3Pressed              = validAfter && g_lastPs2Frame.l3;
-    g_prevR3Pressed              = validAfter && g_lastPs2Frame.r3;
-    g_prevDpadLeftPressed        = validAfter && g_lastPs2Frame.left;
-    g_prevDpadRightPressed       = validAfter && g_lastPs2Frame.right;
-    g_armPushState.prevSquare    = validAfter && g_lastPs2Frame.square;
-    g_posePresetState.prevCircle = validAfter && g_lastPs2Frame.circle;
+    resyncPs2AfterAuto(exitMs);
+    initOled(); // Auto code may have re-initialized Wire1 / the display.
+    reportAutoExit(reason, exitMs);
 
-    g_snap.oledOk    = g_oled.begin();
-    g_snap.oledAddr  = g_oled.i2cAddr();
-    g_snap.oledErr3d = g_oled.err3d();
-    g_snap.oledErr3c = g_oled.err3c();
-
-    if (reason == AutoExitReason::BtnEstop || reason == AutoExitReason::SerialEstop) {
-        triggerEstop(AutoMode::exitReasonStr(reason), exitMs);
-        g_snap.activeSource = ControlSource::None;
-    } else {
-        g_snap.activeSource =
-            g_linkSm.isOperational() ? ControlSource::Ps2 : ControlSource::None;
-        if (reason == AutoExitReason::StallTimeout) {
-            g_oled.beepWarning();
-        } else {
-            g_oled.beepConfirm();
-        }
-        g_serial.printEvent("AUTO", AutoMode::exitReasonStr(reason));
-    }
-
-    bool     voltValid = false;
-    uint16_t battMv    = 0U;
-    g_io.verifyAndHealLowerMcu(exitMs, false, voltValid, battMv, true);
-    applyBatteryTelemetry(voltValid, battMv, exitMs);
+    sampleLowerMcu(exitMs, false, true);
     g_snap.servoRangeErr = g_io.servoRangeErr();
     g_io.syncServoCache(g_snap.servos);
     g_io.applyServos(g_snap.servos, exitMs);
@@ -447,7 +560,11 @@ void runAutoSession(uint32_t nowMs) {
     g_lastArmStepMs = exitMs;
 }
 
-void runControlTick(uint32_t nowMs, uint32_t loopDtMs) {
+// ============================================================================
+// Control tick stages
+// ============================================================================
+
+ButtonEvents handleOnboardButtons(uint32_t nowMs) {
     ButtonEvents btn{};
     g_io.pollButtons(nowMs, btn);
     g_snap.comboHolding  = btn.comboHolding;
@@ -462,13 +579,14 @@ void runControlTick(uint32_t nowMs, uint32_t loopDtMs) {
         g_serialAutoRequested = false;
         triggerEstop("BTN_DOWN press", nowMs);
     } else if (btn.shortUp) {
-        if (g_snap.sysState == SystemState::Estop) {
-            clearEstop("BTN_UP press");
-        }
+        clearEstop("BTN_UP press"); // no-op unless in E-stop
     }
+    return btn;
+}
 
-    const LinkState prevLink = g_linkSm.state();
-    bool            valid    = false;
+/** Reconnects/polls the PS2 pad and advances the link state machine. Returns frame validity. */
+bool updatePs2Link(uint32_t nowMs) {
+    bool valid = false;
 
     if (!g_linkSm.isConnected()) {
         g_lastPs2Frame = Ps2Frame{};
@@ -485,222 +603,183 @@ void runControlTick(uint32_t nowMs, uint32_t loopDtMs) {
         g_linkSm.onFrame(valid, nowMs, modeReset);
     }
 
-    g_snap.ps2Link      = g_linkSm.state();
-    g_snap.ps2Glitching = g_linkSm.isLinkGlitching();
-    g_snap.ps2Mode      = g_lastPs2Frame.modeId;
-    g_snap.ps2Sync      = g_lastPs2Frame.syncByte;
-    g_snap.ps2Ly        = g_lastPs2Frame.ly;
-    g_snap.ps2Rx        = g_lastPs2Frame.rx;
-    logLinkTransition(prevLink, g_snap.ps2Link);
+    syncPs2Snapshot();
+    return valid;
+}
 
-    const bool isMoving = (g_snap.drive.left != 0 || g_snap.drive.right != 0);
-    bool       voltValid = false;
-    uint16_t   battMv    = 0U;
-    if (g_io.verifyAndHealLowerMcu(nowMs, isMoving, voltValid, battMv)) {
-        applyBatteryTelemetry(voltValid, battMv, nowMs);
-        g_snap.servoRangeErr = g_io.servoRangeErr();
-    } else {
-        g_snap.commHealthy = g_io.commHealthy();
+/**
+ * PS2 configuration combos (rising edge only):
+ *   Select            -> Precision Mode toggle
+ *   R3                -> Reverse-Front orientation toggle
+ *   L3                -> RC2 Smooth Trajectory toggle
+ *   Start + L3        -> Reset Motor Trim
+ *   Start + D-Pad L/R -> Adjust straight-line Motor Balance Trim (-/+1%)
+ */
+void handlePs2ConfigCombos() {
+    const Ps2Frame& f = g_lastPs2Frame;
+
+    if (f.select && !g_prevPs2.select) {
+        togglePrecisionMode("PS2 Select: Precision 55% ON (session)",
+                            "PS2 Select: Precision OFF 100%");
     }
-
-    const MotorPowerProfile pwrProfile = g_battStab.motorProfile();
-    updateStabilityMetrics(valid, pwrProfile.compPercent, loopDtMs);
-
-    const bool sysReady = (g_snap.sysState == SystemState::Ready);
-
-    // PS2 Select -> Precision Mode toggle, PS2 R3 -> Reverse-Front Orientation toggle,
-    // PS2 L3 -> RC2 Smooth Trajectory toggle (or Start+L3 -> Reset Motor Trim),
-    // PS2 Start + D-Pad Left/Right -> Adjust straight-line Motor Balance Trim (-/+1%).
-    if (sysReady && g_linkSm.isOperational() && valid) {
-        if (g_lastPs2Frame.select && !g_prevSelectPressed) {
-            g_snap.precisionMode = !g_snap.precisionMode;
-            g_oled.beepConfirm();
-            g_serial.printEvent("CFG", g_snap.precisionMode ? "PS2 Select: Precision 55% ON (session)"
-                                                            : "PS2 Select: Precision OFF 100%");
-        }
-        if (g_lastPs2Frame.r3 && !g_prevR3Pressed) {
-            g_snap.reverseDrive = !g_snap.reverseDrive;
-            g_oled.beepConfirm();
-            g_serial.printEvent("CFG", g_snap.reverseDrive ? "PS2 R3: Reverse-Front ON"
-                                                           : "PS2 R3: Reverse-Front OFF");
-        }
-        if (g_lastPs2Frame.l3 && !g_prevL3Pressed) {
-            if (g_lastPs2Frame.start) {
-                g_snap.motorTrimPct = 0;
-                savePersistentConfig();
-                g_oled.beepConfirm();
-                printTrimChanged("PS2 Start+L3", g_snap.motorTrimPct);
-            } else {
-                g_snap.rc2SmoothEnabled = !g_snap.rc2SmoothEnabled;
-                g_io.setRc2SmoothEnabled(g_snap.rc2SmoothEnabled);
-                savePersistentConfig();
-                g_oled.beepConfirm();
-                g_serial.printEvent("CFG", g_snap.rc2SmoothEnabled
-                                               ? "PS2 L3: RC2 Smooth Slew ON (saved)"
-                                               : "PS2 L3: RC2 Smooth Slew OFF (saved)");
-            }
-        }
-        if (g_lastPs2Frame.start) {
-            if (g_lastPs2Frame.left && !g_prevDpadLeftPressed) {
-                g_snap.motorTrimPct = RobotLogic::stepMotorTrim(g_snap.motorTrimPct, -1);
-                savePersistentConfig();
-                g_oled.beepConfirm();
-                printTrimChanged("PS2 Start+Left", g_snap.motorTrimPct);
-            } else if (g_lastPs2Frame.right && !g_prevDpadRightPressed) {
-                g_snap.motorTrimPct = RobotLogic::stepMotorTrim(g_snap.motorTrimPct, 1);
-                savePersistentConfig();
-                g_oled.beepConfirm();
-                printTrimChanged("PS2 Start+Right", g_snap.motorTrimPct);
-            }
+    if (f.r3 && !g_prevPs2.r3) {
+        toggleReverseDrive("PS2 R3: Reverse-Front ON", "PS2 R3: Reverse-Front OFF");
+    }
+    if (f.l3 && !g_prevPs2.l3) {
+        if (f.start) {
+            setMotorTrim(0, "PS2 Start+L3");
+        } else {
+            toggleRc2Smooth("PS2 L3: RC2 Smooth Slew ON (saved)",
+                            "PS2 L3: RC2 Smooth Slew OFF (saved)");
         }
     }
+    if (f.start) {
+        if (f.left && !g_prevPs2.dpadLeft) {
+            setMotorTrim(RobotLogic::stepMotorTrim(g_snap.motorTrimPct, -1), "PS2 Start+Left");
+        } else if (f.right && !g_prevPs2.dpadRight) {
+            setMotorTrim(RobotLogic::stepMotorTrim(g_snap.motorTrimPct, 1), "PS2 Start+Right");
+        }
+    }
+}
 
-    const bool ps2StartAuto = RobotLogic::shouldStartAutoMode(sysReady,
-                                                              g_linkSm.isOperational(),
-                                                              valid,
-                                                              g_lastPs2Frame.triangle,
-                                                              g_prevTrianglePressed,
-                                                              g_lastPs2Frame.cross);
-    const bool startAuto = ps2StartAuto ||
-                           (sysReady && (btn.autoStartRequested || g_serialAutoRequested));
-    g_serialAutoRequested = false;
+// --- Drive arbitration branches -------------------------------------------------
 
-    if (!g_linkSm.isConnected() || g_linkSm.isFailsafe()) {
-        g_prevTrianglePressed  = false;
-        g_prevSelectPressed    = false;
-        g_prevL3Pressed        = false;
-        g_prevR3Pressed        = false;
-        g_prevDpadLeftPressed  = false;
-        g_prevDpadRightPressed = false;
-    } else if (valid) {
-        g_prevTrianglePressed  = g_lastPs2Frame.triangle;
-        g_prevSelectPressed    = g_lastPs2Frame.select;
-        g_prevL3Pressed        = g_lastPs2Frame.l3;
-        g_prevR3Pressed        = g_lastPs2Frame.r3;
-        g_prevDpadLeftPressed  = g_lastPs2Frame.left;
-        g_prevDpadRightPressed = g_lastPs2Frame.right;
+void driveEstop(uint32_t nowMs) {
+    g_snap.activeSource = ControlSource::None;
+    g_snap.drive        = {0, 0};
+    if (g_io.shouldRefreshStoppedMotors(nowMs)) {
+        g_io.forceMotorsStop(true, nowMs);
+    }
+}
+
+/** Active PS2 link dropped abruptly: cut power & hold brake cleanly without UART flooding. */
+void driveFailsafe(uint32_t nowMs, bool enteredFailsafe) {
+    g_snap.activeSource = ControlSource::None;
+    g_snap.drive        = {0, 0};
+    if (enteredFailsafe) {
+        g_io.invalidateActuatorCaches();
+    }
+    if (enteredFailsafe || g_io.shouldRefreshStoppedMotors(nowMs)) {
+        g_io.forceMotorsStop(true, nowMs);
+    }
+}
+
+/** PS2 Cross acts as immediate brake override even during Serial driving. */
+void driveCrossBrake(uint32_t nowMs) {
+    const bool wasMoving = isDriving();
+    cancelSerialDrive();
+    g_snap.activeSource = ControlSource::Ps2;
+    g_snap.drive        = {0, 0};
+    if (wasMoving || g_io.shouldRefreshStoppedMotors(nowMs)) {
+        g_io.forceMotorsStop(true, nowMs);
+    }
+}
+
+void driveFromSerial(uint32_t nowMs, const MotorPowerProfile& pwr) {
+    g_snap.activeSource = ControlSource::SerialCmd;
+    int16_t effTargetL  = g_serialDrive.targetL;
+    int16_t effTargetR  = g_serialDrive.targetR;
+    if (g_snap.reverseDrive) {
+        effTargetL = static_cast<int16_t>(-g_serialDrive.targetR);
+        effTargetR = static_cast<int16_t>(-g_serialDrive.targetL);
+    }
+    RobotLogic::applyMotorBalanceTrim(effTargetL, effTargetR, g_snap.motorTrimPct);
+    g_snap.drive = RobotLogic::applyDriveTargetsWithSlew(effTargetL,
+                                                         effTargetR,
+                                                         g_snap.drive.left,
+                                                         g_snap.drive.right,
+                                                         computeMaxDriveSpeed(pwr),
+                                                         pwr.accelSlewStep,
+                                                         pwr.decelSlewStep,
+                                                         pwr.compPercent);
+    applyDriveToMotors(nowMs);
+}
+
+/** Returns true when servo targets (and their edge latches) were updated from the frame. */
+bool driveFromPs2(uint32_t nowMs, LinkState prevLink, bool valid, const MotorPowerProfile& pwr) {
+    g_snap.activeSource = ControlSource::Ps2;
+    if (prevLink != LinkState::Operational) {
+        g_lastArmStepMs = nowMs;
+        g_io.invalidateActuatorCaches();
     }
 
-    if (startAuto) {
-        runAutoSession(nowMs);
-        return;
+    if (!valid) {
+        // Brief wireless glitch (<100ms): preserve last safe drive & servo state without overwrite.
+        applyDriveToMotors(nowMs);
+        return false;
     }
 
+    const Ps2Frame& f = g_lastPs2Frame;
+    const bool allowArm =
+        static_cast<uint32_t>(nowMs - g_lastArmStepMs) >= Config::kArmStepIntervalMs;
+    const int16_t prevRc2 = g_snap.servos.rc2Deg;
+    RobotLogic::updateServoTargetsFromPs2(
+        f, g_snap.servos, allowArm, &g_armPushState, &g_posePresetState);
+    if (allowArm && g_snap.servos.rc2Deg != prevRc2) {
+        g_lastArmStepMs = nowMs;
+    }
+    g_snap.comScalePct = RobotLogic::computeCoMDynamicScale(g_snap.servos.rc2Deg);
+
+    // D-Pad Left/Right without Start = micro-turn alignment (Start+D-Pad is trim).
+    const bool microLeft  = !f.start && f.left;
+    const bool microRight = !f.start && f.right;
+    g_snap.drive          = RobotLogic::computeKinodynamicDrive(f.ly,
+                                                                f.rx,
+                                                                g_snap.drive.left,
+                                                                g_snap.drive.right,
+                                                                computeMaxDriveSpeed(pwr),
+                                                                pwr.accelSlewStep,
+                                                                pwr.decelSlewStep,
+                                                                pwr.compPercent,
+                                                                g_snap.servos.rc2Deg,
+                                                                g_snap.reverseDrive,
+                                                                microLeft,
+                                                                microRight,
+                                                                g_snap.motorTrimPct,
+                                                                g_snap.precisionMode);
+    applyDriveToMotors(nowMs);
+    return true;
+}
+
+/** No active source: ramp both wheels down to zero through the coupled slew limiter. */
+void driveCoastToStop(uint32_t nowMs, const MotorPowerProfile& pwr) {
+    g_snap.activeSource = ControlSource::None;
+    g_snap.drive        = RobotLogic::apply2DofKinodynamicSlew(0,
+                                                               0,
+                                                               g_snap.drive.left,
+                                                               g_snap.drive.right,
+                                                               pwr.accelSlewStep,
+                                                               pwr.decelSlewStep,
+                                                               Config::kAngularAccelSlewStep,
+                                                               Config::kAngularDecelSlewStep);
+    applyDriveToMotors(nowMs);
+}
+
+/**
+ * Selects the drive source by priority:
+ *   E-stop > PS2 failsafe > PS2 Cross brake > Serial drive > PS2 manual > coast.
+ * Returns true when PS2 servo targets were updated this tick.
+ */
+bool arbitrateDrive(uint32_t nowMs, LinkState prevLink, bool valid, const MotorPowerProfile& pwr) {
     bool ps2ServosUpdated = false;
     if (g_snap.sysState == SystemState::Estop) {
-        g_snap.activeSource = ControlSource::None;
-        g_snap.drive        = {0, 0};
-        if (g_io.shouldRefreshStoppedMotors(nowMs)) {
-            g_io.forceMotorsStop(true, nowMs);
-        }
+        driveEstop(nowMs);
     } else if (g_linkSm.isFailsafe()) {
-        // Active PS2 link dropped abruptly: cut power & hold brake cleanly without UART flooding.
-        const bool enteredFailsafe = (prevLink != LinkState::Failsafe);
-        g_snap.activeSource = ControlSource::None;
-        g_snap.drive        = {0, 0};
-        if (enteredFailsafe) {
-            g_io.invalidateActuatorCaches();
-        }
-        if (enteredFailsafe || g_io.shouldRefreshStoppedMotors(nowMs)) {
-            g_io.forceMotorsStop(true, nowMs);
-        }
+        driveFailsafe(nowMs, prevLink != LinkState::Failsafe);
     } else if (g_linkSm.isOperational() && valid && g_lastPs2Frame.cross) {
-        // PS2 Cross acts as immediate brake override even during Serial driving.
-        const bool wasMoving = (g_snap.drive.left != 0 || g_snap.drive.right != 0);
-        g_serialDriveLatched = false;
-        g_serialTargetL      = 0;
-        g_serialTargetR      = 0;
-        g_serial.stopMotion();
-        g_snap.activeSource = ControlSource::Ps2;
-        g_snap.drive        = {0, 0};
-        if (wasMoving || g_io.shouldRefreshStoppedMotors(nowMs)) {
-            g_io.forceMotorsStop(true, nowMs);
-        }
-    } else if (g_serialDriveLatched) {
-        g_snap.activeSource = ControlSource::SerialCmd;
-        const int16_t modeCap =
-            g_snap.precisionMode ? Config::kPrecisionMaxPower : Config::kMotorMaxPower;
-        const int16_t maxSpd  = (modeCap < pwrProfile.maxPowerCap) ? modeCap : pwrProfile.maxPowerCap;
-        int16_t effTargetL    = g_snap.reverseDrive ? static_cast<int16_t>(-g_serialTargetR) : g_serialTargetL;
-        int16_t effTargetR    = g_snap.reverseDrive ? static_cast<int16_t>(-g_serialTargetL) : g_serialTargetR;
-        RobotLogic::applyMotorBalanceTrim(effTargetL, effTargetR, g_snap.motorTrimPct);
-        g_snap.drive          = RobotLogic::applyDriveTargetsWithSlew(
-            effTargetL,
-            effTargetR,
-            g_snap.drive.left,
-            g_snap.drive.right,
-            maxSpd,
-            pwrProfile.accelSlewStep,
-            pwrProfile.decelSlewStep,
-            pwrProfile.compPercent);
-        g_io.applyMotors(g_snap.drive.left, g_snap.drive.right, Config::kEnableSmartHoldBrake, nowMs);
+        driveCrossBrake(nowMs);
+    } else if (g_serialDrive.latched) {
+        driveFromSerial(nowMs, pwr);
     } else if (g_linkSm.isOperational()) {
-        g_snap.activeSource = ControlSource::Ps2;
-        if (prevLink != LinkState::Operational) {
-            g_lastArmStepMs = nowMs;
-            g_io.invalidateActuatorCaches();
-        }
-
-        if (valid) {
-            const bool allowArm =
-                static_cast<uint32_t>(nowMs - g_lastArmStepMs) >= Config::kArmStepIntervalMs;
-            const int16_t prevDpad = g_snap.servos.rc2Deg;
-            RobotLogic::updateServoTargetsFromPs2(
-                g_lastPs2Frame, g_snap.servos, allowArm, &g_armPushState, &g_posePresetState);
-            ps2ServosUpdated = true;
-            if (allowArm && g_snap.servos.rc2Deg != prevDpad) {
-                g_lastArmStepMs = nowMs;
-            }
-            g_snap.comScalePct = RobotLogic::computeCoMDynamicScale(g_snap.servos.rc2Deg);
-
-            const int16_t modeCap =
-                g_snap.precisionMode ? Config::kPrecisionMaxPower : Config::kMotorMaxPower;
-            const int16_t maxSpd  = (modeCap < pwrProfile.maxPowerCap) ? modeCap : pwrProfile.maxPowerCap;
-            const bool microLeft  = !g_lastPs2Frame.start && g_lastPs2Frame.left;
-            const bool microRight = !g_lastPs2Frame.start && g_lastPs2Frame.right;
-            g_snap.drive          = RobotLogic::computeKinodynamicDrive(
-                g_lastPs2Frame.ly,
-                g_lastPs2Frame.rx,
-                g_snap.drive.left,
-                g_snap.drive.right,
-                maxSpd,
-                pwrProfile.accelSlewStep,
-                pwrProfile.decelSlewStep,
-                pwrProfile.compPercent,
-                g_snap.servos.rc2Deg,
-                g_snap.reverseDrive,
-                microLeft,
-                microRight,
-                g_snap.motorTrimPct,
-                g_snap.precisionMode);
-            g_io.applyMotors(g_snap.drive.left, g_snap.drive.right, Config::kEnableSmartHoldBrake, nowMs);
-        } else {
-            // Brief wireless glitch (<100ms): preserve last safe drive & servo state without overwrite.
-            g_io.applyMotors(g_snap.drive.left, g_snap.drive.right, Config::kEnableSmartHoldBrake, nowMs);
-        }
+        ps2ServosUpdated = driveFromPs2(nowMs, prevLink, valid, pwr);
     } else {
-        g_snap.activeSource = ControlSource::None;
-        g_snap.drive        = RobotLogic::apply2DofKinodynamicSlew(
-            0,
-            0,
-            g_snap.drive.left,
-            g_snap.drive.right,
-            pwrProfile.accelSlewStep,
-            pwrProfile.decelSlewStep,
-            Config::kAngularAccelSlewStep,
-            Config::kAngularDecelSlewStep);
-        g_io.applyMotors(g_snap.drive.left, g_snap.drive.right, Config::kEnableSmartHoldBrake, nowMs);
+        driveCoastToStop(nowMs, pwr);
     }
     g_snap.holdBrakeActive = g_io.isBrakeEngaged();
+    return ps2ServosUpdated;
+}
 
-    if (!g_linkSm.isConnected() || g_linkSm.isFailsafe()) {
-        g_armPushState.prevSquare    = false;
-        g_posePresetState.prevCircle = false;
-    } else if (!ps2ServosUpdated && valid) {
-        g_armPushState.prevSquare    = g_lastPs2Frame.square;
-        g_posePresetState.prevCircle = g_lastPs2Frame.circle;
-    }
-
+void publishOutputs(uint32_t nowMs) {
     g_io.applyServos(g_snap.servos, nowMs);
     g_oled.render(g_snap, nowMs, false);
     g_snap.oledErr3d = g_oled.err3d();
@@ -714,81 +793,101 @@ void runControlTick(uint32_t nowMs, uint32_t loopDtMs) {
     }
 }
 
-} // namespace
+void runControlTick(uint32_t nowMs, uint32_t loopDtMs) {
+    const ButtonEvents btn = handleOnboardButtons(nowMs);
 
-void setup() {
-    g_snap.wdtResetBoot = (R_SYSTEM->RSTSR1_b.WDTRF != 0);
+    const LinkState prevLink = g_linkSm.state();
+    const bool      valid    = updatePs2Link(nowMs);
+    logLinkTransition(prevLink, g_snap.ps2Link);
 
-    g_serial.begin(Config::kSerialBaud);
+    if (sampleLowerMcu(nowMs, isDriving(), false)) {
+        g_snap.servoRangeErr = g_io.servoRangeErr();
+    } else {
+        g_snap.commHealthy = g_io.commHealthy();
+    }
 
-    // Clear any mid-byte stuck SSD1306 slave on Wire1 before MiniR4.begin() starts OLED.
-    uint8_t sdaBefore  = 1U;
-    uint8_t sdaAfter   = 1U;
-    uint8_t recoverClk = 0U;
-    OledUI::recoverBus(sdaBefore, sdaAfter, recoverClk);
+    const MotorPowerProfile pwrProfile = g_battStab.motorProfile();
+    updateStabilityMetrics(valid, pwrProfile.compPercent, loopDtMs);
 
-    const bool miniOk    = g_io.begin();
+    const bool sysReady    = (g_snap.sysState == SystemState::Ready);
+    const bool ps2Usable   = g_linkSm.isOperational() && valid;
+    const bool ps2LinkLost = !g_linkSm.isConnected() || g_linkSm.isFailsafe();
 
+    if (sysReady && ps2Usable) {
+        handlePs2ConfigCombos();
+    }
+
+    const bool ps2StartAuto = RobotLogic::shouldStartAutoMode(sysReady,
+                                                              g_linkSm.isOperational(),
+                                                              valid,
+                                                              g_lastPs2Frame.triangle,
+                                                              g_prevPs2.triangle,
+                                                              g_lastPs2Frame.cross);
+    const bool startAuto = ps2StartAuto ||
+                           (sysReady && (btn.autoStartRequested || g_serialAutoRequested));
+    g_serialAutoRequested = false;
+
+    if (ps2LinkLost) {
+        latchMenuEdges(false);
+    } else if (valid) {
+        latchMenuEdges(true);
+    }
+
+    if (startAuto) {
+        runAutoSession(nowMs);
+        return;
+    }
+
+    const bool ps2ServosUpdated = arbitrateDrive(nowMs, prevLink, valid, pwrProfile);
+
+    // driveFromPs2() already latched Square/Circle when it consumed the frame.
+    if (ps2LinkLost) {
+        latchServoEdges(false);
+    } else if (!ps2ServosUpdated && valid) {
+        latchServoEdges(true);
+    }
+
+    publishOutputs(nowMs);
+}
+
+// ============================================================================
+// Boot
+// ============================================================================
+
+/** Loads EEPROM config into the snapshot and applies it to the IO layer. */
+bool loadPersistentConfig() {
     PersistentConfig savedCfg{};
-    const bool eepromLoaded = g_io.loadConfigFromEeprom(savedCfg);
-    if (eepromLoaded) {
+    const bool loaded = g_io.loadConfigFromEeprom(savedCfg);
+    if (loaded) {
         g_snap.leftReversed     = savedCfg.leftReversed;
         g_snap.rightReversed    = savedCfg.rightReversed;
-        g_snap.precisionMode    = false;
+        g_snap.precisionMode    = false; // Session-only
         g_snap.rc2SmoothEnabled = savedCfg.rc2SmoothEnabled;
         g_snap.motorTrimPct     = savedCfg.motorTrimPct;
         g_io.setMotorPolarity(g_snap.leftReversed, g_snap.rightReversed);
-        g_io.setRc2SmoothEnabled(g_snap.rc2SmoothEnabled);
-    } else {
-        g_io.setRc2SmoothEnabled(g_snap.rc2SmoothEnabled);
     }
-    g_snap.holdBrakeActive = g_io.isBrakeEngaged();
-    g_snap.servoRangeErr   = g_io.servoRangeErr();
-    g_snap.oledOk        = g_oled.begin();
-    g_snap.oledAddr      = g_oled.i2cAddr();
-    g_snap.oledErr3d     = g_oled.err3d();
-    g_snap.oledErr3c     = g_oled.err3c();
-    const bool oledOk    = g_snap.oledOk;
+    g_io.setRc2SmoothEnabled(g_snap.rc2SmoothEnabled);
+    return loaded;
+}
 
-    const uint32_t nowMs = millis();
-
-    // Seed initial power/health sample cleanly
-    bool     voltValid = false;
-    uint16_t battMv    = 0U;
-    g_io.verifyAndHealLowerMcu(nowMs, false, voltValid, battMv, true);
-    applyBatteryTelemetry(voltValid, battMv, nowMs);
-
+/** Initializes the PS2 link state machine and seeds edge latches from the first frame. */
+bool initPs2Link(uint32_t nowMs) {
     const bool ps2Ready = g_io.isPs2ReadyAtBoot();
     g_linkSm.begin(ps2Ready, nowMs);
     if (ps2Ready) {
         g_io.pollPs2(g_lastPs2Frame);
         const bool bootValid = RobotLogic::isPs2FrameValid(g_lastPs2Frame);
         g_linkSm.onFrame(bootValid, nowMs, false);
-        g_prevTrianglePressed        = bootValid && g_lastPs2Frame.triangle;
-        g_prevSelectPressed          = bootValid && g_lastPs2Frame.select;
-        g_prevL3Pressed              = bootValid && g_lastPs2Frame.l3;
-        g_prevR3Pressed              = bootValid && g_lastPs2Frame.r3;
-        g_prevDpadLeftPressed        = bootValid && g_lastPs2Frame.left;
-        g_prevDpadRightPressed       = bootValid && g_lastPs2Frame.right;
-        g_armPushState.prevSquare    = bootValid && g_lastPs2Frame.square;
-        g_posePresetState.prevCircle = bootValid && g_lastPs2Frame.circle;
+        latchAllPs2Edges(bootValid);
     }
-    g_snap.ps2Link     = g_linkSm.state();
-    g_snap.ps2Mode     = g_lastPs2Frame.modeId;
-    g_snap.ps2Sync     = g_lastPs2Frame.syncByte;
-    g_snap.comScalePct = RobotLogic::computeCoMDynamicScale(g_snap.servos.rc2Deg);
-    updateStabilityMetrics(ps2Ready && RobotLogic::isPs2FrameValid(g_lastPs2Frame),
-                           g_battStab.motorProfile().compPercent,
-                           Config::kControlPeriodMs);
+    g_snap.ps2Link = g_linkSm.state();
+    g_snap.ps2Mode = g_lastPs2Frame.modeId;
+    g_snap.ps2Sync = g_lastPs2Frame.syncByte;
+    return ps2Ready;
+}
 
-    g_lastControlMs   = nowMs;
-    g_lastArmStepMs   = nowMs;
-    g_lastTelemetryMs = nowMs;
-
-    g_oled.render(g_snap, nowMs, true);
-    g_oled.beepBoot();
-
-    g_serial.printBanner();
+void printOledBootLine(uint8_t sdaBefore, uint8_t sdaAfter, uint8_t recoverClk) {
+    const bool oledOk = g_snap.oledOk;
     Serial.print(F("[OLED] SSD1306 addr=0x"));
     Serial.print(g_oled.i2cAddr(), HEX);
     Serial.print(oledOk ? F(" OK (Wire1 ") : F(" ERR="));
@@ -809,27 +908,40 @@ void setup() {
     Serial.print(g_oled.bootSdaAfter());
     Serial.print('/');
     Serial.println(g_oled.bootRecoverClocks());
-    if (!miniOk) {
-        g_serial.printEvent("WARN", "MiniR4 init returned non-OK");
-    }
+}
+
+void printServoBootLine() {
     if (g_io.servoRangeErr() != 0U) {
         Serial.print(F("[WARN] Servo range err="));
         Serial.println(g_io.servoRangeErr());
-    } else {
-        Serial.print(F("[CFG] RC1..RC4 range 0..180deg OK | L1(RC3,RC4)=("));
-        Serial.print(Config::kRc3L1Deg);
-        Serial.print(',');
-        Serial.print(Config::kRc4L1Deg);
-        Serial.print(F(") | Sq=("));
-        Serial.print(Config::kRc3SquareDeg);
-        Serial.print(',');
-        Serial.print(Config::kRc4SquareDeg);
-        Serial.print(F(") | inv3/4=("));
-        Serial.print(Config::kRc3InvertDir ? 1 : 0);
-        Serial.print(',');
-        Serial.print(Config::kRc4InvertDir ? 1 : 0);
-        Serial.println(')');
+        return;
     }
+    Serial.print(F("[CFG] RC1..RC4 range 0..180deg OK | L1(RC3,RC4)=("));
+    Serial.print(Config::kRc3L1Deg);
+    Serial.print(',');
+    Serial.print(Config::kRc4L1Deg);
+    Serial.print(F(") | Sq=("));
+    Serial.print(Config::kRc3SquareDeg);
+    Serial.print(',');
+    Serial.print(Config::kRc4SquareDeg);
+    Serial.print(F(") | inv3/4=("));
+    Serial.print(Config::kRc3InvertDir ? 1 : 0);
+    Serial.print(',');
+    Serial.print(Config::kRc4InvertDir ? 1 : 0);
+    Serial.println(')');
+}
+
+void printBootReport(bool miniOk,
+                     bool eepromLoaded,
+                     uint8_t sdaBefore,
+                     uint8_t sdaAfter,
+                     uint8_t recoverClk) {
+    g_serial.printBanner();
+    printOledBootLine(sdaBefore, sdaAfter, recoverClk);
+    if (!miniOk) {
+        g_serial.printEvent("WARN", "MiniR4 init returned non-OK");
+    }
+    printServoBootLine();
     if (g_snap.wdtResetBoot) {
         g_serial.printEvent("WARN", "Previous reset caused by Watchdog");
     }
@@ -837,6 +949,46 @@ void setup() {
         g_serial.printEvent("EEPROM", "Loaded saved config (rev/trim/rc2Smooth); Precision=100%");
     }
     g_serial.printSnapshot(g_snap);
+}
+
+} // namespace
+
+void setup() {
+    g_snap.wdtResetBoot = (R_SYSTEM->RSTSR1_b.WDTRF != 0);
+
+    g_serial.begin(Config::kSerialBaud);
+
+    // Clear any mid-byte stuck SSD1306 slave on Wire1 before MiniR4.begin() starts OLED.
+    uint8_t sdaBefore  = 1U;
+    uint8_t sdaAfter   = 1U;
+    uint8_t recoverClk = 0U;
+    OledUI::recoverBus(sdaBefore, sdaAfter, recoverClk);
+
+    const bool miniOk       = g_io.begin();
+    const bool eepromLoaded = loadPersistentConfig();
+    g_snap.holdBrakeActive  = g_io.isBrakeEngaged();
+    g_snap.servoRangeErr    = g_io.servoRangeErr();
+    initOled();
+
+    const uint32_t nowMs = millis();
+
+    // Seed initial power/health sample cleanly
+    sampleLowerMcu(nowMs, false, true);
+
+    const bool ps2Ready = initPs2Link(nowMs);
+    g_snap.comScalePct  = RobotLogic::computeCoMDynamicScale(g_snap.servos.rc2Deg);
+    updateStabilityMetrics(ps2Ready && RobotLogic::isPs2FrameValid(g_lastPs2Frame),
+                           g_battStab.motorProfile().compPercent,
+                           Config::kControlPeriodMs);
+
+    g_lastControlMs   = nowMs;
+    g_lastArmStepMs   = nowMs;
+    g_lastTelemetryMs = nowMs;
+
+    g_oled.render(g_snap, nowMs, true);
+    g_oled.beepBoot();
+
+    printBootReport(miniOk, eepromLoaded, sdaBefore, sdaAfter, recoverClk);
 
     // Enable WDT only after MiniR4 STM32 + staggered servo + PS2 boot init completes.
     if (!WDT.begin(Config::kWdtTimeoutMs)) {
