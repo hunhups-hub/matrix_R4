@@ -132,6 +132,17 @@ bool hasEncoderProgressed(int32_t prevCount,
                           int32_t curCount,
                           int32_t minDelta = Config::kAutoStallMinDeltaDeg);
 
+/**
+ * Applies saved EEPROM motor polarity flips (relative to Config::kMotorLeft/RightReverseInit)
+ * onto the polarity flags passed to DriveDC.begin(leftMotorID, rightMotorID, ...).
+ */
+void resolveAutoDrivePolarity(uint8_t leftMotorID,
+                              uint8_t rightMotorID,
+                              bool savedLeftReversed,
+                              bool savedRightReversed,
+                              bool& ioLeftReverse,
+                              bool& ioRightReverse);
+
 /** Steps the D-pad (RC2) servo angle within safe mechanical bounds. */
 int16_t computeArmStep(int16_t currentDeg, bool upPressed, bool downPressed);
 

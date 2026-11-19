@@ -20,17 +20,6 @@
 //    - ถ้าเขียน while(...) วนรอเอง ให้ใส่ delay(1); ข้างใน หรือเช็ก if (autoShouldExit()) break;
 // ============================================================================
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wreturn-type"
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
-#pragma GCC diagnostic ignored "-Wunused-function"
-#pragma GCC diagnostic ignored "-Wunused-value"
-#pragma GCC diagnostic ignored "-Wsign-compare"
-#pragma GCC diagnostic ignored "-Wtype-limits"
-#pragma GCC diagnostic ignored "-Wparentheses"
-
 #ifndef ENABLE_DRIVEDC_BRAKE_DELAY
 #define ENABLE_DRIVEDC_BRAKE_DELAY
 #endif
@@ -92,15 +81,6 @@ struct AutoPowerProxy {
     operator MiniR4Power&() const { return real(); }
 };
 
-template <typename T>
-struct Mj5IsVoid {
-    static constexpr bool value = false;
-};
-template <>
-struct Mj5IsVoid<void> {
-    static constexpr bool value = true;
-};
-
 template <uint8_t ID, TwoWire* WIRE>
 inline MiniR4I2C<ID, WIRE>& getRealI2c() = delete;
 
@@ -126,20 +106,29 @@ inline MiniR4I2C<3U, &Wire1>& getRealI2c<3U, &Wire1>() {
 }
 
 template <uint8_t ID, TwoWire* WIRE>
+inline void initMj5() {}
+
+template <>
+inline void initMj5<static_cast<uint8_t>(-1), &Wire>() {
+    ::MiniR4.I2C0.MJ5.begin();
+}
+
+template <uint8_t ID, TwoWire* WIRE>
 struct AutoMj5Proxy {
     static MatrixMJ5& real() { return getRealI2c<ID, WIRE>().MJ5; }
 
     bool begin() const {
-        if constexpr (ID == static_cast<uint8_t>(-1)) {
-            if constexpr (Mj5IsVoid<decltype(real().begin())>::value) {
-                real().begin();
-                return true;
-            } else {
-                return real().begin();
-            }
-        }
+        initMj5<ID, WIRE>();
         return true;
     }
+    bool     update() const { return real().update(); }
+    bool     isConnected() const { return real().isConnected(); }
+    uint8_t  getLX() const { return real().getLX(); }
+    uint8_t  getLY() const { return real().getLY(); }
+    uint8_t  getRX() const { return real().getRX(); }
+    uint8_t  getRY() const { return real().getRY(); }
+    uint16_t getButtons() const { return real().getButtons(); }
+    bool     Button(uint16_t mask) const { return real().Button(mask); }
 
     operator MatrixMJ5&() const { return real(); }
 };
@@ -181,6 +170,8 @@ struct AutoDriveDCProxy {
                   uint8_t rightMotorID,
                   bool isLeftReverse,
                   bool isRightReverse) const {
+        AutoMode::noteUserLoopActivity();
+        AutoMode::resolveDrivePolarity(leftMotorID, rightMotorID, isLeftReverse, isRightReverse);
         const MMLower::DIR dirL = isLeftReverse ? MMLower::DIR::REVERSE : MMLower::DIR::FORWARD;
         const MMLower::DIR dirR = isRightReverse ? MMLower::DIR::REVERSE : MMLower::DIR::FORWARD;
 
@@ -191,7 +182,7 @@ struct AutoDriveDCProxy {
             }
             if (mmL.Set_Drive2Motor_PARAM(leftMotorID, rightMotorID, dirL, dirR, 1U) ==
                 MMLower::Drive_RESULT::OK) {
-                return real().begin(leftMotorID, rightMotorID, isLeftReverse, isRightReverse);
+                return 0x00U;
             }
             for (uint8_t step = 0U; step < 4U; ++step) {
                 AutoMode::service();
@@ -201,120 +192,215 @@ struct AutoDriveDCProxy {
                 ::delay(25UL);
             }
         }
-        return 0x09U;
+        // ~3 s of STM32 retries exhausted: abort Auto safely instead of driving blind.
+        ::autoAbortDriveInit();
     }
 
     bool setMoveSyncPID(float kp, float ki, float kd) const {
+        AutoMode::noteUserLoopActivity();
         return real().setMoveSyncPID(kp, ki, kd);
     }
     bool setMoveGyroPID(float kp, float ki, float kd) const {
+        AutoMode::noteUserLoopActivity();
         return real().setMoveGyroPID(kp, ki, kd);
     }
     bool setTurnGyroPID(float kp, float ki, float kd) const {
+        AutoMode::noteUserLoopActivity();
         return real().setTurnGyroPID(kp, ki, kd);
     }
 
     uint8_t Move(int16_t leftPower, int16_t rightPower) const {
-        AutoMode::service();
-        const uint8_t res = real().Move(leftPower, rightPower);
-        AutoMode::service();
-        return res;
+        return sendDriveCmd([&]() {
+            return mmL.Set_Drive_Move_Func(leftPower, rightPower, 1U);
+        });
     }
     uint8_t MoveDegs(int16_t leftPower,
                      int16_t rightPower,
                      uint16_t degrees,
                      bool brakeOnStop,
                      bool asyncWait = false) const {
-        AutoMode::service();
-        const uint8_t res = real().MoveDegs(leftPower, rightPower, degrees, brakeOnStop, asyncWait);
-        AutoMode::service();
-        return res;
+        const bool expectMotion = (leftPower != 0 || rightPower != 0) && degrees != 0U;
+        return runBlockingDriveCmd(asyncWait, expectMotion, [&]() {
+            return mmL.Set_Drive_Move_Degs(
+                leftPower, rightPower, degrees, brakeOnStop, asyncWait, 1U);
+        });
     }
+    static uint32_t secondsToMs(float seconds) {
+        if (!(seconds > 0.0f)) {
+            return 0UL;
+        }
+        const float ms = seconds * 1000.0f + 0.5f;
+        if (ms >= 4294967040.0f) {
+            return 4294967040UL;
+        }
+        return static_cast<uint32_t>(ms);
+    }
+
     uint8_t MoveTime(int16_t leftPower,
                      int16_t rightPower,
                      float seconds,
                      bool brakeOnStop,
                      bool asyncWait = false) const {
-        AutoMode::service();
-        const uint8_t res = real().MoveTime(leftPower, rightPower, seconds, brakeOnStop, asyncWait);
-        AutoMode::service();
-        return res;
+        const uint32_t timeMs       = secondsToMs(seconds);
+        const bool     expectMotion = (leftPower != 0 || rightPower != 0) && timeMs > 0UL;
+        return runBlockingDriveCmd(asyncWait, expectMotion, [&]() {
+            return mmL.Set_Drive_Move_Time(
+                leftPower, rightPower, timeMs, brakeOnStop, asyncWait, 1U);
+        });
     }
     uint8_t MoveSync(int16_t leftPower, int16_t rightPower) const {
-        AutoMode::service();
-        const uint8_t res = real().MoveSync(leftPower, rightPower);
-        AutoMode::service();
-        return res;
+        return sendDriveCmd([&]() {
+            return mmL.Set_Drive_MoveSync_Func(leftPower, rightPower, 1U);
+        });
     }
     uint8_t MoveSyncDegs(int16_t leftPower,
                          int16_t rightPower,
                          uint16_t degrees,
                          bool brakeOnStop,
                          bool asyncWait = false) const {
-        AutoMode::service();
-        const uint8_t res =
-            real().MoveSyncDegs(leftPower, rightPower, degrees, brakeOnStop, asyncWait);
-        AutoMode::service();
-        return res;
+        const bool expectMotion = (leftPower != 0 || rightPower != 0) && degrees != 0U;
+        return runBlockingDriveCmd(asyncWait, expectMotion, [&]() {
+            return mmL.Set_Drive_MoveSync_Degs(
+                leftPower, rightPower, degrees, brakeOnStop, asyncWait, 1U);
+        });
     }
     uint8_t MoveSyncTime(int16_t leftPower,
                          int16_t rightPower,
                          float seconds,
                          bool brakeOnStop,
                          bool asyncWait = false) const {
-        AutoMode::service();
-        const uint8_t res =
-            real().MoveSyncTime(leftPower, rightPower, seconds, brakeOnStop, asyncWait);
-        AutoMode::service();
-        return res;
+        const uint32_t timeMs       = secondsToMs(seconds);
+        const bool     expectMotion = (leftPower != 0 || rightPower != 0) && timeMs > 0UL;
+        return runBlockingDriveCmd(asyncWait, expectMotion, [&]() {
+            return mmL.Set_Drive_MoveSync_Time(
+                leftPower, rightPower, timeMs, brakeOnStop, asyncWait, 1U);
+        });
     }
-    uint8_t MoveGyro(int16_t leftPower, int16_t rightPower) const {
-        AutoMode::service();
-        const uint8_t res = real().MoveGyro(leftPower, rightPower);
-        AutoMode::service();
-        return res;
+    uint8_t MoveGyro(int16_t power, int16_t targetYawDeg) const {
+        return sendDriveCmd([&]() {
+            return mmL.Set_Drive_MoveGyro_Func(power, targetYawDeg, 1U);
+        });
     }
-    uint8_t MoveGyroDegs(int16_t leftPower,
-                         int16_t rightPower,
+    uint8_t MoveGyroDegs(int16_t power,
+                         int16_t targetYawDeg,
                          uint16_t degrees,
                          bool brakeOnStop,
                          bool asyncWait = false) const {
-        AutoMode::service();
-        const uint8_t res =
-            real().MoveGyroDegs(leftPower, rightPower, degrees, brakeOnStop, asyncWait);
-        AutoMode::service();
-        return res;
+        const bool expectMotion = (power != 0) && degrees != 0U;
+        return runBlockingDriveCmd(asyncWait, expectMotion, [&]() {
+            return mmL.Set_Drive_MoveGyro_Degs(
+                power, targetYawDeg, degrees, brakeOnStop, asyncWait, 1U);
+        });
     }
-    uint8_t MoveGyroTime(int16_t leftPower,
-                         int16_t rightPower,
+    uint8_t MoveGyroTime(int16_t power,
+                         int16_t targetYawDeg,
                          float seconds,
                          bool brakeOnStop,
                          bool asyncWait = false) const {
-        AutoMode::service();
-        const uint8_t res =
-            real().MoveGyroTime(leftPower, rightPower, seconds, brakeOnStop, asyncWait);
-        AutoMode::service();
-        return res;
+        const uint32_t timeMs       = secondsToMs(seconds);
+        const bool     expectMotion = (power != 0) && timeMs > 0UL;
+        return runBlockingDriveCmd(asyncWait, expectMotion, [&]() {
+            return mmL.Set_Drive_MoveGyro_Time(
+                power, targetYawDeg, timeMs, brakeOnStop, asyncWait, 1U);
+        });
     }
-    uint8_t TurnGyro(int16_t leftPower,
-                     int16_t rightPower,
-                     uint8_t targetAngle,
+    uint8_t TurnGyro(int16_t power,
+                     int16_t targetYawDeg,
+                     uint8_t mode,
                      bool brakeOnStop,
                      bool asyncWait = false) const {
-        AutoMode::service();
-        const uint8_t res =
-            real().TurnGyro(leftPower, rightPower, targetAngle, brakeOnStop, asyncWait);
-        AutoMode::service();
-        return res;
+        const bool expectMotion = (power != 0);
+        return runBlockingDriveCmd(asyncWait, expectMotion, [&]() {
+            return mmL.Set_Drive_TurnGyro(
+                power, targetYawDeg, mode, brakeOnStop, asyncWait, 1U);
+        });
     }
 
-    int32_t getCounter() const { return real().getCounter(); }
-    int32_t getDegrees() const { return real().getDegrees(); }
-    uint8_t resetCounter() const { return real().resetCounter(); }
-    uint8_t brake(bool state) const { return real().brake(state); }
-    bool isPrevTaskDone() const { return real().isPrevTaskDone(); }
+    int32_t getCounter() const {
+        AutoMode::noteUserLoopActivity();
+        AutoMode::service();
+        return real().getCounter();
+    }
+    int32_t getDegrees() const {
+        AutoMode::noteUserLoopActivity();
+        AutoMode::service();
+        return real().getDegrees();
+    }
+    uint8_t resetCounter() const {
+        AutoMode::noteUserLoopActivity();
+        AutoMode::service();
+        return real().resetCounter();
+    }
+    uint8_t brake(bool state) const {
+        AutoMode::noteUserLoopActivity();
+        AutoMode::service();
+        return real().brake(state);
+    }
+    bool isPrevTaskDone() const {
+        AutoMode::noteUserLoopActivity();
+        AutoMode::service();
+        bool stats[2] = {false, false};
+        if (mmL.Get_Drive_isTaskDone(1U, stats) != MMLower::Drive_RESULT::OK) {
+            return true;
+        }
+        return !stats[0];
+    }
 
     operator MiniR4DriveDC<1>&() const { return real(); }
+
+private:
+    template <typename SendFn>
+    uint8_t sendDriveCmd(SendFn sendFn) const {
+        AutoMode::noteUserLoopActivity();
+        AutoMode::service();
+        MMLower::Drive_RESULT result = sendFn();
+        uint8_t idx = 0U;
+        while (result != MMLower::Drive_RESULT::OK) {
+            ::delay(2UL);
+            if (!AutoMode::isRunning()) {
+                return 0x09U;
+            }
+            result = sendFn();
+            idx++;
+            if (result == MMLower::Drive_RESULT::ERROR_Drive_Define) {
+                if (idx >= Drive_retry_Period) {
+                    return 0x07U;
+                }
+            } else if (result != MMLower::Drive_RESULT::OK) {
+                if (idx >= Drive_retry_Period) {
+                    return 0x01U;
+                }
+            }
+        }
+        AutoMode::service();
+        return 0x00U;
+    }
+
+    template <typename SendFn>
+    uint8_t runBlockingDriveCmd(bool asyncWait, bool expectMotion, SendFn sendFn) const {
+        const uint8_t res = sendDriveCmd(sendFn);
+        if (res != 0x00U || asyncWait) {
+            return res;
+        }
+
+        AutoMode::beginBlockingDriveTask(expectMotion);
+        while (AutoMode::isRunning()) {
+            ::delay(10UL);
+            bool stats[2] = {true, false};
+            if (mmL.Get_Drive_isTaskDone(1U, stats) == MMLower::Drive_RESULT::OK && !stats[0]) {
+                break;
+            }
+        }
+        AutoMode::endBlockingDriveTask();
+
+#ifdef ENABLE_DRIVEDC_BRAKE_DELAY
+        if (AutoMode::isRunning()) {
+            ::delay(DRIVEDC_BRAKE_DELAY_MS);
+        }
+#endif
+        AutoMode::service();
+        return 0x00U;
+    }
 };
 
 struct AutoPs2Proxy {
@@ -327,23 +413,27 @@ struct AutoPs2Proxy {
     }
 
     bool Button(uint16_t button) const {
+        AutoMode::noteUserLoopActivity();
         ensurePolledOnAutoEntry();
         consumeEntryTriIfMatched(button);
         return (pressedMask_ & button) != 0U;
     }
 
     unsigned int ButtonDataByte() const {
+        AutoMode::noteUserLoopActivity();
         ensurePolledOnAutoEntry();
         consumeEntryTriIfMatched(static_cast<uint16_t>(PSB_TRIANGLE));
         return pressedMask_;
     }
 
     bool NewButtonState() const {
+        AutoMode::noteUserLoopActivity();
         ensurePolledOnAutoEntry();
         return (pressedMask_ ^ prevPressedMask_) != 0U;
     }
 
     bool NewButtonState(unsigned int button) const {
+        AutoMode::noteUserLoopActivity();
         ensurePolledOnAutoEntry();
         consumeEntryTriIfMatched(static_cast<uint16_t>(button));
         return ((pressedMask_ ^ prevPressedMask_) & static_cast<uint16_t>(button)) != 0U;
@@ -359,6 +449,7 @@ struct AutoPs2Proxy {
     }
 
     uint8_t Analog(uint8_t button) const {
+        AutoMode::noteUserLoopActivity();
         ensurePolledOnAutoEntry();
         switch (button) {
             case PSS_RX: return frame_.rx;
@@ -403,15 +494,22 @@ private:
                 static_cast<uint16_t>(static_cast<uint8_t>(~frame_.buttons1)));
         }
         if (entryTri) {
-            prevPressedMask_ = 0U;
-            entryTriPending_ = true;
+            pressedMask_       = 0U;
+            prevPressedMask_   = 0U;
+            entryTriPending_   = true;
+            entryTriPollsLeft_ = 2U;
+            mask |= static_cast<uint16_t>(PSB_TRIANGLE);
+        } else if (entryTriPending_ && entryTriPollsLeft_ > 0U) {
+            entryTriPollsLeft_--;
+            prevPressedMask_ = static_cast<uint16_t>(pressedMask_ & ~static_cast<uint16_t>(PSB_TRIANGLE));
             mask |= static_cast<uint16_t>(PSB_TRIANGLE);
         } else {
-            prevPressedMask_ = pressedMask_;
-            entryTriPending_ = false;
+            entryTriPending_   = false;
+            entryTriPollsLeft_ = 0U;
+            prevPressedMask_   = pressedMask_;
         }
         pressedMask_ = mask;
-        return ok || entryTri;
+        return ok || entryTri || entryTriPending_;
     }
 
     void ensurePolledOnAutoEntry() const {
@@ -422,7 +520,8 @@ private:
 
     void consumeEntryTriIfMatched(uint16_t mask) const {
         if (entryTriPending_ && ((mask & static_cast<uint16_t>(PSB_TRIANGLE)) != 0U)) {
-            entryTriPending_ = false;
+            entryTriPending_   = false;
+            entryTriPollsLeft_ = 0U;
             AutoMode::notifyPs2TriangleMatched();
         }
     }
@@ -431,6 +530,7 @@ private:
     mutable uint16_t pressedMask_{0U};
     mutable uint16_t prevPressedMask_{0U};
     mutable bool     entryTriPending_{false};
+    mutable uint8_t  entryTriPollsLeft_{0U};
 };
 
 struct AutoMiniR4Proxy {
@@ -494,9 +594,12 @@ struct AutoSerialProxy {
         return ::Serial.write(std::forward<Args>(args)...);
     }
 
-    int   available() const { return ::Serial.available(); }
-    int   read() const { return ::Serial.read(); }
-    int   peek() const { return ::Serial.peek(); }
+    int   available() const { return AutoMode::serialAvailable(); }
+    int   read() const {
+        AutoMode::noteUserLoopActivity();
+        return AutoMode::serialRead();
+    }
+    int   peek() const { return AutoMode::serialPeek(); }
     void  flush() const { ::Serial.flush(); }
     explicit operator bool() const { return static_cast<bool>(::Serial); }
     operator decltype(::Serial)&() const { return ::Serial; }
@@ -509,6 +612,17 @@ inline constexpr AutoSerialProxy Serial{};
 // >>>>> วางโค้ด AUTO จาก MATRIXblock R4 ด้านล่างนี้ได้เลย <<<<<
 // >>>>> PASTE MATRIXblock R4 AUTO CODE BELOW THIS LINE <<<<<
 // ============================================================================
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wreturn-type"
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wunused-value"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#pragma GCC diagnostic ignored "-Wtype-limits"
+#pragma GCC diagnostic ignored "-Wparentheses"
 
 #define ENABLE_DRIVEDC_BRAKE_DELAY
 #include "MatrixMiniR4.h"

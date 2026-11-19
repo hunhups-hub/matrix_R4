@@ -103,6 +103,7 @@ struct ButtonEvents {
     bool  downPressed        = false;
     bool  shortUp            = false;
     bool  shortDown          = false;
+    bool  downPressEdge      = false; // Debounced BTN_DOWN press (fires immediately, not on release)
     bool  comboHolding       = false;
     float uploadHoldRatio    = 0.0f;
     bool  uploadRequested    = false;
@@ -115,7 +116,6 @@ struct SerialDriveCommand {
     bool    active      = false;
     int16_t targetLeft  = 0;
     int16_t targetRight = 0;
-    bool    slowMode    = false;
 };
 
 struct SystemSnapshot {

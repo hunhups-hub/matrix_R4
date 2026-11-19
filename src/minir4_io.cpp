@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 #include <MatrixMiniR4.h>
+#include <Wire.h>
 #include "Modules/MMLower.h"
 
 #include "robot_logic.h"
@@ -13,96 +14,206 @@ namespace {
 constexpr uint8_t kBtnUpId   = 2U;
 constexpr uint8_t kBtnDownId = 1U;
 
+template <typename MotorT>
+bool beginMotorBounded(MotorT& motor) {
+    for (uint8_t attempt = 0U; attempt < 3U; ++attempt) {
+        if (motor.begin()) {
+            return true;
+        }
+        delay(10);
+    }
+    return false;
+}
+
+bool setMotorPowerSingle(uint8_t motorId, int16_t power) {
+    return mmL.SetDCMotorPower(motorId, power) == MMLower::RESULT::OK;
+}
+
+bool isServoParamError(MMLower::RESULT res) {
+    return res == MMLower::RESULT::ERROR_SERVO_MIN_PULSE ||
+           res == MMLower::RESULT::ERROR_SERVO_MAX_PULSE ||
+           res == MMLower::RESULT::ERROR_SERVO_MIN_ANGLE ||
+           res == MMLower::RESULT::ERROR_SERVO_MAX_ANGLE;
+}
+
 } // namespace
 
 bool MiniR4IO::begin() {
-    const bool ok = MiniR4.begin();
+    // Initialize STM32 UART with bounded EchoTest retries (avoids MiniR4.begin() infinite while loops).
+    const bool lowerOk = (mmL.Init() == MMLower::RESULT::OK);
+
+    // Always initialize UNO R4 onboard peripherals regardless of STM32 link state.
+    MiniR4.LED.begin(7);
+    MiniR4.LED.setColor(1, 0, 0, 0);
+    MiniR4.LED.setColor(2, 0, 0, 0);
+    MiniR4.Buzzer.begin(6);
+
+    // Arm Wire1 timeout before OLED init so a shorted/hung I2C1 bus cannot stall boot.
+    Wire1.begin();
+    Wire1.setWireTimeout(static_cast<unsigned int>(Config::kWireTimeoutUs), true);
+    MiniR4.OLED = Adafruit_SSD1306(128, 32, &Wire1, -1);
+    (void)MiniR4.OLED.begin(SSD1306_SWITCHCAPVCC, MATRIXMINIR4_OLED_ADDRESS, false, false);
+    MiniR4.OLED.setTextColor(SSD1306_WHITE);
+    MiniR4.OLED.clearDisplay();
+    MiniR4.OLED.display();
 
     leftReverse_  = Config::kMotorLeftReverseInit;
     rightReverse_ = Config::kMotorRightReverseInit;
 
-    const bool cfgOk = applyLowerMcuConfig(true);
+    if (lowerOk) {
+        (void)MiniR4.Motion.begin();
 
-    // Zero M1/M2 immediately at boot for safety (engage hold-brake if enabled).
-    const bool m1Ok = Config::kEnableSmartHoldBrake ? MiniR4.M1.setBrake(true) : MiniR4.M1.setPower(0);
-    const bool m2Ok = Config::kEnableSmartHoldBrake ? MiniR4.M2.setBrake(true) : MiniR4.M2.setPower(0);
-    lastLeftPower_    = 0;
-    lastRightPower_   = 0;
-    lastBrakeEngaged_ = Config::kEnableSmartHoldBrake && m1Ok && m2Ok;
-    motorsSynced_     = m1Ok && m2Ok;
-    if (!motorsSynced_ || !cfgOk) {
-        commHealthy_   = false;
-        commNeedsHeal_ = true;
+        const bool m1InitOk = beginMotorBounded(MiniR4.M1);
+        const bool m2InitOk = m1InitOk && beginMotorBounded(MiniR4.M2);
+        const bool m3InitOk = m2InitOk && beginMotorBounded(MiniR4.M3);
+        const bool m4InitOk = m3InitOk && beginMotorBounded(MiniR4.M4);
+        const bool mInitOk  = m1InitOk && m2InitOk && m3InitOk && m4InitOk;
+
+        const bool cfgOk = mInitOk && applyLowerMcuConfig(true);
+
+        // Zero M1/M2 immediately at boot for safety (engage hold-brake if enabled).
+        const bool m1Ok = cfgOk && (Config::kEnableSmartHoldBrake
+                                        ? MiniR4.M1.setBrake(true)
+                                        : setMotorPowerSingle(Config::kMotorLeftId, 0));
+        const bool m2Ok = m1Ok && (Config::kEnableSmartHoldBrake
+                                       ? MiniR4.M2.setBrake(true)
+                                       : setMotorPowerSingle(Config::kMotorRightId, 0));
+        lastLeftPower_    = 0;
+        lastRightPower_   = 0;
+        lastBrakeEngaged_ = Config::kEnableSmartHoldBrake && m1Ok && m2Ok;
+        motorsSynced_     = m1Ok && m2Ok;
+        if (motorsSynced_) {
+            lastMotorSendMs_ = millis();
+        }
+
+        if (motorsSynced_) {
+            staggerBootServos();
+        } else {
+            lastServos_   = RobotLogic::clampServoTargets(ServoTargets{});
+            servosSynced_ = false;
+        }
+
+        // Seed initial button state so stuck buttons at boot cannot arm the upload shortcut.
+        bool       upInit    = false;
+        bool       downInit  = false;
+        const bool btnUpOk   = motorsSynced_ && servosSynced_ &&
+                               (mmL.GetButtonState(kBtnUpId, upInit) == MMLower::RESULT::OK);
+        const bool btnDownOk = btnUpOk &&
+                               (mmL.GetButtonState(kBtnDownId, downInit) == MMLower::RESULT::OK);
+        if (!btnUpOk) {
+            upInit = false;
+        }
+        if (!btnDownOk) {
+            downInit = false;
+        }
+        btnUp_.rawState           = upInit;
+        btnUp_.stableState        = btnUp_.rawState;
+        btnDown_.rawState         = downInit;
+        btnDown_.stableState      = btnDown_.rawState;
+        suppressUploadUntilClear_ = btnUp_.stableState || btnDown_.stableState;
+
+        if (!mInitOk || !cfgOk || !motorsSynced_ || !servosSynced_ || !btnUpOk || !btnDownOk) {
+            (void)noteCommFailure();
+        }
+    } else {
+        // Skip blocking STM32 calls during boot; verifyAndHealLowerMcu() recovers when online.
+        lastLeftPower_            = 0;
+        lastRightPower_           = 0;
+        lastBrakeEngaged_         = false;
+        motorsSynced_             = false;
+        lastServos_               = RobotLogic::clampServoTargets(ServoTargets{});
+        servosSynced_             = false;
+        btnUp_                    = DebouncedBtn{};
+        btnDown_                  = DebouncedBtn{};
+        suppressUploadUntilClear_ = false;
+        (void)noteCommFailure();
     }
 
-    staggerBootServos();
-
-    // Reconfigure PS2 pins after MiniR4.begin() using deterministic non-blocking SPI driver.
+    // Reconfigure PS2 pins using deterministic non-blocking SPI driver.
     ps2Ready_ = ps2_.begin(Config::kPs2ClkPin,
                            Config::kPs2CmdPin,
                            Config::kPs2AttPin,
                            Config::kPs2DatPin,
                            Config::kPs2BootTimeoutMs);
 
-    // Seed initial button state so stuck buttons at boot cannot arm the upload shortcut.
-    bool upInit   = false;
-    bool downInit = false;
-    if (mmL.GetButtonState(kBtnUpId, upInit) != MMLower::RESULT::OK) {
-        upInit         = false;
-        commHealthy_   = false;
-        commNeedsHeal_ = true;
-    }
-    if (mmL.GetButtonState(kBtnDownId, downInit) != MMLower::RESULT::OK) {
-        downInit       = false;
-        commHealthy_   = false;
-        commNeedsHeal_ = true;
-    }
-    btnUp_.rawState           = upInit;
-    btnUp_.stableState        = btnUp_.rawState;
-    btnDown_.rawState         = downInit;
-    btnDown_.stableState      = btnDown_.rawState;
-    suppressUploadUntilClear_ = btnUp_.stableState || btnDown_.stableState;
-
     const uint32_t nowMs = millis();
-    lastLowerHealthMs_   = nowMs;
-    lastConfigResyncMs_  = nowMs;
-    lastStopRefreshMs_   = nowMs;
-    lastButtonPollMs_    = nowMs;
+    if (!commHealthy_) {
+        lastCommFailMs_ = nowMs;
+    }
+    lastLowerHealthMs_  = nowMs;
+    lastConfigResyncMs_ = nowMs;
+    lastStopRefreshMs_  = nowMs;
+    lastButtonPollMs_   = nowMs;
 
-    return ok;
+    return lowerOk && commHealthy_;
 }
 
 bool MiniR4IO::applyLowerMcuConfig(bool zeroAuxMotors) {
     // Allow 9V-18V DC adapters as well as 2S-4S packs without false STM32 cutoff.
-    const bool pwrOk =
-        (mmL.SetPowerParam(Config::kPowerFullVolt,
-                           Config::kPowerCutoffVolt,
-                           Config::kPowerAlarmVolt) == MMLower::RESULT::OK);
-
-    const bool m1RevOk = MiniR4.M1.setReverse(leftReverse_);
-    const bool m2RevOk = MiniR4.M2.setReverse(rightReverse_);
-    const bool rngOk   = configureServoRanges();
-
-    bool auxOk = true;
-    if (zeroAuxMotors || !auxMotorsZeroed_) {
-        const bool m3Ok = MiniR4.M3.setPower(0);
-        const bool m4Ok = MiniR4.M4.setPower(0);
-        auxOk            = m3Ok && m4Ok;
-        auxMotorsZeroed_ = auxOk;
+    if (mmL.SetPowerParam(Config::kPowerFullVolt,
+                          Config::kPowerCutoffVolt,
+                          Config::kPowerAlarmVolt) != MMLower::RESULT::OK) {
+        return false;
     }
 
-    return pwrOk && m1RevOk && m2RevOk && rngOk && auxOk;
+    if (!MiniR4.M1.setReverse(leftReverse_) || !MiniR4.M2.setReverse(rightReverse_)) {
+        return false;
+    }
+
+    if (!configureServoRanges()) {
+        return false;
+    }
+
+    if (zeroAuxMotors || !auxMotorsZeroed_) {
+        if (mmL.SetDCMotorSpeedRange(Config::kMotorLeftId, 0U, 100U) != MMLower::RESULT::OK ||
+            mmL.SetDCMotorSpeedRange(Config::kMotorRightId, 0U, 100U) != MMLower::RESULT::OK) {
+            return false;
+        }
+
+        const bool m3Ok  = setMotorPowerSingle(3U, 0);
+        const bool m4Ok  = m3Ok && setMotorPowerSingle(4U, 0);
+        auxMotorsZeroed_ = m3Ok && m4Ok;
+        if (!auxMotorsZeroed_) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+uint32_t MiniR4IO::noteCommFailure() {
+    const uint32_t failMs = millis();
+    commHealthy_          = false;
+    commNeedsHeal_        = true;
+    lastCommFailMs_       = failMs;
+    return failMs;
+}
+
+bool MiniR4IO::isCommBackoffActive(uint32_t nowMs, uint32_t backoffMs) const {
+    return !commHealthy_ &&
+           static_cast<int32_t>(nowMs - lastCommFailMs_) < static_cast<int32_t>(backoffMs);
+}
+
+bool MiniR4IO::isElapsed(uint32_t nowMs, uint32_t sinceMs, uint32_t periodMs) {
+    return static_cast<int32_t>(nowMs - sinceMs) >= static_cast<int32_t>(periodMs);
 }
 
 void MiniR4IO::setMotorPolarity(bool leftReverse, bool rightReverse) {
+    if (leftReverse == leftReverse_ && rightReverse == rightReverse_ && commHealthy_) {
+        return;
+    }
     leftReverse_  = leftReverse;
     rightReverse_ = rightReverse;
+    if (!commHealthy_) {
+        motorsSynced_  = false;
+        commNeedsHeal_ = true;
+        return;
+    }
     const bool ok1 = MiniR4.M1.setReverse(leftReverse_);
-    const bool ok2 = MiniR4.M2.setReverse(rightReverse_);
+    const bool ok2 = ok1 && MiniR4.M2.setReverse(rightReverse_);
     motorsSynced_  = false;
     if (!ok1 || !ok2) {
-        commHealthy_   = false;
-        commNeedsHeal_ = true;
+        (void)noteCommFailure();
     }
 }
 
@@ -148,7 +259,7 @@ bool MiniR4IO::configureRc34PulseRange(uint8_t ch) {
         }
         if (lastRes != MMLower::RESULT::ERROR_SERVO_MIN_PULSE &&
             lastRes != MMLower::RESULT::ERROR_SERVO_MAX_PULSE) {
-            if (rc34PulseErr_ == 0U) {
+            if (isServoParamError(lastRes) && rc34PulseErr_ == 0U) {
                 rc34PulseErr_ = static_cast<uint8_t>(lastRes);
             }
             return false;
@@ -164,16 +275,14 @@ bool MiniR4IO::configureRc34PulseRange(uint8_t ch) {
 
 bool MiniR4IO::configureServoRanges() {
     servoRangeErr_ = 0U;
-    bool allOk     = true;
-    bool pulseDone = true;
     if (Config::kEnableRc34CustomPulse && !rc34PulseSynced_) {
         rc34PulseErr_ = 0U;
     }
     for (uint8_t ch = 1U; ch <= 4U; ++ch) {
         if (Config::kEnableRc34CustomPulse && !rc34PulseSynced_ && (ch == 3U || ch == 4U)) {
             if (!configureRc34PulseRange(ch)) {
-                allOk     = false;
-                pulseDone = false;
+                servoRangeErr_ = rc34PulseErr_;
+                return false;
             }
         }
         const MMLower::RESULT angleRes = mmL.SetServoAngleRange(
@@ -181,19 +290,22 @@ bool MiniR4IO::configureServoRanges() {
             static_cast<uint16_t>(Config::kServoMinDeg),
             static_cast<uint16_t>(Config::kServoMaxDeg));
         if (angleRes != MMLower::RESULT::OK) {
-            allOk = false;
-            if (servoRangeErr_ == 0U) {
+            if (isServoParamError(angleRes) && servoRangeErr_ == 0U) {
                 servoRangeErr_ = static_cast<uint8_t>(angleRes);
             }
+            if (servoRangeErr_ == 0U) {
+                servoRangeErr_ = rc34PulseErr_;
+            }
+            return false;
         }
     }
-    if (Config::kEnableRc34CustomPulse && !rc34PulseSynced_ && pulseDone) {
+    if (Config::kEnableRc34CustomPulse && !rc34PulseSynced_) {
         rc34PulseSynced_ = true;
     }
     if (servoRangeErr_ == 0U) {
         servoRangeErr_ = rc34PulseErr_;
     }
-    return allOk;
+    return true;
 }
 
 void MiniR4IO::staggerBootServos() {
@@ -201,27 +313,27 @@ void MiniR4IO::staggerBootServos() {
     const int16_t      hwRc3    = RobotLogic::applyServoDirection(safeInit.rc3Deg, Config::kRc3InvertDir);
     const int16_t      hwRc4    = RobotLogic::applyServoDirection(safeInit.rc4Deg, Config::kRc4InvertDir);
     const bool ok1 = MiniR4.RC1.setAngle(static_cast<uint16_t>(safeInit.rc1Deg));
-    delay(Config::kServoBootStaggerMs);
-    const bool ok2 = MiniR4.RC2.setAngle(static_cast<uint16_t>(safeInit.rc2Deg));
-    delay(Config::kServoBootStaggerMs);
+    if (ok1) {
+        delay(Config::kServoBootStaggerMs);
+    }
+    const bool ok2 = ok1 && MiniR4.RC2.setAngle(static_cast<uint16_t>(safeInit.rc2Deg));
+    if (ok2) {
+        delay(Config::kServoBootStaggerMs);
+    }
 
     // Engage paired RC3+RC4 together in a single UART frame to avoid one-sided twist at boot.
-    bool ok34 = (mmL.SetAllServoAngle(static_cast<uint16_t>(safeInit.rc1Deg),
-                                      static_cast<uint16_t>(safeInit.rc2Deg),
-                                      static_cast<uint16_t>(hwRc3),
-                                      static_cast<uint16_t>(hwRc4)) == MMLower::RESULT::OK);
-    if (!ok34) {
-        const bool ok3 = MiniR4.RC3.setAngle(static_cast<uint16_t>(hwRc3));
-        delay(Config::kServoBootStaggerMs);
-        const bool ok4 = MiniR4.RC4.setAngle(static_cast<uint16_t>(hwRc4));
-        ok34           = ok3 && ok4;
-    }
+    const bool ok34 = ok2 &&
+                      (mmL.SetAllServoAngle(static_cast<uint16_t>(safeInit.rc1Deg),
+                                            static_cast<uint16_t>(safeInit.rc2Deg),
+                                            static_cast<uint16_t>(hwRc3),
+                                            static_cast<uint16_t>(hwRc4)) == MMLower::RESULT::OK);
 
     lastServos_   = safeInit;
     servosSynced_ = ok1 && ok2 && ok34;
-    if (!servosSynced_) {
-        commHealthy_   = false;
-        commNeedsHeal_ = true;
+    if (servosSynced_) {
+        lastServoSendMs_ = millis();
+    } else {
+        (void)noteCommFailure();
     }
 }
 
@@ -237,8 +349,10 @@ void MiniR4IO::pollPs2(Ps2Frame& outFrame) {
 bool MiniR4IO::updateButtonDebounce(DebouncedBtn& btn,
                                     bool sample,
                                     uint32_t nowMs,
-                                    bool& outShortRelease) {
+                                    bool& outShortRelease,
+                                    bool& outPressEdge) {
     outShortRelease = false;
+    outPressEdge    = false;
     if (sample != btn.rawState) {
         btn.rawState     = sample;
         btn.lastChangeMs = nowMs;
@@ -249,6 +363,7 @@ bool MiniR4IO::updateButtonDebounce(DebouncedBtn& btn,
         btn.stableState = btn.rawState;
         if (btn.stableState) {
             btn.pressLatched = true;
+            outPressEdge     = true;
         } else if (btn.pressLatched) {
             btn.pressLatched = false;
             outShortRelease  = true;
@@ -267,9 +382,11 @@ void MiniR4IO::pollButtons(uint32_t nowMs, ButtonEvents& outEvents) {
     bool pollRan   = false;
     bool shortUp   = false;
     bool shortDown = false;
+    bool downEdge  = false;
 
     // When comm is unhealthy, throttle button polling to prevent continuous 100 ms blocking UART timeouts.
-    if (static_cast<uint32_t>(nowMs - lastButtonPollMs_) >= pollInterval) {
+    if (isElapsed(nowMs, lastButtonPollMs_, pollInterval) &&
+        !isCommBackoffActive(nowMs, Config::kButtonUnhealthyPollPeriodMs)) {
         lastButtonPollMs_ = nowMs;
         pollRan           = true;
 
@@ -277,17 +394,25 @@ void MiniR4IO::pollButtons(uint32_t nowMs, ButtonEvents& outEvents) {
         bool sample = false;
         if (pollUpTurn_) {
             if (mmL.GetButtonState(kBtnUpId, sample) == MMLower::RESULT::OK) {
-                updateButtonDebounce(btnUp_, sample, nowMs, shortUp);
+                bool upEdge = false;
+                updateButtonDebounce(btnUp_, sample, nowMs, shortUp, upEdge);
             } else {
-                commHealthy_   = false;
-                commNeedsHeal_ = true;
+                // Drop held state on comm failure so stale buttons never phantom-trigger Bootloader/Auto.
+                btnUp_            = DebouncedBtn{};
+                comboPrevActive_  = false;
+                comboFired_       = false;
+                upHoldPrevActive_ = false;
+                upHoldFired_      = false;
+                lastButtonPollMs_ = noteCommFailure();
             }
         } else {
             if (mmL.GetButtonState(kBtnDownId, sample) == MMLower::RESULT::OK) {
-                updateButtonDebounce(btnDown_, sample, nowMs, shortDown);
+                updateButtonDebounce(btnDown_, sample, nowMs, shortDown, downEdge);
             } else {
-                commHealthy_   = false;
-                commNeedsHeal_ = true;
+                btnDown_          = DebouncedBtn{};
+                comboPrevActive_  = false;
+                comboFired_       = false;
+                lastButtonPollMs_ = noteCommFailure();
             }
         }
         pollUpTurn_ = !pollUpTurn_;
@@ -295,6 +420,13 @@ void MiniR4IO::pollButtons(uint32_t nowMs, ButtonEvents& outEvents) {
 
     outEvents.upPressed   = btnUp_.stableState;
     outEvents.downPressed = btnDown_.stableState;
+
+    // E-stop must fire the instant BTN_DOWN is pressed (never suppressed, never waits for release).
+    // The press is consumed here so releasing the button does not emit a second shortDown event.
+    if (downEdge) {
+        outEvents.downPressEdge = true;
+        btnDown_.pressLatched   = false;
+    }
 
     if (suppressUploadUntilClear_) {
         if (!btnUp_.stableState && !btnDown_.stableState) {
@@ -345,7 +477,7 @@ void MiniR4IO::pollButtons(uint32_t nowMs, ButtonEvents& outEvents) {
             upHoldStartMs_    = nowMs;
         }
         const uint32_t elapsed = static_cast<uint32_t>(nowMs - upHoldStartMs_);
-        if (elapsed >= 250UL) {
+        if (elapsed >= Config::kAutoHoldBarDelayMs) {
             outEvents.autoHolding = true;
             float ratio           = static_cast<float>(elapsed) / static_cast<float>(Config::kAutoStartBtnHoldMs);
             if (ratio > 1.0f) {
@@ -380,7 +512,9 @@ bool MiniR4IO::verifyAndHealLowerMcu(uint32_t nowMs,
     const uint32_t intervalMs = (isMoving || !commHealthy_ || commNeedsHeal_)
                                     ? Config::kLowerFastHealthMs
                                     : Config::kLowerHealthIntervalMs;
-    if (!force && static_cast<uint32_t>(nowMs - lastLowerHealthMs_) < intervalMs) {
+    if (!force &&
+        (!isElapsed(nowMs, lastLowerHealthMs_, intervalMs) ||
+         isCommBackoffActive(nowMs, Config::kLowerFastHealthMs))) {
         return false;
     }
     lastLowerHealthMs_ = nowMs;
@@ -388,8 +522,7 @@ bool MiniR4IO::verifyAndHealLowerMcu(uint32_t nowMs,
     float v    = 0.0f;
     float perc = 0.0f;
     if (mmL.GetPowerInfo(v, perc) != MMLower::RESULT::OK) {
-        commHealthy_   = false;
-        commNeedsHeal_ = true;
+        lastLowerHealthMs_ = noteCommFailure();
         return true;
     }
 
@@ -403,17 +536,21 @@ bool MiniR4IO::verifyAndHealLowerMcu(uint32_t nowMs,
 
     const bool periodicIdleResync =
         !isMoving &&
-        static_cast<uint32_t>(nowMs - lastConfigResyncMs_) >= Config::kLowerResyncConfigMs;
+        isElapsed(nowMs, lastConfigResyncMs_, Config::kLowerResyncConfigMs);
 
     if (!commHealthy_ || commNeedsHeal_ || brownoutRecovered || periodicIdleResync) {
         if (!commHealthy_ || commNeedsHeal_ || brownoutRecovered) {
             invalidateActuatorCaches();
             rc34PulseSynced_ = false;
         }
-        const bool cfgOk    = applyLowerMcuConfig(brownoutRecovered || !commHealthy_);
-        commHealthy_        = cfgOk;
-        commNeedsHeal_      = !cfgOk;
-        lastConfigResyncMs_ = nowMs;
+        const bool cfgOk    = applyLowerMcuConfig(brownoutRecovered || !commHealthy_ || commNeedsHeal_);
+        lastConfigResyncMs_ = millis();
+        if (cfgOk) {
+            commHealthy_   = true;
+            commNeedsHeal_ = false;
+        } else {
+            lastLowerHealthMs_ = noteCommFailure();
+        }
     }
 
     return true;
@@ -425,13 +562,16 @@ void MiniR4IO::invalidateActuatorCaches() {
 }
 
 bool MiniR4IO::shouldRefreshStoppedMotors(uint32_t nowMs) const {
-    if (!motorsSynced_) {
+    if (!motorsSynced_ || lastLeftPower_ != 0 || lastRightPower_ != 0) {
         const uint32_t retryInterval = commHealthy_
                                            ? Config::kCommRetryIntervalMs
                                            : Config::kCommUnhealthyRetryIntervalMs;
-        return static_cast<uint32_t>(nowMs - lastMotorAttemptMs_) >= retryInterval;
+        if (isCommBackoffActive(nowMs, Config::kCommUnhealthyRetryIntervalMs)) {
+            return false;
+        }
+        return isElapsed(nowMs, lastMotorAttemptMs_, retryInterval);
     }
-    return static_cast<uint32_t>(nowMs - lastStopRefreshMs_) >= Config::kFailsafeRefreshMs;
+    return isElapsed(nowMs, lastStopRefreshMs_, Config::kFailsafeRefreshMs);
 }
 
 void MiniR4IO::applyMotors(int16_t leftPower, int16_t rightPower, bool forceBrake, uint32_t nowMs) {
@@ -440,8 +580,7 @@ void MiniR4IO::applyMotors(int16_t leftPower, int16_t rightPower, bool forceBrak
 
     const bool wantBrake    = (clampedL == 0 && clampedR == 0 && forceBrake);
     const bool brakeChanged = (wantBrake != lastBrakeEngaged_);
-    const bool keepaliveDue =
-        static_cast<uint32_t>(nowMs - lastMotorSendMs_) >= Config::kMotorKeepaliveMs;
+    const bool keepaliveDue = isElapsed(nowMs, lastMotorSendMs_, Config::kMotorKeepaliveMs);
 
     const bool updateL = !motorsSynced_ || (clampedL != lastLeftPower_) ||
                          (clampedL == 0 && brakeChanged) || keepaliveDue;
@@ -455,8 +594,8 @@ void MiniR4IO::applyMotors(int16_t leftPower, int16_t rightPower, bool forceBrak
     const uint32_t retryInterval = commHealthy_
                                        ? Config::kCommRetryIntervalMs
                                        : Config::kCommUnhealthyRetryIntervalMs;
-    if (!motorsSynced_ &&
-        static_cast<uint32_t>(nowMs - lastMotorAttemptMs_) < retryInterval) {
+    if ((!motorsSynced_ && !isElapsed(nowMs, lastMotorAttemptMs_, retryInterval)) ||
+        isCommBackoffActive(nowMs, Config::kCommUnhealthyRetryIntervalMs)) {
         return;
     }
     lastMotorAttemptMs_ = nowMs;
@@ -468,18 +607,18 @@ void MiniR4IO::applyMotors(int16_t leftPower, int16_t rightPower, bool forceBrak
         if (wantBrake) {
             okL = MiniR4.M1.setBrake(true);
         } else {
-            okL = MiniR4.M1.setPower(clampedL);
+            okL = setMotorPowerSingle(Config::kMotorLeftId, clampedL);
         }
         if (okL) {
             lastLeftPower_ = clampedL;
         }
     }
 
-    if (updateR) {
+    if (updateR && okL) {
         if (wantBrake) {
             okR = MiniR4.M2.setBrake(true);
         } else {
-            okR = MiniR4.M2.setPower(clampedR);
+            okR = setMotorPowerSingle(Config::kMotorRightId, clampedR);
         }
         if (okR) {
             lastRightPower_ = clampedR;
@@ -491,18 +630,20 @@ void MiniR4IO::applyMotors(int16_t leftPower, int16_t rightPower, bool forceBrak
         lastMotorSendMs_  = nowMs;
         motorsSynced_     = true;
     } else {
-        motorsSynced_  = false;
-        commHealthy_   = false;
-        commNeedsHeal_ = true;
+        motorsSynced_       = false;
+        lastMotorAttemptMs_ = noteCommFailure();
     }
 }
 
-void MiniR4IO::forceMotorsStop(bool engageBrake, uint32_t nowMs) {
-    const uint32_t retryInterval = commHealthy_
-                                       ? Config::kCommRetryIntervalMs
-                                       : Config::kCommUnhealthyRetryIntervalMs;
-    if (!motorsSynced_ &&
-        static_cast<uint32_t>(nowMs - lastMotorAttemptMs_) < retryInterval) {
+void MiniR4IO::forceMotorsStop(bool engageBrake, uint32_t nowMs, bool forceImmediate) {
+    if (lastLeftPower_ != 0 || lastRightPower_ != 0 || lastBrakeEngaged_ != engageBrake) {
+        motorsSynced_ = false;
+    }
+
+    // Never drop an emergency stop while comm is healthy (or when explicitly forced for reboot).
+    if (!forceImmediate && !commHealthy_ &&
+        (isCommBackoffActive(nowMs, Config::kCommUnhealthyRetryIntervalMs) ||
+         !isElapsed(nowMs, lastMotorAttemptMs_, Config::kCommUnhealthyRetryIntervalMs))) {
         return;
     }
     lastMotorAttemptMs_ = nowMs;
@@ -511,16 +652,16 @@ void MiniR4IO::forceMotorsStop(bool engageBrake, uint32_t nowMs) {
     bool ok2 = false;
     if (engageBrake) {
         ok1 = MiniR4.M1.setBrake(true);
-        ok2 = MiniR4.M2.setBrake(true);
+        ok2 = ok1 && MiniR4.M2.setBrake(true);
     } else {
-        ok1 = MiniR4.M1.setPower(0);
-        ok2 = MiniR4.M2.setPower(0);
+        ok1 = setMotorPowerSingle(Config::kMotorLeftId, 0);
+        ok2 = ok1 && setMotorPowerSingle(Config::kMotorRightId, 0);
     }
 
-    bool auxOk = true;
-    if (!auxMotorsZeroed_) {
-        const bool ok3   = MiniR4.M3.setPower(0);
-        const bool ok4   = MiniR4.M4.setPower(0);
+    bool auxOk = ok1 && ok2;
+    if (auxOk && !auxMotorsZeroed_) {
+        const bool ok3   = setMotorPowerSingle(3U, 0);
+        const bool ok4   = ok3 && setMotorPowerSingle(4U, 0);
         auxOk            = ok3 && ok4;
         auxMotorsZeroed_ = auxOk;
     }
@@ -538,49 +679,43 @@ void MiniR4IO::forceMotorsStop(bool engageBrake, uint32_t nowMs) {
         lastStopRefreshMs_ = nowMs;
         motorsSynced_      = true;
     } else {
-        motorsSynced_  = false;
-        commHealthy_   = false;
-        commNeedsHeal_ = true;
+        motorsSynced_       = false;
+        lastMotorAttemptMs_ = noteCommFailure();
     }
 }
 
 void MiniR4IO::restoreAfterAuto(uint32_t nowMs) {
-    // Stop any DriveDC task started by Auto block code and brake/zero all 4 DC channels.
-    (void)MiniR4.DriveDC.brake(true);
-    MiniR4.M1.setBrake(true);
-    MiniR4.M2.setBrake(true);
-    MiniR4.M3.setPower(0);
-    MiniR4.M4.setPower(0);
-
+    (void)nowMs;
     // Restore deterministic PS2 bit-bang SPI pins & DAT pull-up in case D2/D3 or MiniR4.PS2 ran.
-    digitalWrite(Config::kPs2ClkPin, HIGH);
-    digitalWrite(Config::kPs2CmdPin, HIGH);
-    digitalWrite(Config::kPs2AttPin, HIGH);
-    pinMode(Config::kPs2ClkPin, OUTPUT);
-    pinMode(Config::kPs2CmdPin, OUTPUT);
-    pinMode(Config::kPs2AttPin, OUTPUT);
-    pinMode(Config::kPs2DatPin, INPUT_PULLUP);
+    ps2_.restorePins();
 
-    rc34PulseSynced_    = false;
-    auxMotorsZeroed_    = false;
-    (void)mmL.SetDCMotorSpeedRange(Config::kMotorLeftId, 0U, 100U);
-    (void)mmL.SetDCMotorSpeedRange(Config::kMotorRightId, 0U, 100U);
-    const bool cfgOk    = applyLowerMcuConfig(true);
-    const bool ok1      = MiniR4.M1.setBrake(true);
-    const bool ok2      = MiniR4.M2.setBrake(true);
-    lastConfigResyncMs_ = nowMs;
-
+    rc34PulseSynced_ = false;
+    auxMotorsZeroed_ = false;
     invalidateActuatorCaches();
-    lastLeftPower_      = 0;
-    lastRightPower_     = 0;
-    lastBrakeEngaged_   = true;
-    lastMotorAttemptMs_ = nowMs;
-    lastMotorSendMs_    = nowMs;
-    lastStopRefreshMs_  = nowMs;
-    motorsSynced_       = cfgOk && ok1 && ok2;
-    if (!motorsSynced_) {
-        commHealthy_   = false;
-        commNeedsHeal_ = true;
+    lastLeftPower_    = 0;
+    lastRightPower_   = 0;
+    lastBrakeEngaged_ = false;
+
+    // Stop any DriveDC task started by Auto block code; short-circuit if STM32 UART is unresponsive.
+    const MMLower::Drive_RESULT driveBrakeRes = mmL.Set_Drive_Brake(true, 1U);
+    const bool uartAlive = (driveBrakeRes == MMLower::Drive_RESULT::OK ||
+                            driveBrakeRes == MMLower::Drive_RESULT::ERROR_Drive_Define);
+    const bool cfgOk = uartAlive && applyLowerMcuConfig(true);
+    const bool ok1   = cfgOk && MiniR4.M1.setBrake(true);
+    const bool ok2   = ok1 && MiniR4.M2.setBrake(true);
+
+    const uint32_t doneMs = millis();
+    lastMotorAttemptMs_   = doneMs;
+    lastConfigResyncMs_   = doneMs;
+    lastBrakeEngaged_     = ok1 && ok2;
+    motorsSynced_         = cfgOk && ok1 && ok2;
+    if (motorsSynced_) {
+        commHealthy_       = true;
+        commNeedsHeal_     = false;
+        lastMotorSendMs_   = doneMs;
+        lastStopRefreshMs_ = doneMs;
+    } else {
+        lastMotorAttemptMs_ = noteCommFailure();
     }
 }
 
@@ -594,8 +729,7 @@ void MiniR4IO::applyServos(const ServoTargets& targets, uint32_t nowMs) {
                                                             Config::kRc2SmoothStepDeg)
                                : safe.rc2Deg;
 
-    const bool keepaliveDue =
-        static_cast<uint32_t>(nowMs - lastServoSendMs_) >= Config::kServoKeepaliveMs;
+    const bool keepaliveDue = isElapsed(nowMs, lastServoSendMs_, Config::kServoKeepaliveMs);
 
     const bool send1 = !servosSynced_ || (safe.rc1Deg != lastServos_.rc1Deg) || keepaliveDue;
     const bool send2 = !servosSynced_ || (cmdRc2 != lastServos_.rc2Deg) || keepaliveDue;
@@ -609,17 +743,22 @@ void MiniR4IO::applyServos(const ServoTargets& targets, uint32_t nowMs) {
     const uint32_t retryInterval = commHealthy_
                                        ? Config::kCommRetryIntervalMs
                                        : Config::kCommUnhealthyRetryIntervalMs;
-    if (!servosSynced_ &&
-        static_cast<uint32_t>(nowMs - lastServoAttemptMs_) < retryInterval) {
+    if ((!servosSynced_ && !isElapsed(nowMs, lastServoAttemptMs_, retryInterval)) ||
+        isCommBackoffActive(nowMs, Config::kCommUnhealthyRetryIntervalMs)) {
         return;
     }
     lastServoAttemptMs_ = nowMs;
 
-    bool allOk    = true;
-    bool pairDone = false;
+    bool allOk = false;
 
-    // Send RC3+RC4 together in one UART frame so paired left/right arms actuate simultaneously.
-    if (send3 && send4) {
+    const uint8_t sendCount = static_cast<uint8_t>(send1) +
+                              static_cast<uint8_t>(send2) +
+                              static_cast<uint8_t>(send3) +
+                              static_cast<uint8_t>(send4);
+
+    // Send all 4 channels in a single atomic UART frame whenever paired RC3/RC4 move
+    // or 2+ channels change, preventing left/right arm desync and multi-timeout cascades.
+    if (send3 || send4 || sendCount >= 2U) {
         const uint16_t hwRc1 = static_cast<uint16_t>(safe.rc1Deg);
         const uint16_t hwRc2 = static_cast<uint16_t>(cmdRc2);
         const uint16_t hwRc3 = static_cast<uint16_t>(
@@ -632,40 +771,17 @@ void MiniR4IO::applyServos(const ServoTargets& targets, uint32_t nowMs) {
             lastServos_.rc2Deg = cmdRc2;
             lastServos_.rc3Deg = safe.rc3Deg;
             lastServos_.rc4Deg = safe.rc4Deg;
-            pairDone           = true;
+            allOk              = true;
         }
-    }
-
-    if (!pairDone) {
-        if (send1) {
-            if (MiniR4.RC1.setAngle(static_cast<uint16_t>(safe.rc1Deg))) {
-                lastServos_.rc1Deg = safe.rc1Deg;
-            } else {
-                allOk = false;
-            }
+    } else if (send1) {
+        if (MiniR4.RC1.setAngle(static_cast<uint16_t>(safe.rc1Deg))) {
+            lastServos_.rc1Deg = safe.rc1Deg;
+            allOk              = true;
         }
-        if (send2) {
-            if (MiniR4.RC2.setAngle(static_cast<uint16_t>(cmdRc2))) {
-                lastServos_.rc2Deg = cmdRc2;
-            } else {
-                allOk = false;
-            }
-        }
-        if (send3) {
-            const int16_t hwRc3 = RobotLogic::applyServoDirection(safe.rc3Deg, Config::kRc3InvertDir);
-            if (MiniR4.RC3.setAngle(static_cast<uint16_t>(hwRc3))) {
-                lastServos_.rc3Deg = safe.rc3Deg;
-            } else {
-                allOk = false;
-            }
-        }
-        if (send4) {
-            const int16_t hwRc4 = RobotLogic::applyServoDirection(safe.rc4Deg, Config::kRc4InvertDir);
-            if (MiniR4.RC4.setAngle(static_cast<uint16_t>(hwRc4))) {
-                lastServos_.rc4Deg = safe.rc4Deg;
-            } else {
-                allOk = false;
-            }
+    } else if (send2) {
+        if (MiniR4.RC2.setAngle(static_cast<uint16_t>(cmdRc2))) {
+            lastServos_.rc2Deg = cmdRc2;
+            allOk              = true;
         }
     }
 
@@ -673,8 +789,7 @@ void MiniR4IO::applyServos(const ServoTargets& targets, uint32_t nowMs) {
         lastServoSendMs_ = nowMs;
         servosSynced_    = true;
     } else {
-        servosSynced_  = false;
-        commHealthy_   = false;
-        commNeedsHeal_ = true;
+        servosSynced_       = false;
+        lastServoAttemptMs_ = noteCommFailure();
     }
 }

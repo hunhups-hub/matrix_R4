@@ -170,6 +170,7 @@ void toggleMotorReverse(bool& reversed, const char* onMsg, const char* offMsg) {
     reversed = !reversed;
     g_io.setMotorPolarity(g_snap.leftReversed, g_snap.rightReversed);
     savePersistentConfig();
+    g_oled.beepConfirm();
     g_serial.printEvent("CFG", reversed ? onMsg : offMsg);
 }
 
@@ -208,7 +209,7 @@ void togglePosePreset() {
 
 [[noreturn]] void enterUploadBootloader(const char* source) {
     WDT.refresh();
-    g_io.forceMotorsStop(true, millis());
+    g_io.forceMotorsStop(true, millis(), true);
     g_oled.showBootloaderScreen();
     g_serial.printEvent("BOOT", source ? source : "Entering upload bootloader...");
     Serial.flush();
@@ -456,11 +457,11 @@ void applySerialImmediateActions(const SerialActions& act, uint32_t nowMs) {
     }
 
     applySerialConfigActions(act);
-    applySerialServoActions(act);
 
     if (g_snap.sysState == SystemState::Estop) {
         cancelSerialDrive();
     } else {
+        applySerialServoActions(act);
         g_serialDrive.latched = act.driveCmd.active;
         g_serialDrive.targetL = act.driveCmd.targetLeft;
         g_serialDrive.targetR = act.driveCmd.targetRight;
@@ -481,6 +482,13 @@ void enterAutoSession(uint32_t nowMs) {
     g_snap.autoHolding   = false;
     g_snap.autoHoldPct   = 0.0f;
     g_snap.autoElapsedMs = 0UL;
+
+    const bool frameValid  = g_linkSm.isConnected() && RobotLogic::isPs2FrameValid(g_lastPs2Frame);
+    const uint8_t compPct  = g_battStab.motorProfile().compPercent;
+    const uint8_t syncPass = g_linkSm.isConnected() ? 1U : 3U;
+    for (uint8_t i = 0U; i < syncPass; ++i) {
+        updateStabilityMetrics(frameValid, compPct, Config::kControlPeriodMs);
+    }
     g_oled.render(g_snap, nowMs, true);
     g_oled.beepConfirm();
     g_serial.printEvent("AUTO", "Started -> Press X / BTN_UP / 'x' to exit");
@@ -509,7 +517,7 @@ void reportAutoExit(AutoExitReason reason, uint32_t exitMs) {
         return;
     }
     g_snap.activeSource = g_linkSm.isOperational() ? ControlSource::Ps2 : ControlSource::None;
-    if (reason == AutoExitReason::StallTimeout) {
+    if (reason == AutoExitReason::StallTimeout || reason == AutoExitReason::DriveInitFail) {
         g_oled.beepWarning();
     } else {
         g_oled.beepConfirm();
@@ -550,14 +558,21 @@ void runAutoSession(uint32_t nowMs) {
     initOled(); // Auto code may have re-initialized Wire1 / the display.
     reportAutoExit(reason, exitMs);
 
-    sampleLowerMcu(exitMs, false, true);
+    if (!sampleLowerMcu(exitMs, false, g_io.commHealthy())) {
+        g_snap.commHealthy = g_io.commHealthy();
+    }
     g_snap.servoRangeErr = g_io.servoRangeErr();
+    updateStabilityMetrics(g_linkSm.isConnected() && RobotLogic::isPs2FrameValid(g_lastPs2Frame),
+                           g_battStab.motorProfile().compPercent,
+                           Config::kControlPeriodMs);
     g_io.syncServoCache(g_snap.servos);
     g_io.applyServos(g_snap.servos, exitMs);
+    g_snap.commHealthy = g_io.commHealthy();
     g_oled.render(g_snap, exitMs, true);
 
-    g_lastControlMs = exitMs;
-    g_lastArmStepMs = exitMs;
+    const uint32_t postExitMs = millis();
+    g_lastControlMs           = postExitMs;
+    g_lastArmStepMs           = postExitMs;
 }
 
 // ============================================================================
@@ -575,7 +590,7 @@ ButtonEvents handleOnboardButtons(uint32_t nowMs) {
     if (btn.uploadRequested) {
         enterUploadBootloader("BTN_UP + BTN_DOWN hold 2.5s");
     }
-    if (btn.shortDown) {
+    if (btn.downPressEdge || btn.shortDown) {
         g_serialAutoRequested = false;
         triggerEstop("BTN_DOWN press", nowMs);
     } else if (btn.shortUp) {
@@ -781,6 +796,7 @@ bool arbitrateDrive(uint32_t nowMs, LinkState prevLink, bool valid, const MotorP
 
 void publishOutputs(uint32_t nowMs) {
     g_io.applyServos(g_snap.servos, nowMs);
+    g_snap.commHealthy = g_io.commHealthy();
     g_oled.render(g_snap, nowMs, false);
     g_snap.oledErr3d = g_oled.err3d();
     g_snap.oledErr3c = g_oled.err3c();
@@ -870,19 +886,30 @@ bool loadPersistentConfig() {
     return loaded;
 }
 
-/** Initializes the PS2 link state machine and seeds edge latches from the first frame. */
+/** Initializes the PS2 link state machine and seeds edge latches from the first frames. */
 bool initPs2Link(uint32_t nowMs) {
     const bool ps2Ready = g_io.isPs2ReadyAtBoot();
     g_linkSm.begin(ps2Ready, nowMs);
     if (ps2Ready) {
-        g_io.pollPs2(g_lastPs2Frame);
-        const bool bootValid = RobotLogic::isPs2FrameValid(g_lastPs2Frame);
-        g_linkSm.onFrame(bootValid, nowMs, false);
+        bool bootValid = false;
+        for (uint8_t i = 0U; i < Config::kPs2StableFrames; ++i) {
+            g_io.pollPs2(g_lastPs2Frame);
+            bootValid            = RobotLogic::isPs2FrameValid(g_lastPs2Frame);
+            const bool modeReset = !bootValid && RobotLogic::isPs2UnconfiguredMode(g_lastPs2Frame);
+            g_linkSm.onFrame(bootValid, nowMs, modeReset);
+            if (!bootValid) {
+                break;
+            }
+            if (i + 1U < Config::kPs2StableFrames) {
+                delay(4);
+            }
+        }
         latchAllPs2Edges(bootValid);
     }
-    g_snap.ps2Link = g_linkSm.state();
-    g_snap.ps2Mode = g_lastPs2Frame.modeId;
-    g_snap.ps2Sync = g_lastPs2Frame.syncByte;
+    if (g_linkSm.isOperational()) {
+        g_snap.activeSource = ControlSource::Ps2;
+    }
+    syncPs2Snapshot();
     return ps2Ready;
 }
 
@@ -955,6 +982,10 @@ void printBootReport(bool miniOk,
 
 void setup() {
     g_snap.wdtResetBoot = (R_SYSTEM->RSTSR1_b.WDTRF != 0);
+    if (g_snap.wdtResetBoot) {
+        // Clear sticky RA4M1 WDT reset flag after reading so subsequent clean resets do not re-warn.
+        R_SYSTEM->RSTSR1_b.WDTRF = 0U;
+    }
 
     g_serial.begin(Config::kSerialBaud);
 
@@ -972,18 +1003,16 @@ void setup() {
 
     const uint32_t nowMs = millis();
 
-    // Seed initial power/health sample cleanly
-    sampleLowerMcu(nowMs, false, true);
+    // Seed initial power/health sample cleanly (skip redundant forced timeout if STM32 already failed init).
+    if (!sampleLowerMcu(nowMs, false, miniOk)) {
+        g_snap.commHealthy = g_io.commHealthy();
+    }
 
     const bool ps2Ready = initPs2Link(nowMs);
     g_snap.comScalePct  = RobotLogic::computeCoMDynamicScale(g_snap.servos.rc2Deg);
     updateStabilityMetrics(ps2Ready && RobotLogic::isPs2FrameValid(g_lastPs2Frame),
                            g_battStab.motorProfile().compPercent,
                            Config::kControlPeriodMs);
-
-    g_lastControlMs   = nowMs;
-    g_lastArmStepMs   = nowMs;
-    g_lastTelemetryMs = nowMs;
 
     g_oled.render(g_snap, nowMs, true);
     g_oled.beepBoot();
@@ -994,6 +1023,11 @@ void setup() {
     if (!WDT.begin(Config::kWdtTimeoutMs)) {
         g_serial.printEvent("WARN", "WDT init failed");
     }
+
+    const uint32_t bootDoneMs = millis();
+    g_lastControlMs           = bootDoneMs;
+    g_lastArmStepMs           = bootDoneMs;
+    g_lastTelemetryMs         = bootDoneMs;
 }
 
 void loop() {

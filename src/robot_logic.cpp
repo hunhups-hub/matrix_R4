@@ -4,33 +4,47 @@ namespace RobotLogic {
 
 namespace {
 
-int16_t abs16(int16_t v) {
-    return (v < 0) ? static_cast<int16_t>(-v) : v;
+int32_t abs16To32(int16_t v) {
+    return (v < 0) ? -static_cast<int32_t>(v) : static_cast<int32_t>(v);
 }
 
-void desaturateAndClampDrive(int16_t& left, int16_t& right, int16_t maxSpeed) {
-    const int16_t limit = clamp16(maxSpeed, 0, Config::kMotorMaxPower);
-    if (limit == 0) {
-        left  = 0;
-        right = 0;
+int32_t abs32(int32_t v) {
+    return (v < 0L) ? -v : v;
+}
+
+void desaturateAndClampDrive32(int32_t& left, int32_t& right, int16_t maxSpeed) {
+    const int32_t limit = static_cast<int32_t>(clamp16(maxSpeed, 0, Config::kMotorMaxPower));
+    if (limit == 0L) {
+        left  = 0L;
+        right = 0L;
         return;
     }
 
-    const int16_t peak = (abs16(left) > abs16(right)) ? abs16(left) : abs16(right);
+    const int32_t absL = abs32(left);
+    const int32_t absR = abs32(right);
+    const int32_t peak = (absL > absR) ? absL : absR;
     if (peak > limit) {
-        left  = static_cast<int16_t>((static_cast<int32_t>(left) * limit) / peak);
-        right = static_cast<int16_t>((static_cast<int32_t>(right) * limit) / peak);
+        left  = (left * limit) / peak;
+        right = (right * limit) / peak;
     }
 
-    left  = clamp16(left, static_cast<int16_t>(-limit), limit);
-    right = clamp16(right, static_cast<int16_t>(-limit), limit);
+    left  = clampLong(left, -limit, limit);
+    right = clampLong(right, -limit, limit);
+}
+
+void desaturateAndClampDrive(int16_t& left, int16_t& right, int16_t maxSpeed) {
+    int32_t l32 = static_cast<int32_t>(left);
+    int32_t r32 = static_cast<int32_t>(right);
+    desaturateAndClampDrive32(l32, r32, maxSpeed);
+    left  = static_cast<int16_t>(l32);
+    right = static_cast<int16_t>(r32);
 }
 
 int16_t scaleStickToLimit(int16_t val, int16_t limit) {
     if (val == 0 || limit <= 0) {
         return 0;
     }
-    const int32_t absVal = abs16(val);
+    const int32_t absVal = abs16To32(val);
     int32_t       scaled = (absVal * static_cast<int32_t>(limit) + 50L) / 100L;
     if (scaled < 1L) {
         scaled = 1L;
@@ -97,18 +111,18 @@ int16_t applyAsymmetricSlewStep(int16_t current,
     }
 
     // Pass cleanly through 0 on direction reversal to limit current spikes
-    if ((current > 0 && target < 0 && current <= step) ||
-        (current < 0 && target > 0 && -current <= step)) {
+    if ((current > 0 && target < 0 && static_cast<int32_t>(current) <= step) ||
+        (current < 0 && target > 0 && -static_cast<int32_t>(current) <= step)) {
         return 0;
     }
 
     if (target > current) {
-        const int16_t stepped = static_cast<int16_t>(current + step);
-        return (stepped > target) ? target : stepped;
+        const int32_t stepped = static_cast<int32_t>(current) + step;
+        return (stepped > target) ? target : static_cast<int16_t>(stepped);
     }
 
-    const int16_t stepped = static_cast<int16_t>(current - step);
-    return (stepped < target) ? target : stepped;
+    const int32_t stepped = static_cast<int32_t>(current) - step;
+    return (stepped < target) ? target : static_cast<int16_t>(stepped);
 }
 
 DriveOutput applyDriveTargetsWithSlew(int16_t targetLeft,
@@ -119,20 +133,19 @@ DriveOutput applyDriveTargetsWithSlew(int16_t targetLeft,
                                         int16_t accelSlewStep,
                                         int16_t decelSlewStep,
                                         uint8_t compPercent) {
-    const int16_t cappedComp = clamp16(static_cast<int16_t>(compPercent),
-                                       100,
-                                       static_cast<int16_t>(Config::kBattCompMaxPct));
-    int16_t scaledL = targetLeft;
-    int16_t scaledR = targetRight;
-    if (cappedComp > 100) {
-        scaledL = static_cast<int16_t>((static_cast<int32_t>(targetLeft) * cappedComp) / 100);
-        scaledR = static_cast<int16_t>((static_cast<int32_t>(targetRight) * cappedComp) / 100);
+    const int32_t cappedComp = static_cast<int32_t>(
+        clamp16(static_cast<int16_t>(compPercent), 100, static_cast<int16_t>(Config::kBattCompMaxPct)));
+    int32_t scaledL32 = static_cast<int32_t>(targetLeft);
+    int32_t scaledR32 = static_cast<int32_t>(targetRight);
+    if (cappedComp > 100L) {
+        scaledL32 = (scaledL32 * cappedComp) / 100L;
+        scaledR32 = (scaledR32 * cappedComp) / 100L;
     }
-    desaturateAndClampDrive(scaledL, scaledR, maxSpeed);
+    desaturateAndClampDrive32(scaledL32, scaledR32, maxSpeed);
 
     DriveOutput out;
-    out.left  = applyAsymmetricSlewStep(currentLeft, scaledL, accelSlewStep, decelSlewStep);
-    out.right = applyAsymmetricSlewStep(currentRight, scaledR, accelSlewStep, decelSlewStep);
+    out.left  = applyAsymmetricSlewStep(currentLeft, static_cast<int16_t>(scaledL32), accelSlewStep, decelSlewStep);
+    out.right = applyAsymmetricSlewStep(currentRight, static_cast<int16_t>(scaledR32), accelSlewStep, decelSlewStep);
     return out;
 }
 
@@ -175,8 +188,8 @@ int16_t limitCentripetalTurn(int16_t linearVel, int16_t angularVel, int16_t maxL
         return 0;
     }
     const int16_t clampedW = clamp16(angularVel, Config::kMotorMinPower, Config::kMotorMaxPower);
-    const int32_t absV     = abs16(clamp16(linearVel, Config::kMotorMinPower, Config::kMotorMaxPower));
-    const int32_t absW     = abs16(clampedW);
+    const int32_t absV     = abs16To32(clamp16(linearVel, Config::kMotorMinPower, Config::kMotorMaxPower));
+    const int32_t absW     = abs16To32(clampedW);
     if (absV == 0L || absW == 0L) {
         return clampedW;
     }
@@ -194,11 +207,13 @@ int16_t limitCentripetalTurn(int16_t linearVel, int16_t angularVel, int16_t maxL
 
 uint8_t computeCoMDynamicScale(int16_t rc2Deg) {
     const int16_t clamped = clamp16(rc2Deg, Config::kRc2MinDeg, Config::kRc2MaxDeg);
-    const int16_t kLowCoMDeg = 140;
-    if (clamped >= kLowCoMDeg) {
+    if (clamped >= Config::kCoMLowArmDeg) {
         return 100U;
     }
-    const int32_t span     = static_cast<int32_t>(kLowCoMDeg - Config::kRc2MinDeg);
+    const int32_t span = static_cast<int32_t>(Config::kCoMLowArmDeg - Config::kRc2MinDeg);
+    if (span <= 0L) {
+        return 100U;
+    }
     const int32_t minScale = static_cast<int32_t>(Config::kCoMHighMinScalePct);
     const int32_t scaled   =
         minScale + ((static_cast<int32_t>(clamped - Config::kRc2MinDeg) * (100L - minScale) + (span / 2L)) / span);
@@ -247,7 +262,7 @@ int16_t applyCoulombStiction(int16_t cmdPower, int16_t stictionMin, int16_t maxP
         return clamp16(cmdPower, static_cast<int16_t>(-limit), limit);
     }
 
-    const int32_t absCmd = abs16(clamp16(cmdPower, static_cast<int16_t>(-limit), limit));
+    const int32_t absCmd = abs16To32(clamp16(cmdPower, static_cast<int16_t>(-limit), limit));
     const int32_t spanIn = static_cast<int32_t>(limit - 1);
     const int32_t spanOut = static_cast<int32_t>(limit - stictionMin);
     const int32_t mapped =
@@ -275,14 +290,14 @@ void applyMotorBalanceTrim(int16_t& left, int16_t& right, int8_t trimPct) {
         // Positive trim -> attenuate Right wheel by (100 - trim)% so robot steers slightly Right
         const int32_t scale = 100L - static_cast<int32_t>(clampedTrim);
         const int32_t signR = (right < 0) ? -1L : 1L;
-        const int32_t magR  = (static_cast<int32_t>(abs16(right)) * scale + 50L) / 100L;
-        right               = static_cast<int16_t>(signR * magR);
+        const int32_t magR  = (abs16To32(right) * scale + 50L) / 100L;
+        right               = static_cast<int16_t>(clampLong(signR * magR, -32767L, 32767L));
     } else {
         // Negative trim -> attenuate Left wheel by (100 - |trim|)% so robot steers slightly Left
         const int32_t scale = 100L + static_cast<int32_t>(clampedTrim);
         const int32_t signL = (left < 0) ? -1L : 1L;
-        const int32_t magL  = (static_cast<int32_t>(abs16(left)) * scale + 50L) / 100L;
-        left                = static_cast<int16_t>(signL * magL);
+        const int32_t magL  = (abs16To32(left) * scale + 50L) / 100L;
+        left                = static_cast<int16_t>(clampLong(signL * magL, -32767L, 32767L));
     }
 }
 
@@ -293,11 +308,11 @@ int16_t slewServoAngle(int16_t currentDeg, int16_t targetDeg, int16_t maxStepDeg
         return tgt;
     }
     if (tgt > cur) {
-        const int16_t next = static_cast<int16_t>(cur + maxStepDeg);
-        return (next > tgt) ? tgt : next;
+        const int32_t next = static_cast<int32_t>(cur) + maxStepDeg;
+        return (next > tgt) ? tgt : static_cast<int16_t>(next);
     }
-    const int16_t next = static_cast<int16_t>(cur - maxStepDeg);
-    return (next < tgt) ? tgt : next;
+    const int32_t next = static_cast<int32_t>(cur) - maxStepDeg;
+    return (next < tgt) ? tgt : static_cast<int16_t>(next);
 }
 
 uint16_t computeCrc16(const uint8_t* data, uint8_t len) {
@@ -382,6 +397,21 @@ bool hasEncoderProgressed(int32_t prevCount, int32_t curCount, int32_t minDelta)
     const int64_t diff      = static_cast<int64_t>(curCount) - static_cast<int64_t>(prevCount);
     const int64_t absDiff   = (diff < 0) ? -diff : diff;
     return absDiff >= static_cast<int64_t>(threshold);
+}
+
+void resolveAutoDrivePolarity(uint8_t leftMotorID,
+                              uint8_t rightMotorID,
+                              bool savedLeftReversed,
+                              bool savedRightReversed,
+                              bool& ioLeftReverse,
+                              bool& ioRightReverse) {
+    if (leftMotorID != Config::kMotorLeftId || rightMotorID != Config::kMotorRightId) {
+        return;
+    }
+    const bool leftDelta  = (savedLeftReversed != Config::kMotorLeftReverseInit);
+    const bool rightDelta = (savedRightReversed != Config::kMotorRightReverseInit);
+    ioLeftReverse         = (ioLeftReverse != leftDelta);
+    ioRightReverse        = (ioRightReverse != rightDelta);
 }
 
 DriveOutput computeKinodynamicDrive(uint8_t lyRaw,
@@ -469,14 +499,26 @@ DriveOutput computeKinodynamicDrive(uint8_t lyRaw,
     }
 
     // 5. Coupled 2-DOF translational (v) & rotational (w) slew limiting
-    return apply2DofKinodynamicSlew(scaledL,
-                                    scaledR,
-                                    currentLeft,
-                                    currentRight,
-                                    linAccel,
-                                    linDecel,
-                                    Config::kAngularAccelSlewStep,
-                                    Config::kAngularDecelSlewStep);
+    DriveOutput out = apply2DofKinodynamicSlew(scaledL,
+                                               scaledR,
+                                               currentLeft,
+                                               currentRight,
+                                               linAccel,
+                                               linDecel,
+                                               Config::kAngularAccelSlewStep,
+                                               Config::kAngularDecelSlewStep);
+
+    // Enforce power envelope so rapid forward-to-pivot 2-DOF slew transitions never
+    // overshoot Precision/Battery caps while still allowing smooth ramp-down if already above limit.
+    const int32_t curPeak  = (abs16To32(currentLeft) > abs16To32(currentRight))
+                                 ? abs16To32(currentLeft)
+                                 : abs16To32(currentRight);
+    const int16_t envLimit = static_cast<int16_t>(
+        clampLong((curPeak > static_cast<int32_t>(limit)) ? curPeak : static_cast<int32_t>(limit),
+                  0L,
+                  static_cast<long>(Config::kMotorMaxPower)));
+    desaturateAndClampDrive(out.left, out.right, envLimit);
+    return out;
 }
 
 int16_t computeArmStep(int16_t currentDeg, bool upPressed, bool downPressed) {
@@ -594,6 +636,10 @@ void updateServoTargetsFromPs2(const Ps2Frame& frame,
 }
 
 void decodePs2Payload(const uint8_t raw[9], Ps2Frame& outFrame) {
+    if (raw == nullptr) {
+        outFrame = Ps2Frame{};
+        return;
+    }
     outFrame.modeId   = raw[1];
     outFrame.syncByte = raw[2];
     outFrame.buttons1 = raw[3];
@@ -642,28 +688,28 @@ bool isPs2FrameValid(const Ps2Frame& frame) {
         return false;
     }
 
-    // Stage 2: Physically impossible opposing D-pad states
-    if ((frame.up && frame.down) || (frame.left && frame.right)) {
-        return false;
-    }
-
-    // Stage 3: Impossible all-4 shape buttons pressed simultaneously (bus short)
-    if (frame.triangle && frame.circle && frame.cross && frame.square) {
-        return false;
-    }
-
-    // Stage 4: Stuck floating-high SPI line (every byte == 0xFF)
+    // Stage 2: Stuck floating-high SPI line (every byte == 0xFF)
     if (frame.buttons1 == 0xFFU && frame.buttons2 == 0xFFU &&
         frame.rx == 0xFFU && frame.ry == 0xFFU &&
         frame.lx == 0xFFU && frame.ly == 0xFFU) {
         return false;
     }
 
-    // Stage 5: Short-to-ground SPI line (every byte == 0x00)
+    // Stage 3: Short-to-ground SPI line (every byte == 0x00)
     // Note: pushing both sticks to (0,0) or (255,255) with normal buttons passes cleanly.
     if (frame.buttons1 == 0x00U && frame.buttons2 == 0x00U &&
         frame.rx == 0x00U && frame.ry == 0x00U &&
         frame.lx == 0x00U && frame.ly == 0x00U) {
+        return false;
+    }
+
+    // Stage 4: Physically impossible opposing D-pad states
+    if ((frame.up && frame.down) || (frame.left && frame.right)) {
+        return false;
+    }
+
+    // Stage 5: Impossible all-4 shape buttons pressed simultaneously (bus short)
+    if (frame.triangle && frame.circle && frame.cross && frame.square) {
         return false;
     }
 
@@ -696,7 +742,9 @@ void FailsafeStateMachine::begin(bool initialReady, uint32_t nowMs) {
 
 void FailsafeStateMachine::onFrame(bool frameValid, uint32_t nowMs, bool modeReset) {
     if (!frameValid) {
-        goodFrames_ = 0U;
+        if (state_ != LinkState::Operational) {
+            goodFrames_ = 0U;
+        }
         if (badFrames_ < 0xFFFFU) {
             badFrames_++;
         }
@@ -706,6 +754,7 @@ void FailsafeStateMachine::onFrame(bool frameValid, uint32_t nowMs, bool modeRes
                 modeResetCnt_++;
             }
             if (modeResetCnt_ >= Config::kPs2ModeResetFrames) {
+                goodFrames_          = 0U;
                 state_               = LinkState::Disconnected;
                 reinitCooldownArmed_ = false; // Allow immediate re-config without waiting 500 ms
                 return;
@@ -715,18 +764,21 @@ void FailsafeStateMachine::onFrame(bool frameValid, uint32_t nowMs, bool modeRes
         }
 
         if (state_ == LinkState::Disconnected) {
+            goodFrames_ = 0U;
             return;
         }
 
         if (badFrames_ >= Config::kPs2PersistentLossFrames ||
             static_cast<uint32_t>(nowMs - lastValidMs_) >= Config::kPs2DisconnectMs) {
+            goodFrames_          = 0U;
             state_               = LinkState::Disconnected;
             reinitCooldownArmed_ = false;
             return;
         }
 
         if (state_ == LinkState::Stabilizing || badFrames_ >= Config::kPs2FailsafeBadFrames) {
-            state_ = LinkState::Failsafe;
+            goodFrames_ = 0U;
+            state_      = LinkState::Failsafe;
         }
         return;
     }
@@ -941,8 +993,8 @@ uint8_t BatteryStabilizer::batteryPercent() const {
         return 0U;
     }
 
-    uint16_t emptyMv = Config::kBattCritVoltMv;
-    uint16_t fullMv  = baselineMv_;
+    uint16_t emptyMv;
+    uint16_t fullMv;
     if (baselineMv_ <= 8700U) {
         // 2S LiPo (6.6V..8.4V)
         emptyMv = 6600U;
@@ -998,7 +1050,9 @@ MotorPowerProfile BatteryStabilizer::motorProfile() const {
         profile.maxPowerCap   = Config::kMotorMaxPower;
         profile.accelSlewStep = Config::kMotorAccelSlewStep;
         profile.decelSlewStep = Config::kMotorDecelSlewStep;
-        profile.compPercent   = computeComp(Config::kBattCompMaxPct);
+        profile.compPercent   = (tier_ == BatteryTier::Emergency)
+                                    ? 100U
+                                    : computeComp(Config::kBattCompMaxPct);
         profile.slewLimited   = false;
         return profile;
     }
@@ -1104,7 +1158,9 @@ uint8_t StabilityMonitor::update(const StabilityInput& in) {
             linkPen_ = Config::kStabilityLinkMaxPen;
             break;
         case LinkState::Disconnected:
-            if (everConnected_) {
+            if (in.activeSource == ControlSource::Auto) {
+                linkPen_ = 0U;
+            } else if (everConnected_) {
                 linkPen_ = Config::kStabilityLinkDropPen;
             } else if (in.activeSource == ControlSource::SerialCmd) {
                 linkPen_ = Config::kStabilitySerialLinkPen;

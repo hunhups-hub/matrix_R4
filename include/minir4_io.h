@@ -44,7 +44,7 @@ public:
     void applyMotors(int16_t leftPower, int16_t rightPower, bool forceBrake, uint32_t nowMs);
 
     /** Immediately zeroes M1/M2 (and M3/M4 when unzeroed) with optional brake. */
-    void forceMotorsStop(bool engageBrake, uint32_t nowMs);
+    void forceMotorsStop(bool engageBrake, uint32_t nowMs, bool forceImmediate = false);
 
     /** True when M1/M2 H-bridge electromagnetic hold-brake is currently engaged. */
     bool isBrakeEngaged() const { return lastBrakeEngaged_; }
@@ -81,11 +81,18 @@ private:
         bool     pressLatched  = false;
     };
 
-    bool updateButtonDebounce(DebouncedBtn& btn, bool sample, uint32_t nowMs, bool& outShortRelease);
+    bool updateButtonDebounce(DebouncedBtn& btn,
+                              bool sample,
+                              uint32_t nowMs,
+                              bool& outShortRelease,
+                              bool& outPressEdge);
     bool applyLowerMcuConfig(bool zeroAuxMotors);
-    bool configureRc34PulseRange(uint8_t ch);
-    bool configureServoRanges();
-    void staggerBootServos();
+    bool     configureRc34PulseRange(uint8_t ch);
+    bool     configureServoRanges();
+    void     staggerBootServos();
+    uint32_t noteCommFailure();
+    bool     isCommBackoffActive(uint32_t nowMs, uint32_t backoffMs) const;
+    static bool isElapsed(uint32_t nowMs, uint32_t sinceMs, uint32_t periodMs);
 
     Ps2Driver    ps2_{};
     bool         ps2Ready_                 = false;
@@ -107,6 +114,7 @@ private:
     bool         auxMotorsZeroed_          = false;
     bool         commHealthy_              = true;
     bool         commNeedsHeal_            = false;
+    uint32_t     lastCommFailMs_           = 0;
     uint16_t     prevRawMv_                = 0U;
     uint32_t     lastLowerHealthMs_        = 0;
     uint32_t     lastConfigResyncMs_       = 0;

@@ -23,6 +23,9 @@ public:
 
     bool tryConnect(uint8_t maxAttempts = Config::kPs2InitBurstAttempts);
 
+    /** Restores idle HIGH SPI output levels and DAT pull-up (e.g. after Auto mode). */
+    void restorePins();
+
     void poll(Ps2Frame& outFrame);
 
 private:

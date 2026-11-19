@@ -34,6 +34,11 @@ public:
         if (rxPos_ >= rxLen_) {
             rxPos_ = 0U;
             rxLen_ = 0U;
+        } else if (rxPos_ > 0U) {
+            const size_t remaining = rxLen_ - rxPos_;
+            memmove(rxBuf_, rxBuf_ + rxPos_, remaining);
+            rxPos_ = 0U;
+            rxLen_ = remaining;
         }
         const size_t n = strlen(data);
         for (size_t i = 0U; i < n && (rxLen_ + 1U) < kRxCap; ++i) {
@@ -215,9 +220,9 @@ void SerialControl::printHelp() {
     Serial.println(F("  z / b     : Toggle Precision(55% session) / Reverse-Front | [ / ] : Speed -/+ 15%"));
     Serial.println(F("  , / . / 0 : Motor Balance Trim L(-1%)/R(+1%)/Reset(0%) (saved to EEPROM)"));
     Serial.println(F("  i / k / y : RC2 Up(-10)/Dn(+10)/Toggle Smooth RC2 | j / l : Front RC3+RC4"));
-    Serial.println(F("  o / p     : Aux RC1 0 / 180 deg | q : Toggle Hold/Drop | c <1..4> <deg>"));
+    Serial.println(F("  o / p     : Aux RC1 180 / 0 deg | q : Toggle Hold/Drop | c <1..4> <deg>"));
     Serial.println(F("  m <L> <R> : Direct M1/M2 (-100..100 for 2.5s) | f1 / f2 : Flip M1/M2 dir"));
-    Serial.println(F("  t         : Toggle status stream | u : Enter Upload Bootloader | ? : Help\n"));
+    Serial.println(F("  t / v     : Toggle status stream / I2C diag | u : Bootloader | ? : Help\n"));
 }
 
 void SerialControl::printBanner() {
@@ -232,9 +237,9 @@ void SerialControl::printBanner() {
 
 void SerialControl::printEvent(const char* tag, const char* msg) {
     Serial.print('[');
-    Serial.print(tag);
+    Serial.print(tag ? tag : "");
     Serial.print(F("] "));
-    Serial.println(msg);
+    Serial.println(msg ? msg : "");
 }
 
 void SerialControl::printSnapshot(const SystemSnapshot& snap) {
@@ -283,11 +288,15 @@ void SerialControl::printSnapshot(const SystemSnapshot& snap) {
     Serial.print(static_cast<int>(snap.motorTrimPct));
     Serial.print(F("% prec="));
     Serial.print(snap.precisionMode ? 1 : 0);
+    Serial.print(F(" rf="));
+    Serial.print(snap.reverseDrive ? 1 : 0);
     Serial.print(F(" brk="));
     Serial.print(snap.holdBrakeActive ? 1 : 0);
     Serial.print(F(" rc2Sm="));
     Serial.print(snap.rc2SmoothEnabled ? 1 : 0);
-    Serial.print(F(" RC=("));
+    Serial.print(F(" com="));
+    Serial.print(snap.comScalePct);
+    Serial.print(F("% RC=("));
     Serial.print(snap.servos.rc1Deg);
     Serial.print(',');
     Serial.print(snap.servos.rc2Deg);
@@ -483,13 +492,7 @@ void SerialControl::poll(uint32_t nowMs, int16_t currentSpeedPct, SerialActions&
                 motionExpireMs_ = nowMs + Config::kSerialKeyHoldMs;
                 break;
             case ' ':
-            case 'x':
-            case 'X':
                 activeMotion_ = MotionMode::Stop;
-                break;
-            case '!':
-                activeMotion_             = MotionMode::Stop;
-                outActions.estopRequested = true;
                 break;
             case 'r':
             case 'R':
@@ -593,6 +596,10 @@ void SerialControl::poll(uint32_t nowMs, int16_t currentSpeedPct, SerialActions&
             default:
                 break;
         }
+    }
+
+    if (outActions.estopRequested) {
+        activeMotion_ = MotionMode::Stop;
     }
 
     if (activeMotion_ != MotionMode::Stop &&

@@ -333,12 +333,13 @@ void test_failsafe_burst_glitch_absorption_and_trip(void) {
     TEST_ASSERT_TRUE(sm.isLinkGlitching());
     TEST_ASSERT_EQUAL_UINT16(3U, sm.badFrames());
 
-    // Single valid frame absorbs glitch burst, resetting badFrames count
+    // Single valid frame absorbs glitch burst without dropping out of Operational
     sm.onFrame(true, 275UL);
     TEST_ASSERT_EQUAL_UINT16(0U, sm.badFrames());
     TEST_ASSERT_FALSE(sm.isLinkGlitching());
+    TEST_ASSERT_TRUE(sm.isOperational());
 
-    // Re-arm to Operational
+    // Continued valid frames remain Operational
     sm.onFrame(true, 300UL);
     sm.onFrame(true, 325UL);
     TEST_ASSERT_TRUE(sm.isOperational());
@@ -460,6 +461,15 @@ void test_servo_bounds_and_ps2_presets(void) {
     RobotLogic::updateServoTargetsFromPs2(idle, servos, true);
     TEST_ASSERT_EQUAL_INT16(Config::kRc3L1Deg, servos.rc3Deg);
     TEST_ASSERT_EQUAL_INT16(Config::kRc1L2Deg, servos.rc1Deg);
+
+    // R2 retracts RC1 to kRc1R2Deg (0 deg) and clears any active Circle pose preset
+    ArmPosePresetState poseState{};
+    poseState.dropActive = true;
+    Ps2Frame fR2 = makeValidFrame();
+    fR2.r2 = true;
+    RobotLogic::updateServoTargetsFromPs2(fR2, servos, false, nullptr, &poseState);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc1R2Deg, servos.rc1Deg);
+    TEST_ASSERT_FALSE(poseState.dropActive);
 }
 
 void test_square_push_ground_toggle_and_l1_r1_override(void) {
@@ -482,7 +492,7 @@ void test_square_push_ground_toggle_and_l1_r1_override(void) {
 
     Ps2Frame idle = makeValidFrame();
 
-    // 1. From boot init (180, 180): 1st Square press activates push-ground (30, 30)
+    // 1. From boot init (30, 30): 1st Square press activates push-ground (30, 30)
     RobotLogic::updateServoTargetsFromPs2(fSquare, servos, true, &push);
     TEST_ASSERT_TRUE(push.active);
     TEST_ASSERT_TRUE(push.prevSquare);
@@ -504,7 +514,7 @@ void test_square_push_ground_toggle_and_l1_r1_override(void) {
     TEST_ASSERT_EQUAL_INT16(Config::kRc3SquareDeg, servos.rc3Deg);
     TEST_ASSERT_EQUAL_INT16(Config::kRc4SquareDeg, servos.rc4Deg);
 
-    // 2. 2nd Square press cancels and restores previous (180, 180)
+    // 2. 2nd Square press cancels and restores previous (30, 30)
     RobotLogic::updateServoTargetsFromPs2(fSquare, servos, true, &push);
     TEST_ASSERT_FALSE(push.active);
     TEST_ASSERT_TRUE(push.prevSquare);
@@ -514,7 +524,7 @@ void test_square_push_ground_toggle_and_l1_r1_override(void) {
     RobotLogic::updateServoTargetsFromPs2(idle, servos, true, &push);
     TEST_ASSERT_FALSE(push.prevSquare);
 
-    // 3. From L1 (70, 70): 1st Square -> (30, 30), 2nd Square -> (70, 70)
+    // 3. From L1 (30, 30): 1st Square -> (30, 30), 2nd Square -> (30, 30)
     Ps2Frame fL1 = makeValidFrame();
     fL1.l1 = true;
     RobotLogic::updateServoTargetsFromPs2(fL1, servos, true, &push);
@@ -700,6 +710,7 @@ void test_battery_stabilizer_progressive_sag_tiers(void) {
     TEST_ASSERT_EQUAL_INT16(Config::kEnableBatterySagThrottle ? Config::kBattLowMaxPower : Config::kMotorMaxPower, prof.maxPowerCap);
     TEST_ASSERT_EQUAL_INT16(Config::kEnableBatterySagThrottle ? Config::kBattLowAccelSlew : Config::kMotorAccelSlewStep, prof.accelSlewStep);
     TEST_ASSERT_EQUAL_INT16(Config::kEnableBatterySagThrottle ? Config::kBattLowDecelSlew : Config::kMotorDecelSlewStep, prof.decelSlewStep);
+    TEST_ASSERT_EQUAL_UINT8(Config::kEnableBatterySagThrottle ? 110U : Config::kBattCompMaxPct, prof.compPercent);
     TEST_ASSERT_EQUAL(Config::kEnableBatterySagThrottle, prof.slewLimited);
 
     // Drive voltage down to Critical tier (sag threshold <= 76% of 12600 = 9576 mV)
@@ -711,6 +722,7 @@ void test_battery_stabilizer_progressive_sag_tiers(void) {
     TEST_ASSERT_EQUAL_INT16(Config::kEnableBatterySagThrottle ? Config::kBattCritMaxPower : Config::kMotorMaxPower, prof.maxPowerCap);
     TEST_ASSERT_EQUAL_INT16(Config::kEnableBatterySagThrottle ? Config::kBattCritAccelSlew : Config::kMotorAccelSlewStep, prof.accelSlewStep);
     TEST_ASSERT_EQUAL_INT16(Config::kEnableBatterySagThrottle ? Config::kBattCritDecelSlew : Config::kMotorDecelSlewStep, prof.decelSlewStep);
+    TEST_ASSERT_EQUAL_UINT8(Config::kEnableBatterySagThrottle ? 100U : Config::kBattCompMaxPct, prof.compPercent);
     TEST_ASSERT_EQUAL(Config::kEnableBatterySagThrottle, prof.slewLimited);
 
     // Drive voltage down to Emergency tier (sag threshold <= 69% of 12600 = 8694 mV)
@@ -722,6 +734,7 @@ void test_battery_stabilizer_progressive_sag_tiers(void) {
     TEST_ASSERT_EQUAL_INT16(Config::kEnableBatterySagThrottle ? Config::kBattEmergMaxPower : Config::kMotorMaxPower, prof.maxPowerCap);
     TEST_ASSERT_EQUAL_INT16(Config::kEnableBatterySagThrottle ? Config::kBattEmergAccelSlew : Config::kMotorAccelSlewStep, prof.accelSlewStep);
     TEST_ASSERT_EQUAL_INT16(Config::kEnableBatterySagThrottle ? Config::kBattEmergDecelSlew : Config::kMotorDecelSlewStep, prof.decelSlewStep);
+    TEST_ASSERT_EQUAL_UINT8(100U, prof.compPercent);
     TEST_ASSERT_EQUAL(Config::kEnableBatterySagThrottle, prof.slewLimited);
 }
 
@@ -892,10 +905,14 @@ void test_stability_monitor_individual_penalties(void) {
     stb.update(in);
     TEST_ASSERT_EQUAL_UINT8(Config::kStabilitySyncWaitPen, stb.linkPenalty());
 
-    // Disconnected (after ever connected) = 25%
+    // Disconnected (after ever connected) = 25% when idle, but 0% during Autonomous mode
     in.ps2Link = LinkState::Disconnected;
     stb.update(in);
     TEST_ASSERT_EQUAL_UINT8(Config::kStabilityLinkDropPen, stb.linkPenalty());
+
+    in.activeSource = ControlSource::Auto;
+    stb.update(in);
+    TEST_ASSERT_EQUAL_UINT8(0U, stb.linkPenalty());
 
     // Disconnected before ever connected:
     stb.reset();
@@ -908,10 +925,15 @@ void test_stability_monitor_individual_penalties(void) {
     stb.update(in);
     TEST_ASSERT_EQUAL_UINT8(Config::kStabilitySerialLinkPen, stb.linkPenalty()); // 2%
 
+    in.activeSource = ControlSource::Auto;
+    stb.update(in);
+    TEST_ASSERT_EQUAL_UINT8(0U, stb.linkPenalty()); // 0% during autonomous run without PS2
+
     // Operational link glitch penalty (+8% per bad frame up to 35%)
     stb.reset();
-    in.ps2Link    = LinkState::Operational;
-    in.frameValid = true;
+    in.activeSource = ControlSource::Ps2;
+    in.ps2Link      = LinkState::Operational;
+    in.frameValid   = true;
     stb.update(in); // Initialize clean Operational baseline (linkPen_ = 0)
     TEST_ASSERT_EQUAL_UINT8(0U, stb.linkPenalty());
 
@@ -1263,7 +1285,7 @@ void test_serial_speed_batching_timeout_and_estop_interrupt(void) {
     TEST_ASSERT_TRUE(act.speedPctChanged);
     TEST_ASSERT_EQUAL_INT16(90, act.newSpeedPct);
 
-    // Multiple '[' in one poll batch clamp at kSerialMinSpeed (15%)
+    // Multiple '[' in one poll batch clamp at kSerialMinSpeed (20%)
     NativeSerial::feed("[[[[");
     sc.poll(1050UL, 60, act);
     TEST_ASSERT_TRUE(act.speedPctChanged);
@@ -1492,6 +1514,13 @@ void test_kinodynamic_drive_reverse_front_and_dpad_micro_turn(void) {
     TEST_ASSERT_EQUAL_INT16(static_cast<int16_t>(-Config::kMicroTurnPower), nudgeRight.right);
     TEST_ASSERT_EQUAL_INT16(static_cast<int16_t>(-Config::kMicroTurnPower), nudgeLeft.left);
     TEST_ASSERT_EQUAL_INT16(Config::kMicroTurnPower, nudgeLeft.right);
+
+    // Combined forward throttle + right steering in Normal mode applies kTurnExpoPct (45%)
+    // and kTurnMaxRatioPct (80%) so outer wheel leads inner wheel smoothly.
+    const DriveOutput arcRight = RobotLogic::computeKinodynamicDrive(
+        64U, 192U, 50, 50, 100, 100, 100, 100U, 140, false, false, false);
+    TEST_ASSERT_GREATER_THAN_INT16(arcRight.right, arcRight.left);
+    TEST_ASSERT_GREATER_THAN_INT16(0, arcRight.right);
 }
 
 void test_precision_mode_full_stick_scaling_and_micro_turn(void) {
@@ -1687,6 +1716,38 @@ void test_auto_encoder_stall_progress_logic(void) {
     TEST_ASSERT_TRUE(RobotLogic::hasEncoderProgressed(100, 103, 3));
     TEST_ASSERT_TRUE(RobotLogic::hasEncoderProgressed(100, 97, 3));
     TEST_ASSERT_TRUE(RobotLogic::hasEncoderProgressed(-500, -510, 3));
+
+    // Auto DriveDC polarity resolution from saved EEPROM f1/f2 flags:
+    bool revL = false;
+    bool revR = true;
+    RobotLogic::resolveAutoDrivePolarity(
+        1U, 2U, Config::kMotorLeftReverseInit, Config::kMotorRightReverseInit, revL, revR);
+    TEST_ASSERT_FALSE(revL);
+    TEST_ASSERT_TRUE(revR);
+
+    // Flipping left motor (f1) inverts revL while keeping revR
+    revL = false;
+    revR = true;
+    RobotLogic::resolveAutoDrivePolarity(
+        1U, 2U, !Config::kMotorLeftReverseInit, Config::kMotorRightReverseInit, revL, revR);
+    TEST_ASSERT_TRUE(revL);
+    TEST_ASSERT_TRUE(revR);
+
+    // Flipping right motor (f2) inverts revR while keeping revL
+    revL = false;
+    revR = true;
+    RobotLogic::resolveAutoDrivePolarity(
+        1U, 2U, Config::kMotorLeftReverseInit, !Config::kMotorRightReverseInit, revL, revR);
+    TEST_ASSERT_FALSE(revL);
+    TEST_ASSERT_FALSE(revR);
+
+    // Non-drive motor pair IDs (e.g. 3, 4) are left untouched
+    revL = false;
+    revR = true;
+    RobotLogic::resolveAutoDrivePolarity(
+        3U, 4U, !Config::kMotorLeftReverseInit, !Config::kMotorRightReverseInit, revL, revR);
+    TEST_ASSERT_FALSE(revL);
+    TEST_ASSERT_TRUE(revR);
 }
 
 void test_serial_phase2_trim_and_rc2_smooth_keys(void) {
@@ -1740,6 +1801,83 @@ void test_servo_direction_inversion(void) {
                               : Config::kRc4InitDeg,
         rc4InitHw);
     TEST_ASSERT_TRUE(Config::kRc34PulseMinUs < Config::kRc34PulseMaxUs);
+}
+
+void test_kinodynamic_envelope_and_overflow_safety(void) {
+    // 1. Precision Mode (55%) forward-to-pivot transition with raised arm (RC2=0 -> CoM 65%)
+    //    must NEVER overshoot the 55% ceiling during 2-DOF slew.
+    const DriveOutput precPivot = RobotLogic::computeKinodynamicDrive(
+        128U, 255U, 55, 55, Config::kMotorMaxPower, 25, 50, 100U, 0, false, false, false, 0, true);
+    TEST_ASSERT_LESS_OR_EQUAL_INT16(Config::kPrecisionMaxPower, precPivot.left);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT16(static_cast<int16_t>(-Config::kPrecisionMaxPower), precPivot.left);
+    TEST_ASSERT_LESS_OR_EQUAL_INT16(Config::kPrecisionMaxPower, precPivot.right);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT16(static_cast<int16_t>(-Config::kPrecisionMaxPower), precPivot.right);
+
+    // 2. Battery Emergency cap (35%, decel=18) forward-to-pivot must NEVER overshoot 35%.
+    const DriveOutput emergPivot = RobotLogic::computeKinodynamicDrive(
+        128U, 255U, 35, 35, Config::kBattEmergMaxPower, 6, 18, 100U, 140, false, false, false, 0, false);
+    TEST_ASSERT_LESS_OR_EQUAL_INT16(Config::kBattEmergMaxPower, emergPivot.left);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT16(static_cast<int16_t>(-Config::kBattEmergMaxPower), emergPivot.right);
+
+    // 3. Adversarial int16_t targets with 115% torque compensation must NOT overflow or flip sign.
+    const DriveOutput highComp = RobotLogic::applyDriveTargetsWithSlew(
+        30000, -32768, 0, 0, 100, 100, 100, 115U);
+    TEST_ASSERT_GREATER_THAN_INT16(0, highComp.left);
+    TEST_ASSERT_LESS_OR_EQUAL_INT16(100, highComp.left);
+    TEST_ASSERT_EQUAL_INT16(-100, highComp.right);
+
+    // 4. Extreme int16_t inputs in applyAsymmetricSlewStep, slewServoAngle, applyMotorBalanceTrim, decodePs2Payload.
+    TEST_ASSERT_EQUAL_INT16(32767, RobotLogic::applyAsymmetricSlewStep(32700, 32767, 100, 100));
+    TEST_ASSERT_EQUAL_INT16(-32768, RobotLogic::applyAsymmetricSlewStep(-32700, -32768, 100, 100));
+    TEST_ASSERT_EQUAL_INT16(-1, RobotLogic::applyAsymmetricSlewStep(-32768, 100, 100, 32767));
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::applyAsymmetricSlewStep(-32767, 100, 100, 32767));
+    TEST_ASSERT_EQUAL_INT16(180, RobotLogic::slewServoAngle(90, 180, 32767));
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::slewServoAngle(90, 0, 32767));
+
+    int16_t trimL = -32768;
+    int16_t trimR = 32767;
+    RobotLogic::applyMotorBalanceTrim(trimL, trimR, -10);
+    TEST_ASSERT_LESS_THAN_INT16(0, trimL);
+    TEST_ASSERT_EQUAL_INT16(32767, trimR);
+
+    Ps2Frame nullFrame = makeValidFrame();
+    RobotLogic::decodePs2Payload(nullptr, nullFrame);
+    TEST_ASSERT_FALSE(nullFrame.linkOk);
+    TEST_ASSERT_FALSE(RobotLogic::isPs2FrameValid(nullFrame));
+}
+
+void test_serial_estop_batch_help_and_telemetry_fields(void) {
+    SerialControl sc;
+    SerialActions act{};
+
+    // 1. ESTOP '!' followed by drive key 'w' in the same RX batch must keep driveCmd stopped.
+    NativeSerial::feed("!w");
+    sc.poll(7000UL, 80, act);
+    TEST_ASSERT_TRUE(act.estopRequested);
+    TEST_ASSERT_FALSE(act.driveCmd.active);
+    TEST_ASSERT_EQUAL_INT16(0, act.driveCmd.targetLeft);
+    TEST_ASSERT_EQUAL_INT16(0, act.driveCmd.targetRight);
+
+    // 2. Help text accurately matches o=180 / p=0 and documents 'v' I2C diag.
+    NativeSerial::reset();
+    NativeSerial::feed("?");
+    sc.poll(7050UL, 80, act);
+    TEST_ASSERT_NOT_NULL(strstr(NativeSerial::output(), "Aux RC1 180 / 0 deg"));
+    TEST_ASSERT_NOT_NULL(strstr(NativeSerial::output(), "I2C diag"));
+
+    // 3. printEvent handles nullptr safely without crashing.
+    NativeSerial::reset();
+    sc.printEvent(nullptr, nullptr);
+    TEST_ASSERT_NOT_NULL(strstr(NativeSerial::output(), "[] "));
+
+    // 4. Snapshot telemetry includes reverse-front (rf=) and CoM scale (com=).
+    SystemSnapshot snap{};
+    snap.reverseDrive = true;
+    snap.comScalePct  = 78U;
+    NativeSerial::reset();
+    sc.printSnapshot(snap);
+    TEST_ASSERT_NOT_NULL(strstr(NativeSerial::output(), "rf=1"));
+    TEST_ASSERT_NOT_NULL(strstr(NativeSerial::output(), "com=78%"));
 }
 
 // ============================================================================
@@ -1806,6 +1944,8 @@ int main(int argc, char** argv) {
     RUN_TEST(test_auto_encoder_stall_progress_logic);
     RUN_TEST(test_serial_phase2_trim_and_rc2_smooth_keys);
     RUN_TEST(test_servo_direction_inversion);
+    RUN_TEST(test_kinodynamic_envelope_and_overflow_safety);
+    RUN_TEST(test_serial_estop_batch_help_and_telemetry_fields);
 
     return UNITY_END();
 }

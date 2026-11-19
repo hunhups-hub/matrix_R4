@@ -16,18 +16,28 @@ inline R_PORT0_Type* resolvePort(uint8_t pin, uint16_t& outMask) {
     const uint8_t portIdx = static_cast<uint8_t>(raw >> 8);
     const uint8_t bitIdx  = static_cast<uint8_t>(raw & 0xFFU);
 
-    static R_PORT0_Type* const kPorts[8] = {
-        R_PORT0, R_PORT1, R_PORT2, R_PORT3,
-        R_PORT4, R_PORT5, R_PORT6, R_PORT7
-    };
-
-    if (portIdx >= 8U || bitIdx >= 16U) {
+    if (bitIdx >= 16U) {
         outMask = 0U;
         return nullptr;
     }
 
+    R_PORT0_Type* port = nullptr;
+    switch (portIdx) {
+        case 0U: port = R_PORT0; break;
+        case 1U: port = R_PORT1; break;
+        case 2U: port = R_PORT2; break;
+        case 3U: port = R_PORT3; break;
+        case 4U: port = R_PORT4; break;
+        case 5U: port = R_PORT5; break;
+        case 6U: port = R_PORT6; break;
+        case 7U: port = R_PORT7; break;
+        default:
+            outMask = 0U;
+            return nullptr;
+    }
+
     outMask = static_cast<uint16_t>(1U << bitIdx);
-    return kPorts[portIdx];
+    return port;
 }
 
 inline void fastSetHigh(void* portPtr, uint16_t mask, uint8_t fallbackPin) {
@@ -70,28 +80,37 @@ bool Ps2Driver::begin(uint8_t clkPin,
     att_.port = resolvePort(attPin, att_.mask);
     dat_.port = resolvePort(datPin, dat_.mask);
 
-    // Preload idle HIGH levels before setting OUTPUT to avoid spurious CS edges
-    digitalWrite(clkPin, HIGH);
-    digitalWrite(cmdPin, HIGH);
-    digitalWrite(attPin, HIGH);
-
-    pinMode(clkPin, OUTPUT);
-    pinMode(cmdPin, OUTPUT);
-    pinMode(attPin, OUTPUT);
-    // Keep internal pull-up active so floating DAT cleanly reads 0xFF when unplugged
-    pinMode(datPin, INPUT_PULLUP);
-
     initialized_ = true;
+    restorePins();
 
     const uint32_t startMs = millis();
-    do {
+    for (;;) {
         if (tryConnectSingleCycle()) {
             return true;
         }
+        if (static_cast<uint32_t>(millis() - startMs) >= bootTimeoutMs) {
+            break;
+        }
         delay(Config::kPs2InitRetryGapMs);
-    } while (static_cast<uint32_t>(millis() - startMs) < bootTimeoutMs);
+    }
 
     return false;
+}
+
+void Ps2Driver::restorePins() {
+    if (!initialized_) {
+        return;
+    }
+    // Preload idle HIGH levels before setting OUTPUT to avoid spurious CS edges
+    digitalWrite(clk_.pin, HIGH);
+    digitalWrite(cmd_.pin, HIGH);
+    digitalWrite(att_.pin, HIGH);
+
+    pinMode(clk_.pin, OUTPUT);
+    pinMode(cmd_.pin, OUTPUT);
+    pinMode(att_.pin, OUTPUT);
+    // Keep internal pull-up active so floating DAT cleanly reads 0xFF when unplugged
+    pinMode(dat_.pin, INPUT_PULLUP);
 }
 
 bool Ps2Driver::tryConnect(uint8_t maxAttempts) {
@@ -123,8 +142,9 @@ bool Ps2Driver::tryConnectSingleCycle() {
     const uint8_t r4 = spiTxRx(0x00U);
     spiEnd();
 
-    // If DAT stays idle HIGH (0xFF) across all 5 bytes, no receiver responded; bail early (~0.8 ms).
-    if (r0 == 0xFFU && r1 == 0xFFU && r2 == 0xFFU && r3 == 0xFFU && r4 == 0xFFU) {
+    // If DAT stays idle HIGH (0xFF) or shorted LOW (0x00) across all 5 bytes, bail early (~0.8 ms).
+    if ((r0 == 0xFFU && r1 == 0xFFU && r2 == 0xFFU && r3 == 0xFFU && r4 == 0xFFU) ||
+        (r0 == 0x00U && r1 == 0x00U && r2 == 0x00U && r3 == 0x00U && r4 == 0x00U)) {
         return false;
     }
 

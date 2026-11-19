@@ -20,7 +20,8 @@ enum class AutoExitReason : uint8_t {
     SerialUpload,
     Timeout,
     StallTimeout,
-    UserExit
+    UserExit,
+    DriveInitFail
 };
 
 namespace AutoBlockUser {
@@ -71,6 +72,26 @@ bool hasEntryTrianglePending();
  */
 void notifyPs2TriangleMatched();
 
+/** Applies EEPROM motor polarity flips relative to boot defaults to DriveDC.begin(). */
+void resolveDrivePolarity(uint8_t leftMotorID,
+                          uint8_t rightMotorID,
+                          bool& ioLeftReverse,
+                          bool& ioRightReverse);
+
+/** Marks entry into a blocking DriveDC move wait so dead-UART and stall detection can abort safely. */
+void beginBlockingDriveTask(bool expectWheelMotion = true);
+
+/** Marks exit from a blocking DriveDC move wait. */
+void endBlockingDriveTask();
+
+/** Records that AutoBlockUser::loop() performed meaningful user activity beyond boilerplate polling. */
+void noteUserLoopActivity();
+
+/** Abort-safe Serial pass-through for Auto code (emergency keys are always intercepted first). */
+int serialAvailable();
+int serialRead();
+int serialPeek();
+
 } // namespace AutoMode
 
 /** Optional helper for custom Auto loops to test whether X/ESTOP was requested. */
@@ -78,3 +99,6 @@ bool autoShouldExit();
 
 /** Optional helper for Auto block code to finish and return to Manual mode. */
 [[noreturn]] void autoExit();
+
+/** Safely aborts Auto (motors braked, Manual restored) when DriveDC could not be configured. */
+[[noreturn]] void autoAbortDriveInit();

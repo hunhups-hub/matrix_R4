@@ -72,6 +72,27 @@
                 "clear": true
             },
             "problemMatcher": "$gcc"
+        },
+        {
+            "label": "PIO: Test Native (matrix_R4)",
+            "type": "process",
+            "command": "${env:USERPROFILE}\\.platformio\\penv\\Scripts\\pio.exe",
+            "args": [
+                "test",
+                "-e",
+                "native",
+                "-v"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            },
+            "problemMatcher": "$gcc"
         }
     ]
 }

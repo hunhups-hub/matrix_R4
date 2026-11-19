@@ -21,11 +21,12 @@
    - การเปิดโปรเจกต์และการโหลด Toolchain อัตโนมัติ
    - การเรียกใช้งาน PlatformIO ผ่าน Terminal และ CLI
 5. [คู่มือการคอมไพล์ ทดสอบ และอัปโหลดโปรแกรม (Build, Test & Upload Step-by-Step)](#5-คู่มือการคอมไพล์-ทดสอบ-และอัปโหลดโปรแกรม-build-test--upload-step-by-step)
-   - 5.1 การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์ (`pio test -e native` — ครบ 36 รายการ 10 หมวดหมู่)
+   - 5.1 การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์ (`pio test -e native` — ครบ 38 รายการ 10 หมวดหมู่)
    - 5.2 การคอมไพล์โค้ดสำหรับฮาร์ดแวร์ (`pio run -e uno_r4_wifi`)
    - 5.3 การอัปโหลดเฟิร์มแวร์ลงบอร์ด (`pio run -e uno_r4_wifi --target upload`)
    - 5.4 ทางลัดเข้าสู่โหมดอัปโหลด Bootloader (Upload Bootloader Mode Shortcut)
    - 5.5 การเปิด Serial Monitor เพื่อดูข้อมูลการทำงานแบบเรียลไทม์
+   - 5.6 การวิเคราะห์โค้ดเชิงสถิต (`pio check` / `cppcheck`)
 6. [คู่มือการควบคุมหุ่นยนต์และโหมดแข่งขันอัตโนมัติ (Robot Operation & Competition Manual)](#6-คู่มือการควบคุมหุ่นยนต์และโหมดแข่งขันอัตโนมัติ-robot-operation--competition-manual)
    - 6.1 แผนผังและตารางการควบคุมด้วยจอยสติ๊ก PS2 / MJ2 Wireless
    - 6.2 การควบคุมด้วยปุ่มกดบนบอร์ด Carrier Shield (Hardware Buttons)
@@ -35,8 +36,8 @@
    - 6.6 ระบบบันทึกการตั้งค่าถาวรลงหน่วยความจำ EEPROM (CRC-16-CCITT Persistent Config)
 7. [สถาปัตยกรรมโค้ด แบบจำลองฟิสิกส์ และการทำงานภายใน (Code Architecture & Engineering Details)](#7-สถาปัตยกรรมโค้ด-แบบจำลองฟิสิกส์-และการทำงานภายใน-code-architecture--engineering-details)
    - 7.1 [แผนผังรอบการทำงานลูปควบคุมหลัก 40 Hz (25 ms Cycle Diagram)](#71-แผนผังรอบการทำงานลูปควบคุมหลัก-40-hz-25-ms-cycle-diagram)
-   - 7.2 [คำอธิบายโครงสร้างและหน้าที่ของทุกไฟล์ในโปรเจกต์อย่างละเอียด (Exhaustive File-by-File Breakdown - 27 ไฟล์)](#72-คำอธิบายโครงสร้างและหน้าที่ของทุกไฟล์ในโปรเจกต์อย่างละเอียด-exhaustive-file-by-file-breakdown---27-ไฟล์)
-     - [กลุ่มที่ 1: ไฟล์ระดับรากของโปรเจกต์ (Project Root Files - 3 ไฟล์)](#กลุ่มที่-1-ไฟล์ระดับรากของโปรเจกต์-project-root-files---3-ไฟล์)
+   - 7.2 [คำอธิบายโครงสร้างและหน้าที่ของทุกไฟล์ในโปรเจกต์อย่างละเอียด (Exhaustive File-by-File Breakdown - 28 ไฟล์)](#72-คำอธิบายโครงสร้างและหน้าที่ของทุกไฟล์ในโปรเจกต์อย่างละเอียด-exhaustive-file-by-file-breakdown---28-ไฟล์)
+     - [กลุ่มที่ 1: ไฟล์ระดับรากของโปรเจกต์ (Project Root Files - 4 ไฟล์)](#กลุ่มที่-1-ไฟล์ระดับรากของโปรเจกต์-project-root-files---4-ไฟล์)
      - [กลุ่มที่ 2: โฟลเดอร์การตั้งค่า Visual Studio Code (.vscode/ - 4 ไฟล์)](#กลุ่มที่-2-โฟลเดอร์การตั้งค่า-visual-studio-code-vscode---4-ไฟล์)
      - [กลุ่มที่ 3: ไฟล์ส่วนหัวและการประกาศฟังก์ชัน (include/ - 9 ไฟล์)](#กลุ่มที่-3-ไฟล์ส่วนหัวและการประกาศฟังก์ชัน-include---9-ไฟล์)
      - [กลุ่มที่ 4: ซอร์สโค้ดการทำงานหลัก (src/ - 8 ไฟล์)](#กลุ่มที่-4-ซอร์สโค้ดการทำงานหลัก-src---8-ไฟล์)
@@ -53,6 +54,7 @@
    - ปัญหาที่ 6: การตั้งค่าระบบป้องกันไฟตก (`kEnableBatterySagThrottle`) และอาการชะลอความเร็วเมื่อแบตอ่อน
    - ปัญหาที่ 7: โหมด Auto หยุดทำงานเองก่อนจบสคริปต์ (ระบบตรวจจับล้อติดขัด Encoder Stall Protection)
    - ปัญหาที่ 8: หน้าจอ OLED ดับ หรือมืดสนิท
+9. [สรุปการยกระดับความปลอดภัยและความเสถียรล่าสุด (Security & Stability Hardening Summary)](#9-สรุปการยกระดับความปลอดภัยและความเสถียรล่าสุด-security--stability-hardening-summary)
 
 ---
 
@@ -187,7 +189,7 @@
 | **RC3** | PWM Output | **แขนหน้าซ้าย (Front Left)** | ควบคุมด้วย STM32 (ตอบสนองทันที 100%, ซิงก์ 1 เฟรมคู่ `RC4` ผ่าน `SetAllServoAngle` และตั้งช่วงพัลส์ `500–2500 µs`): ค่าเริ่มต้น `30°`, ปุ่ม `L1` = `30°` (ก้มลง), ปุ่ม `R1` = `140°` (ยกขึ้น), ปุ่ม `Square` = สลับดันพื้น `30°` / คืนค่าเดิม |
 | **RC4** | PWM Output | **แขนหน้าขวา (Front Right)** | ควบคุมด้วย STM32 (ตอบสนองทันที 100%, ซิงก์ 1 เฟรมคู่ `RC3` และกลับทิศอัตโนมัติ `kRc4InvertDir = true`): ค่าเริ่มต้น `30°`, ปุ่ม `L1` = `30°` (ก้มลง), ปุ่ม `R1` = `140°` (ยกขึ้น), ปุ่ม `Square` = สลับดันพื้น `30°` / คืนค่าเดิม |
 | **BTN_UP** | User Input | **ปุ่มกดด้านบน (ID 2)** | กดสั้น: ปลด ESTOP หรือหยุดโหมด Auto / กดค้างเดี่ยว 1.2s: เริ่มโหมด Auto / กดค้างคู่ `BTN_DOWN` 2.5s: เข้า Bootloader |
-| **BTN_DOWN** | User Input | **ปุ่มกดด้านล่าง (ID 1)** | กดสั้น: สั่งหยุดฉุกเฉิน (ESTOP) ทันทีทั้งในโหมด Manual และ Auto / กดค้างคู่ `BTN_UP` 2.5s: เข้า Bootloader |
+| **BTN_DOWN** | User Input | **ปุ่มกดด้านล่าง (ID 1)** | กดทันที (Rising-Edge 30 ms): สั่งหยุดฉุกเฉิน (ESTOP) ทันทีทั้งในโหมด Manual และ Auto โดยไม่ต้องรอปล่อยนิ้ว / กดค้างคู่ `BTN_UP` 2.5s: เข้า Bootloader |
 
 ---
 
@@ -251,7 +253,7 @@
    - **`kPowerCutoffVolt` (`6.0f` = 6.0V ใน `include/config.h`)**: คือ **ระดับแรงดันตัดไฟขั้นต่ำของชิปฮาร์ดแวร์ STM32 (Hardware Cutoff Floor)** ซึ่งส่งผ่านฟังก์ชัน `mmL.SetPowerParam(Config::kPowerFullVolt, Config::kPowerCutoffVolt, Config::kPowerAlarmVolt)` ใน `src/minir4_io.cpp` เพื่อตั้งให้ STM32 รองรับทั้งหม้อแปลง DC 9V และ LiPo 2S–4S โดยตั้งไว้ที่ `6.0V` ให้ต่ำกว่าเกณฑ์ฉุกเฉินของซอฟต์แวร์ (`6.4V`)
    - **`kBattEmergVoltMv` (`6400U` = 6.4V), `kBattCritVoltMv` (`6800U` = 6.8V), `kLowVoltWarnMv` (`7200U` = 7.2V)**: คือเกณฑ์แรงดันไฟตกของซอฟต์แวร์ `BatteryStabilizer` ใน `src/robot_logic.cpp` (ทำงานร่วมกับสัดส่วนแรงดันตกเทียบกับค่าไฟพัก `baselineMv_`: `83%` -> `Low`, `76%` -> `Critical`, `69%` -> `Emergency`) พร้อมระยะ Hysteresis **`350 mV` (`kBattHysteresisMv`)** และเวลาหน่วงฟื้นตัว **`1500 ms` (`kBattRecoveryHoldMs`)** รวมถึงมีกลไก **Regen Spike Guard** ป้องกันแรงดันไฟย้อนตอนเบรกไม่ให้ดันค่า `baselineMv_` สูงเกินแพ็กแบตจริง
    - **ตัวเลือกโหมดแข่งขันเต็มกำลัง vs โหมดลดกำลังป้องกันไฟตก (`kEnableBatterySagThrottle` ใน `include/config.h`)**:
-     - ค่าเริ่มต้นตั้งไว้ที่ **`kEnableBatterySagThrottle = false` (โหมดแข่งขันเต็มกำลัง 100%)**: หุ่นยนต์จะคงเพดานกำลังขับสูงสุด `100%` และอัตราเร่งเต็มพิกัดเสมอแม้แบตเตอรี่เริ่มอ่อน พร้อมช่วยชดเชยแรงบิดอัตโนมัติ (`compPercent` สูงสุด `115%`) และแสดงสัญลักษณ์เตือน `L`/`C`/`E` บนหน้าจอ OLED
+     - ค่าเริ่มต้นตั้งไว้ที่ **`kEnableBatterySagThrottle = false` (โหมดแข่งขันเต็มกำลัง 100%)**: หุ่นยนต์จะคงเพดานกำลังขับสูงสุด `100%` และอัตราเร่งเต็มพิกัดเสมอแม้แบตเตอรี่เริ่มอ่อน พร้อมช่วยชดเชยแรงบิดอัตโนมัติ (`compPercent` สูงสุด `115%` ในระดับ `Normal`/`Low`/`Critical` และงดบูสต์ที่ระดับ `Emergency <= 6.4V` เพื่อลดความเสี่ยงไฟตก) รวมถึงแสดงสัญลักษณ์เตือน `L`/`C`/`E` บนหน้าจอ OLED
      - หากเปลี่ยนเป็น **`kEnableBatterySagThrottle = true` (โหมดถนอมแบตเตอรี่/ป้องกันไฟตก)**: เมื่อแรงดันตกสู่ระดับ `Low`, `Critical`, หรือ `Emergency` ระบบจะลดเพดานกำลังขับลงเป็น `72%`, `50%`, และ `35%` พร้อมลดความชันอัตราเร่งลงอัตโนมัติเพื่อป้องกันบอร์ดรีบูตเมื่อใช้แบตเตอรี่เก่าหรือเสื่อมสภาพ
 
 ---
@@ -325,16 +327,16 @@
 ```
 *(หรือพิมพ์ `pio test -e native` หากตั้งค่า Environment Path แล้ว)*
 
-**ผลลัพธ์ที่คาดหวัง**: ระบบจะรันชุดทดสอบ Unity Unit Tests ครบทั้ง **36 รายการ (10 หมวดหมู่)** โดยจะผ่านทั้งหมด (`[PASSED]`) 100% ภายในเวลาไม่กี่วินาที:
+**ผลลัพธ์ที่คาดหวัง**: ระบบจะรันชุดทดสอบ Unity Unit Tests ครบทั้ง **38 รายการ (10 หมวดหมู่)** โดยจะผ่านทั้งหมด (`[PASSED]`) 100% ภายในเวลาไม่กี่วินาที:
 ```text
 =================================== SUMMARY ===================================
 Environment    Test              Status    Duration
 -------------  ----------------  --------  ------------
-native         test_robot_logic  PASSED    00:00:01.314
-================= 36 test cases: 36 succeeded in 00:00:01.314 =================
+native         test_robot_logic  PASSED    00:00:02.729
+================= 38 test cases: 38 succeeded in 00:00:02.729 =================
 ```
 
-**คำอธิบายชุดทดสอบทั้ง 36 รายการ (10 หมวดหมู่หลัก)** ใน [test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp):
+**คำอธิบายชุดทดสอบทั้ง 38 รายการ (10 หมวดหมู่หลัก)** ใน [test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp):
 1. **การคำนวณจลนศาสตร์ล้อและการตัด Deadzone (Differential Drive Kinematics - 4 รายการ)**:
    - `test_axis_deadzone_and_extremes`: ตรวจสอบว่าช่วง Deadband ตรงกลางของจอยสติ๊ก (`109..146`) ตัดเป็น `0` อย่างสมบูรณ์ และเมื่อโยกสุดจะได้ `±100%` แน่นอน
    - `test_differential_drive_zero_speed_boundary`: ตรวจสอบว่าเมื่อขีดจำกัดความเร็วเป็น `0` หรือติดลบ มอเตอร์จะไม่ขยับหรือค่อยๆ ลดความเร็วสู่ `0`
@@ -345,7 +347,7 @@ native         test_robot_logic  PASSED    00:00:01.314
    - `test_asymmetric_slew_zero_crossing_trajectory`: ตรวจสอบการเปลี่ยนทิศทางกะทันหันข้ามจุดศูนย์ โดยต้องลดความเร็วจนหยุดสนิทที่ `0` ก่อนจะเริ่มเร่งไปในทิศตรงข้าม
 3. **ระบบตรวจสอบแพ็กเก็ต เซอร์โวดันพื้น และ Failsafe State Machine (5 รายการ)**:
    - `test_ps2_decode_and_5stage_validation`: ตรวจสอบการคัดกรองแพ็กเก็ตข้อมูลทั้ง 5 ชั้นอย่างเข้มงวด และการรองรับมุมสุดก้านโยก `(0,0)` / `(255,255)`
-   - `test_failsafe_burst_glitch_absorption_and_trip`: ตรวจสอบการทนทานต่อสัญญาณรบกวนคลื่นสั้น (Glitch 1–3 เฟรม) และการตัดการทำงานเข้า Failsafe เมื่อสัญญาณขาดหายติดต่อกันครบ 4 เฟรม
+   - `test_failsafe_burst_glitch_absorption_and_trip`: ตรวจสอบการดูดซับสัญญาณรบกวนคลื่นสั้น (Glitch 1–3 เฟรม) โดยยังคงสถานะ `Operational` ไม่กระตุกเบรก และการตัดการทำงานเข้า `Failsafe` เมื่อสัญญาณขาดหายติดต่อกันครบ 4 เฟรม
    - `test_failsafe_persistent_loss_disconnect_and_reinit_cooldown`: ตรวจสอบการเข้าสู่สถานะหลุดการเชื่อมต่อ (`Disconnected`) เมื่อสัญญาณหายเกิน 3 วินาที (120 เฟรม) หรือจอยรีเซ็ตโหมดเป็น `0x41` ครบ 3 เฟรม พร้อมการหน่วง Cooldown 500 ms
    - `test_servo_bounds_and_ps2_presets`: ตรวจสอบการจำกัดขอบเขตองศาเซอร์โวให้อยู่ในช่วง `0°..180°` และการขยับ `RC1..RC4` ด้วยปุ่ม L1, R1, L2, R2, D-Pad
    - `test_square_push_ground_toggle_and_l1_r1_override`: ตรวจสอบปุ่ม `Square` กดครั้งที่ 1 ดันพื้น (`RC3=30°, RC4=30°`), กดครั้งที่ 2 คืนค่าเดิมก่อนกด และการยกเลิกอัตโนมัติเมื่อกด `L1`/`R1` แทรก
@@ -374,13 +376,15 @@ native         test_robot_logic  PASSED    00:00:01.314
    - `test_kinodynamic_drive_reverse_front_and_dpad_micro_turn`: ตรวจสอบการสลับด้านหน้า-หลัง (`reverseDrive`) และการหมุนตัวละเอียดด้วย D-Pad ซ้าย/ขวา (`±26%`)
    - `test_precision_mode_full_stick_scaling_and_micro_turn`: ตรวจสอบการสเกลก้านโยกเต็มระยะในโหมด Precision (`0..55%`), การหมุนตัวอยู่กับที่, Micro-Turn `±18%`, การจำกัดทับซ้อนจาก Sag Cap, และ Telemetry `prec=1`
    - `test_circle_pose_preset_and_serial_competition_shortcuts`: ตรวจสอบปุ่ม `Circle` สลับท่าวาง (`145°, 140°`) / ท่าถือ (`75°, 70°`) และคีย์ลัด Serial `g`, `z`, `b`, `q`
-10. **การกวาดมุมสมูท RC2, สมดุลล้อ, EEPROM CRC-16, ล้อติดขัด และกลับทิศเซอร์โว (Phase 2 Enhancements - 6 รายการ)**:
+10. **การกวาดมุมสมูท RC2, สมดุลล้อ, EEPROM CRC-16, ล้อติดขัด, กลับทิศเซอร์โว และความปลอดภัยขอบเขตขั้นสูง (Phase 2 & Hardening - 8 รายการ)**:
     - `test_rc2_smooth_servo_slew`: ตรวจสอบฟังก์ชัน `slewServoAngle()` กวาดมุม `RC2` ทีละ `6°/tick` อย่างแม่นยำและจำกัดขอบเขต `[0°, 180°]`
     - `test_motor_balance_trim_and_stepping`: ตรวจสอบการปรับค่าชดเชยสมดุลล้อ `stepMotorTrim()` และการลดทอนกำลังล้อซ้าย/ขวาด้วย `applyMotorBalanceTrim()` ในช่วง `[-15%, +15%]`
     - `test_persistent_config_crc16_pack_unpack`: ตรวจสอบการแพ็กและถอดรหัส `PersistentConfig` ขนาด 8 ไบต์พร้อม CRC-16-CCITT และการปฏิเสธข้อมูลที่บิตเพี้ยนหรือ EEPROM ว่าง (`0xFF`)
-    - `test_auto_encoder_stall_progress_logic`: ตรวจสอบฟังก์ชัน `hasEncoderProgressed()` สำหรับตรวจจับความก้าวหน้าของ Encoder ล้อ (`>= 3°`)
+    - `test_auto_encoder_stall_progress_logic`: ตรวจสอบฟังก์ชัน `hasEncoderProgressed()` สำหรับตรวจจับความก้าวหน้าของ Encoder ล้อ (`>= 3°`) และ `resolveAutoDrivePolarity()` สำหรับซิงก์ทิศมอเตอร์ EEPROM เข้า `DriveDC`
     - `test_serial_phase2_trim_and_rc2_smooth_keys`: ตรวจสอบคีย์ลัด Serial `,`, `.`, `0` (Motor Trim) และ `y` (สลับโหมดสมูท `RC2`)
     - `test_servo_direction_inversion`: ตรวจสอบฟังก์ชัน `applyServoDirection()` (`deg -> 180 - deg`), ความสมมาตรเมื่อแปลงกลับสองครั้ง, ค่าคงที่เริ่มต้นของ `RC3`/`RC4` และช่วงพัลส์ `kRc34PulseMinUs < kRc34PulseMaxUs`
+    - `test_kinodynamic_envelope_and_overflow_safety`: ตรวจสอบว่าไปป์ไลน์ 2-DOF Slew ไม่พุ่งเกินเพดาน Precision (`55%`) หรือ Battery Emergency (`35%`) เมื่อเปลี่ยนจากวิ่งตรงเป็นหมุนตัวทันที พร้อมตรวจป้องกัน `int16_t` overflow ใน `applyDriveTargetsWithSlew`, `applyAsymmetricSlewStep`, `slewServoAngle`, `applyMotorBalanceTrim` และความทนทานต่อ `nullptr` ใน `decodePs2Payload`
+    - `test_serial_estop_batch_help_and_telemetry_fields`: ตรวจสอบว่า `!w` ในแบตช์เดียวกันยังหยุดมอเตอร์สนิท, ข้อความ Help แสดง `Aux RC1 180 / 0 deg` และ `v` ถูกต้อง, `printEvent(nullptr, nullptr)` ปลอดภัย และ Telemetry `[STAT]` แสดงฟิลด์ `rf=` และ `com=`
 
 ---
 
@@ -393,9 +397,9 @@ native         test_robot_logic  PASSED    00:00:01.314
 
 **ผลลัพธ์ที่คาดหวัง**: โค้ดจะถูกคอมไพล์ด้วยออปชัน `-Wall -Wextra -Werror` ผ่านโดยสมบูรณ์ ไม่มี Error และไม่มี Warning:
 ```text
-RAM:   [====      ]  43.9% (used 14380 bytes from 32768 bytes)
-Flash: [====      ]  41.7% (used 109232 bytes from 262144 bytes)
-========================= [SUCCESS] Took 2.78 seconds =========================
+RAM:   [====      ]  43.9% (used 14396 bytes from 32768 bytes)
+Flash: [====      ]  41.5% (used 108820 bytes from 262144 bytes)
+========================= [SUCCESS] Took 14.86 seconds =========================
 ```
 
 ---
@@ -463,10 +467,20 @@ Flash: [====      ]  41.7% (used 109232 bytes from 262144 bytes)
   z / b     : Toggle Precision(55% session) / Reverse-Front | [ / ] : Speed -/+ 15%
   , / . / 0 : Motor Balance Trim L(-1%)/R(+1%)/Reset(0%) (saved to EEPROM)
   i / k / y : RC2 Up(-10)/Dn(+10)/Toggle Smooth RC2 | j / l : Front RC3+RC4
-  o / p     : Aux RC1 0 / 180 deg | q : Toggle Hold/Drop | c <1..4> <deg>
+  o / p     : Aux RC1 180 / 0 deg | q : Toggle Hold/Drop | c <1..4> <deg>
   m <L> <R> : Direct M1/M2 (-100..100 for 2.5s) | f1 / f2 : Flip M1/M2 dir
-  t         : Toggle status stream | u : Enter Upload Bootloader | ? : Help
+  t / v     : Toggle status stream / I2C diag | u : Bootloader | ? : Help
 ```
+
+---
+
+### 5.6 การวิเคราะห์โค้ดเชิงสถิต (`pio check` / `cppcheck`)
+คุณสามารถตรวจสอบคุณภาพโค้ดเชิงสถิตด้วย `cppcheck` ทั้งสำหรับเป้าหมายฮาร์ดแวร์จริงและสภาพแวดล้อมทดสอบได้ด้วยคำสั่ง:
+```powershell
+& "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" check -e uno_r4_wifi --skip-packages
+& "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" check -e native --skip-packages
+```
+**ผลลัพธ์ที่คาดหวัง**: โฟลเดอร์ `src/` ผ่านสะอาด **`0 HIGH, 0 MEDIUM`** ทั้งสองสภาพแวดล้อม (ดูรายงานรายละเอียดเพิ่มเติมได้ใน [MATRIX_MARC_READINESS.md](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/MATRIX_MARC_READINESS.md))
 
 ---
 
@@ -527,7 +541,7 @@ Flash: [====      ]  41.7% (used 109232 bytes from 262144 bytes)
   - **กดสั้นแล้วปล่อย (ขณะกำลังรันโหมด Auto)**: สั่งหยุดโหมด Auto ทันทีและกลับสู่โหมด Manual (`BTN_UP stop -> Manual ready`)
   - **กดค้างเดี่ยว 1.2 วินาที (`1200 ms`)**: สั่งเริ่ม **โหมด Auto** โดยตรงจากตัวหุ่นยนต์ **โดยไม่จำเป็นต้องเปิดจอย PS2**! เมื่อกดค้างเกิน `250 ms` หน้าจอ OLED จะแสดงแถบกราฟิก `Hold UP->AUTO XX%` จนครบ 100% แล้วเริ่มรัน Auto ทันที
 - **ปุ่ม `BTN_DOWN` (ปุ่มล่าง - ID 1)**:
-  - **กดสั้น**: สั่ง **หยุดฉุกเฉิน (ESTOP - Emergency Stop)** ทันทีทั้งในโหมด Manual และโหมด Auto มอเตอร์ทุกตัวจะถูกล็อกเบรกเป็น 0 สนิท ไฟ RGB กะพริบสีแดง และส่งเสียงเตือนความถี่ต่ำ
+  - **กดทันที (Rising-Edge ผ่าน Debounce 30 ms ไม่ต้องรอปล่อยนิ้ว)**: สั่ง **หยุดฉุกเฉิน (ESTOP - Emergency Stop)** ทันทีทั้งในโหมด Manual และโหมด Auto มอเตอร์ทุกตัวจะถูกล็อกเบรกเป็น 0 สนิท ไฟ RGB กะพริบสีแดง และส่งเสียงเตือนความถี่ต่ำ
 - **กดปุ่ม `BTN_UP` และ `BTN_DOWN` พร้อมกันค้างไว้ 2.5 วินาที (`2500 ms`)**:
   - สั่งให้ระบบเข้าสู่ **โหมด Upload Bootloader** โดยจะมีแถบเปอร์เซ็นต์ `Upload in XX%` บนจอ OLED ไฟ LED เปลี่ยนเป็นสีเหลืองอำพันแล้วเปลี่ยนเป็นสีฟ้าสว่าง พร้อมเสียงบี๊บเตือน เพื่อให้สามารถอัปโหลดโค้ดใหม่ผ่านคอมพิวเตอร์ได้อย่างง่ายดาย
 
@@ -544,12 +558,12 @@ Flash: [====      ]  41.7% (used 109232 bytes from 262144 bytes)
 | `a` | เลี้ยวซ้าย | หมุนตัวเลี้ยวทางซ้าย และหยุดอัตโนมัติภายใน `650 ms` |
 | `d` | เลี้ยวขวา | หมุนตัวเลี้ยวทางขวา และหยุดอัตโนมัติภายใน `650 ms` |
 | `Space` หรือ `x` | **หยุดมอเตอร์ทันที** | ตัดคำสั่งการเคลื่อนที่ของมอเตอร์เป็น 0 โดยทันที (และใช้ตัดออกจากโหมด Auto กลับสู่ Manual ได้ทันที) |
-| `!` | **หยุดฉุกเฉิน (ESTOP)** | ดักจับทันทีแม้พิมพ์ค้างกลางบรรทัด ล้างบัฟเฟอร์และเข้าสู่สถานะ `ESTOP` ล็อกเบรกมอเตอร์สนิท |
+| `!` | **หยุดฉุกเฉิน (ESTOP)** | ดักจับทันทีแม้พิมพ์ค้างกลางบรรทัดหรือมาในแบตช์เดียวกับคีย์ขับ (เช่น `!w`) ล้างบัฟเฟอร์ เข้าสู่สถานะ `ESTOP` ล็อกเบรกมอเตอร์สนิท และบล็อกคำสั่งขยับมอเตอร์/เซอร์โวจาก Serial ทั้งหมดจนกว่าจะกดปลดล็อก |
 | `r` | **ปลดสถานะฉุกเฉิน (Resume)**| ปลดล็อกสถานะ `ESTOP` ให้หุ่นยนต์กลับมาพร้อมรับคำสั่งอีกครั้ง (`Ready`) |
 | `g` | **เริ่มโหมด Auto** | สั่งเริ่มรันโหมด Auto (`src/auto_block_code.cpp`) ทันทีผ่าน Serial Monitor |
 | `z` | **สลับโหมดช้า (Precision)** | สลับเปิด/ปิดโหมดช้า Precision (`55%` แบบเต็มระยะก้านโยก) / `100%` สำหรับรอบการใช้งานปัจจุบัน (เริ่มที่ `100%` เสมอเมื่อรีบูต) |
 | `b` | **สลับด้านหน้า-หลัง (Reverse)** | สลับทิศทางการขับด้านหน้า-หลัง (`Reverse-Front Orientation`) |
-| `q` | **สลับท่าชุดเซอร์โว `RC1+RC2`** | สลับระหว่างท่าวางปล่อย (`RC1=145°, RC2=140°`) และท่าถือยกเก็บ (`RC1=75°, RC2=70°`) |
+| `q` | **สลับท่าชุดเซอร์โว `RC1+RC2`** | สลับระหว่างท่าวางปล่อย (`RC1=145°, RC2=140°`) และท่าถือยกเก็บ (`RC1=75°, RC2=70°`) *(ถูกบล็อกขณะติด `ESTOP`)* |
 | `y` | **สลับโหมดสมูทเฉพาะแขน `RC2`** | เปิด/ปิดการกวาดมุมแบบนุ่มนวล (`240°/s`) เฉพาะเซอร์โว `RC2` และบันทึกลง `EEPROM` |
 | `,` หรือ `<` | **จูนสมดุลล้อไปทางซ้าย (`-1%`)** | ปรับ Motor Balance Trim ลดลง `-1%` (ต่ำสุด `-15%`) และบันทึกลง `EEPROM` |
 | `.` หรือ `>` | **จูนสมดุลล้อไปทางขวา (`+1%`)** | ปรับ Motor Balance Trim เพิ่มขึ้น `+1%` (สูงสุด `+15%`) และบันทึกลง `EEPROM` |
@@ -558,11 +572,11 @@ Flash: [====      ]  41.7% (used 109232 bytes from 262144 bytes)
 | `]` | เพิ่มความเร็ว Serial | เพิ่มความเร็วการเคลื่อนที่ผ่านคีย์บอร์ดขึ้นทีละ `15%` (สูงสุด `100%`) สามารถส่งต่อเนื่องในชุดเดียวกันได้ เช่น `]]` |
 | `f1` | สลับทิศทางมอเตอร์ M1 | กลับทิศทางการหมุนของล้อซ้าย (Toggle Reverse) บันทึกลง `EEPROM` ต้องพิมพ์ตรงรูปคำสั่งเป๊ะๆ (`f1` หรือ `F1` แล้วกด Enter) |
 | `f2` | สลับทิศทางมอเตอร์ M2 | กลับทิศทางการหมุนของล้อขวา (Toggle Reverse) บันทึกลง `EEPROM` ต้องพิมพ์ตรงรูปคำสั่งเป๊ะๆ (`f2` หรือ `F2` แล้วกด Enter) |
-| `i` / `k` | ปรับเซอร์โว `RC2` | `i` ลดมุม `RC2` `-10°` (ยื่น/ยกขึ้น ตาม `kRc2InvertDir = true`), `k` เพิ่มมุม `RC2` `+10°` (ก้ม/วางลง) |
-| `j` / `l` | แขนหน้า `RC3+RC4` | สั่งแขนหน้าคู่ก้มลง (`j` = `30°`) หรือยกขึ้น (`l` = `140°`) พร้อมกันในเฟรมเดียว |
-| `o` / `p` | เซอร์โวเสริม `RC1` | ขยับเซอร์โว `RC1` ไปที่ `180°` (`o`, กาง/เปิด ตาม `kRc1L2Deg`) หรือ `0°` (`p`, หุบ/ปิด ตาม `kRc1R2Deg`) *(ข้อความเมนู Help ในเฟิร์มแวร์ยังพิมพ์ป้ายว่า `0 / 180 deg`)* |
+| `i` / `k` | ปรับเซอร์โว `RC2` | `i` ลดมุม `RC2` `-10°` (ยื่น/ยกขึ้น ตาม `kRc2InvertDir = true`), `k` เพิ่มมุม `RC2` `+10°` (ก้ม/วางลง) *(ถูกบล็อกขณะติด `ESTOP`)* |
+| `j` / `l` | แขนหน้า `RC3+RC4` | สั่งแขนหน้าคู่ก้มลง (`j` = `30°`) หรือยกขึ้น (`l` = `140°`) พร้อมกันในเฟรมเดียว *(ถูกบล็อกขณะติด `ESTOP`)* |
+| `o` / `p` | เซอร์โวเสริม `RC1` | ขยับเซอร์โว `RC1` ไปที่ `180°` (`o`, กาง/เปิด ตาม `kRc1L2Deg`) หรือ `0°` (`p`, หุบ/ปิด ตาม `kRc1R2Deg`) *(ถูกบล็อกขณะติด `ESTOP`)* |
 | `m <L> <R>` | กำหนดกำลังมอเตอร์ตรง | สั่งกำลังขับมอเตอร์ M1 และ M2 โดยตรงแล้วกด Enter เช่น `m 60 -60` หรือ `M 60, -60` (จำกัด `[-100, 100]` มีผลนาน `2.5 วินาที`; ปฏิเสธข้อความขยะต่อท้าย) |
-| `c <ch> <deg>`| กำหนดองศาเซอร์โวตรง | สั่งเซอร์โวช่องที่ `1..4` ไปยังองศาที่กำหนดแล้วกด Enter เช่น `c 1 90` หรือ `C 2, 140` (จำกัด `[0, 180]` ปฏิเสธช่องนอก `1..4` และข้อความขยะต่อท้าย) |
+| `c <ch> <deg>`| กำหนดองศาเซอร์โวตรง | สั่งเซอร์โวช่องที่ `1..4` ไปยังองศาที่กำหนดแล้วกด Enter เช่น `c 1 90` หรือ `C 2, 140` (จำกัด `[0, 180]` ปฏิเสธช่องนอก `1..4` และข้อความขยะต่อท้าย; ถูกบล็อกขณะติด `ESTOP`) |
 | `t` | สลับการส่ง Telemetry | เปิด/ปิดการสตรีมข้อมูลสถานะระบบ (`[STAT]`) ลงบน Serial Monitor ทุกๆ `500 ms` |
 | `v` | สแกนและวินิจฉัยบัส I2C | สแกนตรวจสอบอุปกรณ์บนบัส `Wire1` (400kHz และ 100kHz), มัลติเพล็กเซอร์ `PCA9548A (0x70)` ช่อง `0..3`, และบัส `Wire` พร้อมแสดงค่ารีจิสเตอร์พิน `P400`/`P401` |
 | `u` | เข้าโหมด Bootloader | สั่งรีเซ็ตบอร์ดเข้าโหมด Upload Bootloader ทันทีผ่านคำสั่งซอฟต์แวร์ |
@@ -570,7 +584,7 @@ Flash: [====      ]  41.7% (used 109232 bytes from 262144 bytes)
 
 #### ตัวอย่างและคำอธิบายข้อความ Telemetry (`[STAT]`) เมื่อกด `t`
 ```text
-[STAT] READY src=PS2 ps2=OPERATIONAL(0x73/0x5A,128,128) vbat=11.85V(85% NORM cap=100%) comm=OK stb=100% jit=0ms M=(0,0) rev=(0,1) trim=0% prec=0 brk=1 rc2Sm=1 RC=(180,90,30,30) spd=100% rngErr=0 oled=0x3D(ok=1,e3d=0,e3c=255)
+[STAT] READY src=PS2 ps2=OPERATIONAL(0x73/0x5A,128,128) vbat=11.85V(85% NORM cap=100%) comm=OK stb=100% jit=0ms M=(0,0) rev=(0,1) trim=0% prec=0 rf=0 brk=1 rc2Sm=1 com=88% RC=(180,90,30,30) spd=100% rngErr=0 oled=0x3D(ok=1,e3d=0,e3c=255)
 ```
 - `READY` / `ESTOP`: สถานะหลักของระบบ
 - `src=`: แหล่งควบคุมปัจจุบัน (`IDLE`, `PS2`, `SERIAL`, `AUTO`)
@@ -582,8 +596,10 @@ Flash: [====      ]  41.7% (used 109232 bytes from 262144 bytes)
 - `rev=(L,R)`: สถานะกลับทิศมอเตอร์ M1 และ M2 (`0` หรือ `1`)
 - `trim=`: ค่าชดเชยสมดุลล้อซ้าย-ขวา (`-15%..+15%`)
 - `prec=`: สถานะโหมดช้า Precision Mode `55%` (`1` = เปิด, `0` = ปิด)
+- `rf=`: สถานะโหมดสลับด้านหน้า-หลัง Reverse-Front (`1` = เปิด, `0` = ปิด)
 - `brk=`: สถานะเบรกแม่เหล็กไฟฟ้า H-Bridge (`1` = ล็อกเบรกอยู่, `0` = ไม่ได้ล็อก)
 - `rc2Sm=`: สถานะโหมดกวาดมุมสมูทของเซอร์โว `RC2` (`1` = เปิด, `0` = ปิด)
+- `com=`: ตัวคูณสเกลจุดศูนย์ถ่วง CoM Dynamic Scale (`65%..100%`) คำนวณจากมุมแขนยก `RC2`
 - `RC=(rc1,rc2,rc3,rc4)`: องศาเป้าหมายของเซอร์โวทั้ง 4 ช่อง
 - `spd=`: ความเร็วการขับผ่าน Serial (`20%..100%`)
 - `rngErr=`: รหัสข้อผิดพลาดจากการตั้งช่วงมุมเซอร์โวบน STM32 (`0` = ปกติ)
@@ -611,18 +627,20 @@ Flash: [====      ]  41.7% (used 109232 bytes from 262144 bytes)
 #### ความฉลาดของชั้นตัวครอบความปลอดภัย (`AutoMiniR4Proxy` ใน `src/auto_block_code.cpp`)
 โค้ดที่สร้างจาก MATRIXblock R4 มักจะมีคำสั่งตั้งค่าระบบที่อาจไปทับหรือทำลายการตั้งค่าของเฟิร์มแวร์หลัก แต่ไฟล์ [src/auto_block_code.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/auto_block_code.cpp) ได้สร้าง Proxy คอยดักและดูแลความปลอดภัยให้โดยอัตโนมัติ:
 - **`MiniR4.begin()` และ `MiniR4.PWR.setBattCell(...)`**: ถูกแปลงเป็น Safe No-op เพื่อไม่ให้รีเซ็ตพารามิเตอร์ไฟหรือล้างการตั้งค่าพินจอย PS2
-- **`Serial.begin(9600)`**: ถูกแปลงเป็น Safe No-op เพื่อไม่ให้เปลี่ยน Baudrate ของพอร์ต USB Serial หลัก (`115200`)
+- **`Serial.begin(9600)` และ `AutoSerialProxy`**: `Serial.begin()` ถูกแปลงเป็น Safe No-op เพื่อไม่ให้เปลี่ยน Baudrate ของพอร์ต USB Serial หลัก (`115200`) ขณะที่ระบบดักจับคำสั่งหยุดฉุกเฉิน (`!`, `x`, `X`, `Space`, `u`, `U`) จะดูดไบต์ทั้งหมดและเก็บไบต์อื่นไว้ใน Ring Buffer ขนาด 32 ไบต์ส่งต่อให้ `Serial.available()`/`read()`/`peek()` ของโค้ด Auto ทำให้ตัวอักษร `\r`/`\n` (เช่น หลังพิมพ์ `g<Enter>`) ไม่สามารถบล็อกคำสั่งหยุดฉุกเฉินได้
 - **`MiniR4.I2C1..I2C4.MJ5.begin()`**: ข้ามการเรียก `Wire1.begin()` ซ้ำบนบัสภายใน เพื่อไม่ให้หน้าจอ OLED ค้างหรือถูกลดความเร็วลงจาก 400 kHz
-- **`MiniR4.DriveDC.begin(1, 2, false, true)`**: มีลูปตรวจสอบความพร้อมของ STM32 พร้อม Timeout ปลอดภัย 3 วินาที และเปิดใช้งาน `service()` ระหว่างรอ
+- **`MiniR4.DriveDC.begin(1, 2, false, true)` และตระกูล `Move*`**: ซิงก์ทิศทางมอเตอร์ `f1`/`f2` ที่บันทึกไว้ใน EEPROM เข้ากับ `DriveDC` โดยอัตโนมัติ (`resolveAutoDrivePolarity`) พร้อมจดจำหมายเลขช่องมอเตอร์จริงเพื่อส่งให้ระบบตรวจจับล้อติดขัด (`Encoder` + `Drive Degrees` แยก baseline), ปัดเศษ/จำกัดขอบเขตเวลา `float` ในคำสั่ง `MoveTime`/`MoveSyncTime`/`MoveGyroTime` อย่างปลอดภัย และหากตั้งค่า STM32 ไม่สำเร็จภายใน ~3 วินาที จะสั่งเบรกและตัดกลับโหมด Manual ทันที (`DriveInitFail`) โดยไม่ปล่อยให้หุ่นวิ่งทั้งที่ยังไม่ได้ตั้งค่า
 - **`if (MiniR4.PS2.Button(PSB_TRIANGLE))`**: บล็อกเริ่มต้นยอดนิยมของ MATRIXblock R4! เมื่อคุณกดปุ่มสามเหลี่ยม (หรือกดปุ่ม `BTN_UP` ค้าง 1.2s / พิมพ์ `g`) เพื่อเข้าโหมด Auto ระบบ `AutoPs2Proxy` จะจำลองสัญญาณ `PSB_TRIANGLE` แบบ One-Shot Latch ให้เป็น `true` ในรอบแรกทันที ทำให้โค้ดภายใต้ `if (MiniR4.PS2.Button(PSB_TRIANGLE)) { ... }` ทำงานได้ทันทีแม้คุณจะปล่อยนิ้วจากปุ่มสามเหลี่ยมไปแล้ว หรือแม้จะสั่งเริ่ม Auto จากปุ่มบนบอร์ดโดยไม่ได้เปิดจอย! และเมื่อโค้ดในบล็อกนั้นทำงานจบ ระบบจะแจ้งเตือน `notifyPs2TriangleMatched()` เพื่อพากลับสู่โหมดบังคับมือ (Manual) ให้อัตโนมัติทันที!
 - **`MiniR4.RC1..RC4.setAngle(deg)`**: ทุกครั้งที่โค้ด Auto สั่งขยับเซอร์โว ระบบจะเรียก `AutoMode::recordServoAngle(ID, angle)` เพื่อซิงก์องศาล่าสุดเก็บไว้ (โดยสำหรับ `RC3`/`RC4` จะแปลงมุมฮาร์ดแวร์กลับเป็นมุมตรรกะผ่าน `applyServoDirection()` ให้ตรงกับค่า `kRc3InvertDir`/`kRc4InvertDir`) เมื่อออกจากโหมด Auto กลับสู่โหมด Manual เซอร์โวจะคงอยู่ที่ตำแหน่งสุดท้ายนั้นอย่างนุ่มนวล ไม่ดีดกลับไปท่าเริ่มต้น
+
+> **ข้อควรระวังในการเขียนโค้ดเสริมในโหมด Auto**: เนื่องจากการตัดจบโหมด Auto ทันทีจากภายใน `delay()` หรือ `DriveDC` ใช้กลไก `setjmp`/`longjmp` จึงควรหลีกเลี่ยงการประกาศตัวแปร C++ ที่มี destructor (เช่น `String`) เป็นตัวแปรท้องถิ่นในโซนวางโค้ดของ [src/auto_block_code.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/auto_block_code.cpp) เพื่อป้องกันการรั่วไหลของหน่วยความจำ Heap เมื่อถูกสั่งยกเลิกกลางคัน
 
 #### 3 วิธีในการสั่งเริ่มโหมด Auto (Start Auto Mode)
 1. **กดปุ่ม `Triangle (△)` บนจอยสติ๊ก PS2**: กดหนึ่งครั้งขณะหุ่นยนต์อยู่ในสถานะ `Ready` และจอยเชื่อมต่อสมบูรณ์ (`PS2 OK`)
 2. **กดปุ่ม `BTN_UP` บนบอร์ด Carrier Shield ค้างไว้ 1.2 วินาที**: สะดวกมากสำหรับการปล่อยหุ่นออกจากจุดสตาร์ทในการแข่งขันโดยไม่ต้องถือจอยสติ๊ก (หน้าจอ OLED จะขึ้นแถบ `Hold UP->AUTO` จนครบ 100%)
 3. **พิมพ์ `g` หรือ `G` ในหน้าต่าง Serial Monitor**: สำหรับทดสอบรันโหมด Auto ขณะต่อสาย USB กับคอมพิวเตอร์
 
-#### 11 เงื่อนไขการจบหรือยกเลิกโหมด Auto (`AutoExitReason`)
+#### 12 เงื่อนไขการจบหรือยกเลิกโหมด Auto (`AutoExitReason`)
 ระหว่างที่โหมด Auto กำลังทำงาน ฟังก์ชัน `yield()` ของบอร์ดจะถูกดักจับเพื่อรีเฟรช Watchdog Timer อัปเดตนาฬิกาจับเวลาบนจอ OLED (`AUTO XX.Xs X:Exit`) และตรวจสอบคำสั่งยกเลิกทุกๆ 25 ms ทำให้สามารถหยุดหุ่นได้ทันทีแม้กำลังอยู่ในคำสั่ง `delay(1000)` หรือ `DriveDC.MoveDegs(...)`:
 
 | ลำดับ | รหัส `AutoExitReason` | วิธีสั่งงาน / เงื่อนไข | ข้อความแจ้งเตือนบน Serial | สถานะหลังออกจาก Auto |
@@ -631,13 +649,14 @@ Flash: [====      ]  41.7% (used 109232 bytes from 262144 bytes)
 | 2 | `Ps2Cross` | กดปุ่ม **Cross (✖)** บนจอยสติ๊ก PS2 | `PS2 X pressed -> Manual ready` | ล็อกเบรกหยุดมอเตอร์และกลับสู่โหมด Manual ทันที |
 | 3 | `BtnStop` | กดปุ่ม **`BTN_UP`** บนบอร์ดแบบสั้น 1 ครั้ง | `BTN_UP stop -> Manual ready` | ล็อกเบรกหยุดมอเตอร์และกลับสู่โหมด Manual ทันที |
 | 4 | `SerialStop` | พิมพ์ **`x`**, **`X`**, หรือ **`Space`** ใน Serial Monitor | `Serial 'x' stop -> Manual ready` | ล็อกเบรกหยุดมอเตอร์และกลับสู่โหมด Manual ทันที |
-| 5 | `StallTimeout` | **ล้อติดขัดหมุนต่อไม่ได้** ระหว่างคำสั่ง `DriveDC` นานเกิน `1.6 วินาที` (หลังช่วงผ่อนผัน `1.25 วินาที`) | `Wheel stall -> Manual ready` | ส่งเสียงเตือน 520 Hz หยุดมอเตอร์ป้องกันเฟือง/มอเตอร์ไหม้ และกลับสู่โหมด Manual |
+| 5 | `StallTimeout` | **ล้อติดขัดหมุนต่อไม่ได้** หรือ STM32 ขาดการติดต่อระหว่างคำสั่ง `DriveDC` นานเกิน `1.6 วินาที` (หลังช่วงผ่อนผัน `1.25 วินาที`) | `Wheel stall -> Manual ready` | ส่งเสียงเตือน 520 Hz หยุดมอเตอร์ป้องกันเฟือง/มอเตอร์ไหม้ และกลับสู่โหมด Manual |
 | 6 | `Timeout` | รันโหมด Auto ติดต่อกันนานเกินเวลาปลอดภัยสูงสุด **`60 วินาที`** (`kAutoMaxDurationMs`) | `Auto timeout -> Manual ready` | ล็อกเบรกหยุดมอเตอร์และกลับสู่โหมด Manual |
 | 7 | `UserExit` | โค้ดผู้ใช้เรียกฟังก์ชัน `autoExit();` ด้วยตนเอง | `autoExit() -> Manual ready` | ล็อกเบรกหยุดมอเตอร์และกลับสู่โหมด Manual |
-| 8 | `BtnEstop` | กดปุ่ม **`BTN_DOWN`** บนบอร์ดแบบสั้น 1 ครั้ง | `BTN_DOWN ESTOP` | ตัดเข้าโหมดหยุดฉุกเฉิน `ESTOP!` ทันที |
-| 9 | `SerialEstop` | พิมพ์ **`!`** ใน Serial Monitor | `Serial '!' ESTOP` | ตัดเข้าโหมดหยุดฉุกเฉิน `ESTOP!` ทันที |
-| 10 | `UploadCombo` | กดปุ่ม **`BTN_UP + BTN_DOWN`** ค้างพร้อมกันครบ 2.5 วินาที | `BTN_UP + BTN_DOWN upload` | หยุดมอเตอร์และรีบูตเข้าโหมด Upload Bootloader |
-| 11 | `SerialUpload` | พิมพ์ **`u`** หรือ **`U`** ใน Serial Monitor | `Serial 'u' upload` | หยุดมอเตอร์และรีบูตเข้าโหมด Upload Bootloader |
+| 8 | `DriveInitFail` | `DriveDC.begin()` ตั้งค่า STM32 ไม่สำเร็จภายใน ~3 วินาที | `DriveDC init failed (STM32 comm) -> Manual ready` | ส่งเสียงเตือน 520 Hz ล็อกเบรกและกลับสู่โหมด Manual อย่างปลอดภัย |
+| 9 | `BtnEstop` | กดปุ่ม **`BTN_DOWN`** บนบอร์ด (ทำงานทันทีที่กด `downPressEdge`) | `BTN_DOWN ESTOP` | ตัดเข้าโหมดหยุดฉุกเฉิน `ESTOP!` ทันที |
+| 10 | `SerialEstop` | พิมพ์ **`!`** ใน Serial Monitor | `Serial '!' ESTOP` | ตัดเข้าโหมดหยุดฉุกเฉิน `ESTOP!` ทันที |
+| 11 | `UploadCombo` | กดปุ่ม **`BTN_UP + BTN_DOWN`** ค้างพร้อมกันครบ 2.5 วินาที | `BTN_UP + BTN_DOWN upload` | หยุดมอเตอร์และรีบูตเข้าโหมด Upload Bootloader |
+| 12 | `SerialUpload` | พิมพ์ **`u`** หรือ **`U`** ใน Serial Monitor | `Serial 'u' upload` | หยุดมอเตอร์และรีบูตเข้าโหมด Upload Bootloader |
 
 ---
 
@@ -804,50 +823,51 @@ Flash: [====      ]  41.7% (used 109232 bytes from 262144 bytes)
 
 ---
 
-### 7.2 คำอธิบายโครงสร้างและหน้าที่ของทุกไฟล์ในโปรเจกต์อย่างละเอียด (Exhaustive File-by-File Breakdown - 27 ไฟล์)
+### 7.2 คำอธิบายโครงสร้างและหน้าที่ของทุกไฟล์ในโปรเจกต์อย่างละเอียด (Exhaustive File-by-File Breakdown - 28 ไฟล์)
 
-เพื่อให้ผู้เริ่มต้นและนักพัฒนาเข้าใจการทำงานของระบบอย่างถ่องแท้ แผนภาพด้านล่างแสดงโครงสร้างโฟลเดอร์และไฟล์ทั้งหมดในโปรเจกต์ (**ครบถ้วนทั้ง 27 ไฟล์** ไม่รวมโฟลเดอร์ชั่วคราว `.pio` และ `.git`):
+เพื่อให้ผู้เริ่มต้นและนักพัฒนาเข้าใจการทำงานของระบบอย่างถ่องแท้ แผนภาพด้านล่างแสดงโครงสร้างโฟลเดอร์และไฟล์ทั้งหมดในโปรเจกต์ (**ครบถ้วนทั้ง 28 ไฟล์** ไม่รวมโฟลเดอร์ชั่วคราว `.pio` และ `.git`):
 
 ```text
 matrix_R4/
 ├── .gitignore                                      # [1] กฎการคัดออกไฟล์ชั่วคราวและ Build Artifacts จาก Git
 ├── platformio.ini                                  # [2] ไฟล์กำหนดค่าหลักของโปรเจกต์ PlatformIO (uno_r4_wifi และ native)
 ├── README.md                                       # [3] คู่มือการใช้งานและเอกสารวิศวกรรมฉบับสมบูรณ์ภาษาไทย
+├── MATRIX_MARC_READINESS.md                        # [4] รายงานประเมินความพร้อมเฟิร์มแวร์สำหรับการแข่งขัน Matrix MARC
 ├── .vscode/                                        # โฟลเดอร์การตั้งค่าสภาพแวดล้อม Visual Studio Code (4 ไฟล์)
-│   ├── c_cpp_properties.json                       # [4] กำหนด Include Paths, Defines และ Compiler Path สำหรับ IntelliSense
-│   ├── extensions.json                             # [5] แนะนำ Extension ที่จำเป็นสำหรับโปรเจกต์ (PlatformIO IDE)
-│   ├── launch.json                                 # [6] การกำหนดค่า Debugger สำหรับ Hardware Probes (CMSIS-DAP, SVD)
-│   └── tasks.json                                  # [7] คำสั่งอัตโนมัติของ VS Code สำหรับ Build, Upload และ Monitor
+│   ├── c_cpp_properties.json                       # [5] กำหนด Include Paths, Defines และ Compiler Path สำหรับ IntelliSense
+│   ├── extensions.json                             # [6] แนะนำ Extension ที่จำเป็นสำหรับโปรเจกต์ (PlatformIO IDE)
+│   ├── launch.json                                 # [7] การกำหนดค่า Debugger สำหรับ Hardware Probes (CMSIS-DAP, SVD)
+│   └── tasks.json                                  # [8] คำสั่งอัตโนมัติของ VS Code สำหรับ Build, Upload, Monitor และ Test
 ├── include/                                        # ส่วนหัวโปรแกรม (Header Files) ประกาศ Interface และโครงสร้างข้อมูล (9 ไฟล์)
-│   ├── README                                      # [8] คำอธิบายมาตรฐานของ PlatformIO สำหรับการใช้งาน Header Files
-│   ├── config.h                                    # [9] ค่าคงที่ คาบเวลา พารามิเตอร์ฟิสิกส์ พิน และ EEPROM ของระบบทั้งหมด
-│   ├── types.h                                     # [10] นิยามโครงสร้างข้อมูล (Enums, Structs) และสถานะระบบที่ใช้ร่วมกัน
-│   ├── robot_logic.h                               # [11] ประกาศฟังก์ชันอัลกอริทึมฟิสิกส์ 5 ขั้นตอน, CRC-16 และ State Machine (Pure C++11)
-│   ├── serial_control.h                            # [12] ประกาศคลาสประมวลผลคำสั่ง Serial CLI และจัดรูปแบบ Telemetry
-│   ├── minir4_io.h                                 # [13] ประกาศคลาส Hardware Abstraction สำหรับ MATRIX Mini R4, STM32 และ EEPROM
-│   ├── ps2_driver.h                                # [14] ประกาศคลาสไดรเวอร์ Bit-bang SPI และการเข้าถึงรีจิสเตอร์พอร์ต RA4M1
-│   ├── oled_ui.h                                   # [15] ประกาศคลาสควบคุมจอแสดงผล OLED SSD1306, ไฟ RGB LED และ Piezo Buzzer
-│   └── auto_mode.h                                 # [16] ประกาศอินเทอร์เฟซโหมดอัตโนมัติ (AutoMode), AutoExitReason และฟังก์ชันช่วย
+│   ├── README                                      # [9] คำอธิบายมาตรฐานของ PlatformIO สำหรับการใช้งาน Header Files
+│   ├── config.h                                    # [10] ค่าคงที่ คาบเวลา พารามิเตอร์ฟิสิกส์ พิน และ EEPROM ของระบบทั้งหมด
+│   ├── types.h                                     # [11] นิยามโครงสร้างข้อมูล (Enums, Structs) และสถานะระบบที่ใช้ร่วมกัน
+│   ├── robot_logic.h                               # [12] ประกาศฟังก์ชันอัลกอริทึมฟิสิกส์ 5 ขั้นตอน, CRC-16 และ State Machine (Pure C++11)
+│   ├── serial_control.h                            # [13] ประกาศคลาสประมวลผลคำสั่ง Serial CLI และจัดรูปแบบ Telemetry
+│   ├── minir4_io.h                                 # [14] ประกาศคลาส Hardware Abstraction สำหรับ MATRIX Mini R4, STM32 และ EEPROM
+│   ├── ps2_driver.h                                # [15] ประกาศคลาสไดรเวอร์ Bit-bang SPI และการเข้าถึงรีจิสเตอร์พอร์ต RA4M1
+│   ├── oled_ui.h                                   # [16] ประกาศคลาสควบคุมจอแสดงผล OLED SSD1306, ไฟ RGB LED และ Piezo Buzzer
+│   └── auto_mode.h                                 # [17] ประกาศอินเทอร์เฟซโหมดอัตโนมัติ (AutoMode), AutoExitReason และฟังก์ชันช่วย
 ├── src/                                            # ซอร์สโค้ดการทำงานหลัก (Implementation Files - 8 ไฟล์)
-│   ├── main.cpp                                    # [17] จุดเริ่มต้นโปรแกรม (setup/loop), 40 Hz Scheduler, EEPROM, Auto และ Bootloader
-│   ├── robot_logic.cpp                             # [18] อิมพลีเมนต์ฟิสิกส์จลนพลศาสตร์ 5 ขั้นตอน, Slew, Failsafe, Battery Sag และ CRC-16
-│   ├── serial_control.cpp                          # [19] อิมพลีเมนต์การแยกคำสั่ง CLI, คีย์ลัดแข่งขัน, Timeout 1500 ms และ FakeSerialPort
-│   ├── minir4_io.cpp                               # [20] อิมพลีเมนต์การติดต่อ STM32 UART, Smart Hold-Brake, RC2 Smooth Slew และ EEPROM
-│   ├── ps2_driver.cpp                              # [21] อิมพลีเมนต์โพรโทคอล Bit-bang SPI ความเร็วสูงผ่านรีจิสเตอร์ POSR/PORR/PIDR
-│   ├── oled_ui.cpp                                 # [22] อิมพลีเมนต์การเรนเดอร์ UI 4 บรรทัด, กู้คืนบัส I2C, แอนิเมชัน RGB และเสียงเตือน
-│   ├── auto_mode.cpp                               # [23] อิมพลีเมนต์เอนจินรันโหมด Auto, ดักจับ yield()/ปุ่ม X และตรวจจับล้อติดขัด (Stall)
-│   └── auto_block_code.cpp                         # [24] พื้นที่วางโค้ด Auto จาก MATRIXblock R4 พร้อมชั้น Proxy ความปลอดภัยครบวงจร
+│   ├── main.cpp                                    # [18] จุดเริ่มต้นโปรแกรม (setup/loop), 40 Hz Scheduler, EEPROM, Auto และ Bootloader
+│   ├── robot_logic.cpp                             # [19] อิมพลีเมนต์ฟิสิกส์จลนพลศาสตร์ 5 ขั้นตอน, Slew, Sag, Failsafe และ CRC-16
+│   ├── serial_control.cpp                          # [20] อิมพลีเมนต์การแยกคำสั่ง CLI, คีย์ลัดแข่งขัน, Timeout 1500 ms และ FakeSerialPort
+│   ├── minir4_io.cpp                               # [21] อิมพลีเมนต์การติดต่อ STM32 UART, Smart Hold-Brake, RC2 Smooth Slew และ EEPROM
+│   ├── ps2_driver.cpp                              # [22] อิมพลีเมนต์โพรโทคอล Bit-bang SPI ความเร็วสูงผ่านรีจิสเตอร์ POSR/PORR/PIDR
+│   ├── oled_ui.cpp                                 # [23] อิมพลีเมนต์การเรนเดอร์ UI 4 บรรทัด, กู้คืนบัส I2C, แอนิเมชัน RGB และเสียงเตือน
+│   ├── auto_mode.cpp                               # [24] อิมพลีเมนต์เอนจินรันโหมด Auto, ดักจับ yield()/ปุ่ม X และตรวจจับล้อติดขัด (Stall)
+│   └── auto_block_code.cpp                         # [25] พื้นที่วางโค้ด Auto จาก MATRIXblock R4 พร้อมชั้น Proxy ความปลอดภัยครบวงจร
 ├── lib/                                            # โฟลเดอร์สำหรับ Private Project Libraries (1 ไฟล์)
-│   └── README                                      # [25] คำแนะนำมาตรฐานของ PlatformIO ในการสร้างและติดตั้งไลบรารีส่วนตัว
+│   └── README                                      # [26] คำแนะนำมาตรฐานของ PlatformIO ในการสร้างและติดตั้งไลบรารีส่วนตัว
 └── test/                                           # ส่วนการทดสอบซอฟต์แวร์อัตโนมัติ (Automated Unit Tests - 2 ไฟล์)
-    ├── README                                      # [26] คำแนะนำมาตรฐานของ PlatformIO สำหรับ Test Runner และ Unit Testing
+    ├── README                                      # [27] คำแนะนำมาตรฐานของ PlatformIO สำหรับ Test Runner และ Unit Testing
     └── test_robot_logic/
-        └── test_main.cpp                           # [27] ชุดแบบทดสอบอัตโนมัติ 36 รายการ (10 หมวดหมู่) บน Native Host ด้วย Unity
+        └── test_main.cpp                           # [28] ชุดแบบทดสอบอัตโนมัติ 38 รายการ (10 หมวดหมู่) บน Native Host ด้วย Unity
 ```
 
 ---
 
-#### กลุ่มที่ 1: ไฟล์ระดับรากของโปรเจกต์ (Project Root Files - 3 ไฟล์)
+#### กลุ่มที่ 1: ไฟล์ระดับรากของโปรเจกต์ (Project Root Files - 4 ไฟล์)
 
 ##### 7.2.1 [platformio.ini](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/platformio.ini) — ไฟล์กำหนดค่าหลักของโปรเจกต์ PlatformIO
 เป็นหัวใจสำคัญในการควบคุมการคอมไพล์ จัดการไลบรารี และกำหนดสภาพแวดล้อมการทำงานของโปรเจกต์ โดยกำหนดไว้ 2 สภาพแวดล้อมอย่างชัดเจน:
@@ -860,52 +880,56 @@ matrix_R4/
 2. **`[env:native]` (Target จำลองบนคอมพิวเตอร์โฮสต์)**:
    - `platform = native`, `platform_packages = platformio/toolchain-gccmingw32@^1.40900.0`
    - `build_flags = -std=c++11 -Wall -Wextra -Werror -Iinclude`
-   - `build_src_filter = +<robot_logic.cpp> +<serial_control.cpp>` และ `test_build_src = yes`: ดึงโมดูลลอจิกบริสุทธิ์และตัวแยกคำสั่ง Serial มาคอมไพล์รันชุดทดสอบทั้ง 36 ข้อบนคอมพิวเตอร์ได้โดยตรงโดยไม่ต้องต่อบอร์ดจริง
+   - `build_src_filter = +<robot_logic.cpp> +<serial_control.cpp>` และ `test_build_src = yes`: ดึงโมดูลลอจิกบริสุทธิ์และตัวแยกคำสั่ง Serial มาคอมไพล์รันชุดทดสอบทั้ง 38 ข้อบนคอมพิวเตอร์ได้โดยตรงโดยไม่ต้องต่อบอร์ดจริง
 
 ##### 7.2.2 [README.md](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/README.md) — คู่มือการใช้งานและเอกสารวิศวกรรมฉบับสมบูรณ์ภาษาไทย
-ไฟล์เอกสารคู่มือฉบับสมบูรณ์ที่คุณกำลังอ่านอยู่นี้ ครอบคลุมตั้งแต่สถาปัตยกรรมระบบ, ผังพิน, การติดตั้ง PlatformIO, คู่มือการบังคับด้วยจอยสติ๊กและคีย์บอร์ด, การวางโค้ดโหมดอัตโนมัติจาก MATRIXblock R4, แบบจำลองฟิสิกส์จลนพลศาสตร์ 5 ขั้นตอน, คำอธิบายโค้ดครบทั้ง 27 ไฟล์ ไปจนถึงการแก้ไขปัญหาหน้างาน
+ไฟล์เอกสารคู่มือฉบับสมบูรณ์ที่คุณกำลังอ่านอยู่นี้ ครอบคลุมตั้งแต่สถาปัตยกรรมระบบ, ผังพิน, การติดตั้ง PlatformIO, คู่มือการบังคับด้วยจอยสติ๊กและคีย์บอร์ด, การวางโค้ดโหมดอัตโนมัติจาก MATRIXblock R4, แบบจำลองฟิสิกส์จลนพลศาสตร์ 5 ขั้นตอน, คำอธิบายโค้ดครบทั้ง 28 ไฟล์ ไปจนถึงการแก้ไขปัญหาหน้างาน
 
 ##### 7.2.3 [.gitignore](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/.gitignore) — กฎการคัดออกไฟล์ชั่วคราวและ Build Artifacts จาก Git
 กำหนดกฎสำหรับ Git เพื่อไม่ให้ติดตามไฟล์ชั่วคราวและไฟล์ที่สร้างขึ้นเฉพาะเครื่อง ได้แก่ `.pio`, `.vscode/.browse.c_cpp.db*`, `.vscode/c_cpp_properties.json`, `.vscode/launch.json`, และ `.vscode/ipch`
+
+##### 7.2.4 [MATRIX_MARC_READINESS.md](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/MATRIX_MARC_READINESS.md) — รายงานประเมินความพร้อมสำหรับการแข่งขัน Matrix MARC
+เอกสารประเมินความพร้อมเชิงวิศวกรรมของเฟิร์มแวร์ตามเกณฑ์ถ่วงน้ำหนัก 7 หมวด พร้อมผลการรันคอมไพล์จริง (`uno_r4_wifi`), ผลการรัน Unit Test (`native`), ผลการตรวจ `cppcheck`, สรุปความเสี่ยงและรายการตรวจสอบก่อนลงสนามจริง (HIL Checklist)
 
 ---
 
 #### กลุ่มที่ 2: โฟลเดอร์การตั้งค่า Visual Studio Code (`.vscode/` - 4 ไฟล์)
 
-##### 7.2.4 [.vscode/c_cpp_properties.json](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/.vscode/c_cpp_properties.json) — การกำหนดค่า C/C++ IntelliSense
+##### 7.2.5 [.vscode/c_cpp_properties.json](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/.vscode/c_cpp_properties.json) — การกำหนดค่า C/C++ IntelliSense
 กำหนดพาธ `includePath`, คอมไพเลอร์ `arm-none-eabi-gcc.exe`, มาตรฐานภาษา `gnu++17`/`gnu11` และ Preprocessor Defines (`ARDUINO_UNOWIFIR4`, `F_CPU=48000000L`, `_RENESAS_RA_`) เพื่อให้ระบบช่วยพิมพ์อัจฉริยะของ VS Code ทำงานได้อย่างแม่นยำ
 
-##### 7.2.5 [.vscode/extensions.json](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/.vscode/extensions.json) — รายการส่วนขยายที่แนะนำสำหรับ VS Code
+##### 7.2.6 [.vscode/extensions.json](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/.vscode/extensions.json) — รายการส่วนขยายที่แนะนำสำหรับ VS Code
 แนะนำส่วนขยาย `platformio.platformio-ide` เมื่อเปิดโปรเจกต์ครั้งแรก และบล็อกส่วนขยายที่อาจทำงานชนกัน (`ms-vscode.cpptools-extension-pack`, `pioarduino.pioarduino-ide`)
 
-##### 7.2.6 [.vscode/launch.json](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/.vscode/launch.json) — การกำหนดค่า Hardware Debugger
+##### 7.2.7 [.vscode/launch.json](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/.vscode/launch.json) — การกำหนดค่า Hardware Debugger
 กำหนดโปรไฟล์การดีบักผ่าน GDB (`PIO Debug`, `PIO Debug (skip Pre-Debug)`, `PIO Debug (without uploading)`) โดยชี้ไปยังไฟล์ `.pio/build/uno_r4_wifi/firmware.elf` และไฟล์คำอธิบายรีจิสเตอร์ `R7FA4M1AB.svd`
 
-##### 7.2.7 [.vscode/tasks.json](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/.vscode/tasks.json) — ชุดคำสั่งอัตโนมัติของ VS Code สำหรับ Build, Upload และ Monitor
-รวบรวม Task คำสั่งอัตโนมัติ 3 รายการที่เรียกใช้ผ่าน `Ctrl + Shift + B` หรือ `Terminal -> Run Task...` ได้แก่:
+##### 7.2.8 [.vscode/tasks.json](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/.vscode/tasks.json) — ชุดคำสั่งอัตโนมัติของ VS Code สำหรับ Build, Upload, Monitor และ Test
+รวบรวม Task คำสั่งอัตโนมัติ 4 รายการที่เรียกใช้ผ่าน `Ctrl + Shift + B` หรือ `Terminal -> Run Task...` ได้แก่:
 - `PIO: Upload Firmware (matrix_R4)`
 - `PIO: Upload & Monitor (matrix_R4)`
 - `PIO: Build (matrix_R4)`
+- `PIO: Test Native (matrix_R4)`
 
 ---
 
 #### กลุ่มที่ 3: ไฟล์ส่วนหัวและการประกาศฟังก์ชัน (`include/` - 9 ไฟล์)
 
-##### 7.2.8 [include/README](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/README) — คู่มือมาตรฐาน PlatformIO สำหรับ Header Files
+##### 7.2.9 [include/README](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/README) — คู่มือมาตรฐาน PlatformIO สำหรับ Header Files
 เอกสารคำแนะนำมาตรฐานของ PlatformIO อธิบายหลักการทำงานและการใช้งานไฟล์ส่วนหัว (`.h`) ด้วยคำสั่ง `#include`
 
-##### 7.2.9 [include/config.h](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/config.h) — ค่าคงที่ คาบเวลา พารามิเตอร์ฟิสิกส์ พิน และ EEPROM ทั้งหมด
+##### 7.2.10 [include/config.h](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/config.h) — ค่าคงที่ คาบเวลา พารามิเตอร์ฟิสิกส์ พิน และ EEPROM ทั้งหมด
 ศูนย์รวมค่าคงที่ทางวิศวกรรมทั้งหมดของหุ่นยนต์ภายใต้ `namespace Config` (ดูตารางสรุปค่าคงที่ทั้งหมดได้ในหัวข้อ [7.4](#74-ตารางอ้างอิงพารามิเตอร์ทางวิศวกรรมทั้งหมดใน-includeconfigh)):
-- คาบเวลาลูปควบคุม 40 Hz (`25 ms`), การโพลปุ่มกด/แบตเตอรี่/STM32 (รวมถึง `kButtonUnhealthyPollPeriodMs = 250 ms` และ `kCommUnhealthyRetryIntervalMs = 100 ms`), จอ OLED (`180 ms`), และ Watchdog (`3000 ms`)
-- พารามิเตอร์มอเตอร์ `M1`/`M2` และพารามิเตอร์ฟิสิกส์จลนพลศาสตร์ (`kThrottleExpoPct`, `kTurnExpoPct`, `kMaxCentripetalLatAccel`, `kMotorStictionMinPower`, `kCoMHighMinScalePct`, `kMicroTurnPower`, `kEnableSmartHoldBrake`, `kMaxMotorTrimPct`)
+- คาบเวลาลูปควบคุม 40 Hz (`25 ms`), การโพลปุ่มกด/STM32 (รวมถึง `kButtonUnhealthyPollPeriodMs = 250 ms` และ `kCommUnhealthyRetryIntervalMs = 100 ms`), จอ OLED (`180 ms`), และ Watchdog (`3000 ms`)
+- พารามิเตอร์มอเตอร์ `M1`/`M2` และพารามิเตอร์ฟิสิกส์จลนพลศาสตร์ (`kThrottleExpoPct`, `kTurnExpoPct`, `kMaxCentripetalLatAccel`, `kMotorStictionMinPower`, `kCoMHighMinScalePct`, `kCoMLowArmDeg`, `kMicroTurnPower`, `kEnableSmartHoldBrake`, `kMaxMotorTrimPct`)
 - แอดเดรสและส่วนหัวของ EEPROM (`kEepromConfigAddr = 128`, Magic `'M'`, `'R'`, Version `1`)
 - พินและไทม์มิ่งของไดรเวอร์จอยสติ๊ก PS2 (`D11`, `D4`, `D12`, `D5`, Mode `0x73`, Sync `0x5A`, Deadzone `18`)
 - มุมเริ่มต้นและมุม Preset ของเซอร์โว `RC1..RC4` (ค่าเริ่มต้น `RC1=180°, RC2=90°, RC3=30°, RC4=30°`, ท่า Hold/Drop ของปุ่ม `Circle`, ท่าดันพื้น `30°` ของปุ่ม `Square`, อัตราการกวาดมุมสมูทของ `RC2` ที่ `6°/25ms`, ช่วงพัลส์ `kEnableRc34CustomPulse` และ `kRc3InvertDir`/`kRc4InvertDir`)
 - เกณฑ์แรงดันแบตเตอรี่ (`kPowerFullVolt`, `kPowerCutoffVolt`, `kEnableBatterySagThrottle`) และความเร็วเริ่มต้นของ Serial (`kSerialDefaultSpeed = 100%`)
-- ค่าคงที่ของโหมด Auto (`kAutoStartBtnHoldMs = 1200 ms`, `kAutoMaxDurationMs = 60000 ms`, และพารามิเตอร์ตรวจจับล้อติดขัด `kAutoStallGraceMs`, `kAutoStallTimeoutMs`, `kAutoStallMinDeltaDeg`)
+- ค่าคงที่ของโหมด Auto (`kAutoStartBtnHoldMs = 1200 ms`, `kAutoHoldBarDelayMs = 250 ms`, `kAutoMaxDurationMs = 60000 ms`, และพารามิเตอร์ตรวจจับล้อติดขัด `kAutoStallGraceMs`, `kAutoStallTimeoutMs`, `kAutoStallMinDeltaDeg`)
 - น้ำหนักคะแนนหักสำหรับดัชนีความเสถียร (`StabilityMonitor`)
 
-##### 7.2.10 [include/types.h](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/types.h) — ชนิดข้อมูล โครงสร้างข้อมูล และสถานะระบบที่ใช้ร่วมกัน
+##### 7.2.11 [include/types.h](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/types.h) — ชนิดข้อมูล โครงสร้างข้อมูล และสถานะระบบที่ใช้ร่วมกัน
 นิยาม Enumerations และ Data Structures ทั้งหมดที่ใช้สื่อสารระหว่างโมดูล:
 - `enum class LinkState`: `Disconnected`, `Failsafe`, `Stabilizing`, `Operational`
 - `enum class ControlSource`: `None`, `Ps2`, `SerialCmd`, `Auto`
@@ -919,21 +943,21 @@ matrix_R4/
 - `struct ButtonEvents`: สถานะปุ่มบนบอร์ด รวมถึงการกดค้างคู่เข้า Bootloader (`comboHolding`, `uploadHoldRatio`, `uploadRequested`) และการกดค้างปุ่มบนเข้าโหมด Auto (`autoHolding`, `autoHoldRatio`, `autoStartRequested`)
 - `struct SerialDriveCommand` และ `struct SystemSnapshot`: ภาพรวมสถานะทุกมิติของระบบสำหรับส่งให้จอ OLED และ Serial Telemetry
 
-##### 7.2.11 [include/robot_logic.h](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/robot_logic.h) — ประกาศฟังก์ชันขั้นตอนวิธีฟิสิกส์และ State Machine บริสุทธิ์
+##### 7.2.12 [include/robot_logic.h](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/robot_logic.h) — ประกาศฟังก์ชันขั้นตอนวิธีฟิสิกส์และ State Machine บริสุทธิ์
 ประกาศฟังก์ชันคณิตศาสตร์ แบบจำลองฟิสิกส์ และ State Machine ที่เขียนด้วยมาตรฐาน C++11 บริสุทธิ์ (100% Arduino-free):
 - ฟังก์ชันพื้นฐานและจลนศาสตร์ดั้งเดิม: `clamp16()`, `clampLong()`, `computeAxisWithDeadzone()`, `applyAsymmetricSlewStep()`, `applyDriveTargetsWithSlew()`, `computeDifferentialDrive()`
 - แบบจำลองฟิสิกส์ 5 ขั้นตอนและระบบขับเคลื่อนขั้นสูง: `applyCubicExpo()`, `limitCentripetalTurn()`, `computeCoMDynamicScale()`, `apply2DofKinodynamicSlew()`, `applyCoulombStiction()`, `computeKinodynamicDrive()`
 - ฟังก์ชันปรับจูนสมดุลล้อและกวาดมุมเซอร์โว: `stepMotorTrim()`, `applyMotorBalanceTrim()`, `slewServoAngle()`
-- ฟังก์ชันจัดการข้อมูล EEPROM และตรวจจับล้อติดขัด: `computeCrc16()`, `packPersistentConfig()`, `unpackPersistentConfig()`, `hasEncoderProgressed()`
+- ฟังก์ชันจัดการข้อมูล EEPROM และตรวจจับล้อติดขัด: `computeCrc16()`, `packPersistentConfig()`, `unpackPersistentConfig()`, `hasEncoderProgressed()`, `resolveAutoDrivePolarity()`
 - ฟังก์ชันจัดการเซอร์โวและตรวจสอบแพ็กเก็ต PS2: `computeArmStep()`, `clampServoTargets()`, `applyServoDirection()`, `updateServoTargetsFromPs2()`, `decodePs2Payload()`, `isPs2UnconfiguredMode()`, `isPs2FrameValid()`
 - ฟังก์ชันตัดสินใจเข้า/ออกโหมด Auto: `shouldStartAutoMode()`, `shouldAbortAutoMode()`
 - คลาส State Machine หลัก 3 คลาส: `FailsafeStateMachine`, `BatteryStabilizer`, และ `StabilityMonitor`
 
-##### 7.2.12 [include/serial_control.h](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/serial_control.h) — ประกาศคลาสประมวลผลคำสั่งและสตรีม Telemetry ผ่าน Serial
+##### 7.2.13 [include/serial_control.h](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/serial_control.h) — ประกาศคลาสประมวลผลคำสั่งและสตรีม Telemetry ผ่าน Serial
 ประกาศ `struct SerialActions`, คลาส `SerialControl`, และเนมสเปซจำลอง `NativeSerial` (เฉพาะ `#ifndef ARDUINO` สำหรับ Unit Test):
 - รองรับสัญญาณคำสั่งครบถ้วน: `uploadRequested`, `estopRequested`, `resumeRequested`, `autoStartRequested`, `togglePrecision`, `toggleReverseDrive`, `togglePosePreset`, `toggleRc2Smooth`, `trimLeftStep`, `trimRightStep`, `trimReset`, `toggleLeftReverse`, `toggleRightReverse`, `i2cScanRequested`, คำสั่งขยับเซอร์โว และคำสั่งขับมอเตอร์
 
-##### 7.2.13 [include/minir4_io.h](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/minir4_io.h) — ประกาศคลาสติดต่อฮาร์ดแวร์บอร์ด Carrier, ชิป STM32 และ EEPROM
+##### 7.2.14 [include/minir4_io.h](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/minir4_io.h) — ประกาศคลาสติดต่อฮาร์ดแวร์บอร์ด Carrier, ชิป STM32 และ EEPROM
 ประกาศคลาส `MiniR4IO` ทำหน้าที่เป็น Hardware Abstraction Layer (HAL):
 - ควบคุมมอเตอร์ (`applyMotors`, `forceMotorsStop`, `isBrakeEngaged`) พร้อมระบบเบรกแม่เหล็กไฟฟ้า H-Bridge
 - ควบคุมเซอร์โว (`applyServos`, `setRc2SmoothEnabled`, `syncServoCache`, `servoRangeErr`) พร้อมตัวช่วยตั้งพัลส์ `configureRc34PulseRange()` และสตาร์ตเซอร์โวที่จุดบูต `staggerBootServos()`
@@ -941,68 +965,69 @@ matrix_R4/
 - อ่านและบันทึกข้อมูลการตั้งค่าลง EEPROM (`loadConfigFromEeprom`, `saveConfigToEeprom`)
 - โพลปุ่มกดแบบสลับฝั่ง (`pollButtons`) และตรวจสอบ/ฟื้นฟูชิป STM32 อัตโนมัติ (`verifyAndHealLowerMcu`)
 
-##### 7.2.14 [include/ps2_driver.h](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/ps2_driver.h) — ประกาศคลาสไดรเวอร์ Bit-bang SPI และรีจิสเตอร์พอร์ต RA4M1
-ประกาศคลาส `Ps2Driver` และโครงสร้าง `FastPin` (`port`, `mask`, `pin`) สำหรับรับส่งข้อมูล SPI ความเร็วสูงกับตัวรับสัญญาณจอยสติ๊ก PS2 / MJ2 โดยไม่บล็อกลูปควบคุม
+##### 7.2.15 [include/ps2_driver.h](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/ps2_driver.h) — ประกาศคลาสไดรเวอร์ Bit-bang SPI และรีจิสเตอร์พอร์ต RA4M1
+ประกาศคลาส `Ps2Driver` (`begin`, `tryConnect`, `restorePins`, `poll`) และโครงสร้าง `FastPin` (`port`, `mask`, `pin`) สำหรับรับส่งข้อมูล SPI ความเร็วสูงกับตัวรับสัญญาณจอยสติ๊ก PS2 / MJ2 โดยไม่บล็อกลูปควบคุม
 
-##### 7.2.15 [include/oled_ui.h](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/oled_ui.h) — ประกาศคลาสควบคุมจอ OLED SSD1306, ไฟ RGB LED และ Piezo Buzzer
+##### 7.2.16 [include/oled_ui.h](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/oled_ui.h) — ประกาศคลาสควบคุมจอ OLED SSD1306, ไฟ RGB LED และ Piezo Buzzer
 ประกาศคลาส `OledUI` สำหรับจัดการการกู้คืนบัส I2C (`recoverBus`), การวาดแดชบอร์ด 4 บรรทัดพร้อมแคช FNV-1a (`render`), หน้าจอ Bootloader (`showBootloaderScreen`), การวินิจฉัยบัส I2C (`printI2cDiag`), แอนิเมชันไฟ RGB (`updateRgbLeds`), และเสียงเตือน Buzzer (`beepBoot`, `beepConfirm`, `beepWarning`)
 
-##### 7.2.16 [include/auto_mode.h](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/auto_mode.h) — ประกาศอินเทอร์เฟซเอนจินโหมดอัตโนมัติ (`AutoMode`) และ `AutoExitReason`
+##### 7.2.17 [include/auto_mode.h](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/auto_mode.h) — ประกาศอินเทอร์เฟซเอนจินโหมดอัตโนมัติ (`AutoMode`) และ `AutoExitReason`
 ประกาศโครงสร้างและฟังก์ชันสำหรับระบบรันโหมดอัตโนมัติ:
-- `enum class AutoExitReason`: ระบุสาเหตุการออกจากโหมด Auto ทั้ง 11 รูปแบบ (`Completed`, `Ps2Cross`, `SerialStop`, `BtnStop`, `BtnEstop`, `SerialEstop`, `UploadCombo`, `SerialUpload`, `Timeout`, `StallTimeout`, `UserExit`)
+- `enum class AutoExitReason`: ระบุสาเหตุการออกจากโหมด Auto ทั้ง 12 รูปแบบ (`Completed`, `Ps2Cross`, `SerialStop`, `BtnStop`, `BtnEstop`, `SerialEstop`, `UploadCombo`, `SerialUpload`, `Timeout`, `StallTimeout`, `UserExit`, `DriveInitFail`)
 - `namespace AutoBlockUser`: ประกาศจุดเข้าใช้งาน `void setup()` และ `void loop()` ของโค้ดที่วางใน `src/auto_block_code.cpp`
-- `namespace AutoMode`: ประกาศฟังก์ชัน `execute()`, `service()`, `recordServoAngle()`, `isRunning()`, `exitReasonStr()`, `pollPs2ForAuto()`, `hasEntryTrianglePending()`, `notifyPs2TriangleMatched()` รวมถึงฟังก์ชันช่วย `autoShouldExit()` และ `autoExit()`
+- `namespace AutoMode`: ประกาศฟังก์ชัน `execute()`, `service()`, `recordServoAngle()`, `isRunning()`, `exitReasonStr()`, `pollPs2ForAuto()`, `hasEntryTrianglePending()`, `notifyPs2TriangleMatched()`, `resolveDrivePolarity()`, `beginBlockingDriveTask()`, `endBlockingDriveTask()`, `serialAvailable()`/`serialRead()`/`serialPeek()` รวมถึงฟังก์ชันช่วย `autoShouldExit()`, `autoExit()` และ `autoAbortDriveInit()`
 
 ---
 
 #### กลุ่มที่ 4: ซอร์สโค้ดการทำงานหลัก (`src/` - 8 ไฟล์)
 
-##### 7.2.17 [src/main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/main.cpp) — จุดเริ่มต้นโปรแกรมแบบ Modular Helpers, State Transitions และ 40 Hz Non-blocking Scheduler
+##### 7.2.18 [src/main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/main.cpp) — จุดเริ่มต้นโปรแกรมแบบ Modular Helpers, State Transitions และ 40 Hz Non-blocking Scheduler
 ซอร์สโค้ดหลักที่จัดโครงสร้างแบบแยกหน้าที่ชัดเจนและเชื่อมโยงทุกโมดูลเข้าด้วยกัน:
-- **ชุดเตรียมระบบตอนเปิดเครื่อง (Boot Helpers & `setup()`)**: ตรวจจับการรีบูตจาก Watchdog (`WDTRF`), กู้คืนบัส I2C ล่วงหน้า (`OledUI::recoverBus`), เริ่มต้น `g_io.begin()`, โหลด `PersistentConfig` จาก EEPROM (`loadPersistentConfig()`), เริ่มต้นจอ OLED (`initOled()`), อ่านค่าไฟเริ่มต้น (`sampleLowerMcu()`), ซิงก์จอย PS2 และ Edge Latches (`initPs2Link()`, `latchAllPs2Edges()`), พิมพ์รายงานบูต (`printBootReport()` / `printOledBootLine()` / `printServoBootLine()`), และเปิดใช้ Watchdog Timer (`3000 ms`)
-- **ตัวช่วยตั้งค่าร่วมกันและสถานะระบบ (Shared Actions & State Transitions)**: จัดการการสลับโหมดที่เรียกใช้ร่วมกันทั้งจาก PS2 และ Serial (`togglePrecisionMode()`, `toggleReverseDrive()`, `toggleRc2Smooth()`, `setMotorTrim()`, `toggleMotorReverse()`, `togglePosePreset()`), การเปลี่ยนสถานะฉุกเฉิน/บูตโหลดเดอร์ (`enterUploadBootloader()`, `triggerEstop()`, `clearEstop()`), และการคำนวณพลังงาน/ความเสถียร (`applyBatteryTelemetry()`, `updateStabilityMetrics()`)
-- **การรับคำสั่ง Serial และโหมด Auto (`applySerialImmediateActions()` / `runAutoSession()`)**: แยกประมวลผลคำสั่งตั้งค่า เซอร์โว และมอเตอร์จาก Serial ทันทีในทุก `loop()`, จัดการวงจรเข้า-ออกโหมด Auto (`enterAutoSession()`, `AutoMode::execute()`, `resyncPs2AfterAuto()`, `reportAutoExit()`) พร้อมกู้คืนฮาร์ดแวร์ด้วย `g_io.restoreAfterAuto()` และรีซิงก์ตำแหน่งเซอร์โว/ปุ่มจอย
-- **ลูปควบคุม 40 Hz แบบแบ่งขั้นตอน (`runControlTick()` และ `loop()`)**: ทำงานเป็นลำดับขั้นตอนย่อยที่ชัดเจน ได้แก่ `handleOnboardButtons()` -> `updatePs2Link()` -> `sampleLowerMcu()` -> `updateStabilityMetrics()` -> `handlePs2ConfigCombos()` และตรวจเริ่มโหมด Auto -> `arbitrateDrive()` (จัดลำดับความสำคัญ `driveEstop` > `driveFailsafe` > `driveCrossBrake` > `driveFromSerial` > `driveFromPs2` > `driveCoastToStop`) -> `publishOutputs()` (ส่งค่าเซอร์โว เรนเดอร์ OLED และสตรีม Telemetry)
+- **ชุดเตรียมระบบตอนเปิดเครื่อง (Boot Helpers & `setup()`)**: ตรวจจับและล้างแฟลกการรีบูตจาก Watchdog (`WDTRF`), กู้คืนบัส I2C ล่วงหน้า (`OledUI::recoverBus`), เริ่มต้น `g_io.begin()`, โหลด `PersistentConfig` จาก EEPROM (`loadPersistentConfig()`), เริ่มต้นจอ OLED (`initOled()`), อ่านค่าไฟเริ่มต้น (`sampleLowerMcu()`), ซิงก์จอย PS2 และ Edge Latches (`initPs2Link()`, `latchAllPs2Edges()`), พิมพ์รายงานบูต (`printBootReport()` / `printOledBootLine()` / `printServoBootLine()`), เปิดใช้ Watchdog Timer (`3000 ms`), และรีเซ็ตนาฬิกาจับคาบลูปเมื่อบูตเสร็จเพื่อให้รอบแรกปราศจาก Jitter
+- **ตัวช่วยตั้งค่าร่วมกันและสถานะระบบ (Shared Actions & State Transitions)**: จัดการการสลับโหมดที่เรียกใช้ร่วมกันทั้งจาก PS2 และ Serial (`togglePrecisionMode()`, `toggleReverseDrive()`, `toggleRc2Smooth()`, `setMotorTrim()`, `toggleMotorReverse()`, `togglePosePreset()`), การเปลี่ยนสถานะฉุกเฉิน/บูตโหลดเดอร์ (`enterUploadBootloader()` แบบบังคับเบรกทันที, `triggerEstop()`, `clearEstop()`), และการคำนวณพลังงาน/ความเสถียร (`applyBatteryTelemetry()`, `updateStabilityMetrics()`)
+- **การรับคำสั่ง Serial และโหมด Auto (`applySerialImmediateActions()` / `runAutoSession()`)**: แยกประมวลผลคำสั่งตั้งค่า เซอร์โว และมอเตอร์จาก Serial ทันทีในทุก `loop()` (พร้อมบล็อกทั้งมอเตอร์และเซอร์โวระหว่าง `ESTOP`), จัดการวงจรเข้า-ออกโหมด Auto (`enterAutoSession()`, `AutoMode::execute()`, `resyncPs2AfterAuto()`, `reportAutoExit()`) พร้อมกู้คืนฮาร์ดแวร์ด้วย `g_io.restoreAfterAuto()`, รีซิงก์ตำแหน่งเซอร์โว/ปุ่มจอย และรีเซ็ตตัวจับเวลาลูปหลังจบ Auto
+- **ลูปควบคุม 40 Hz แบบแบ่งขั้นตอน (`runControlTick()` และ `loop()`)**: ทำงานเป็นลำดับขั้นตอนย่อยที่ชัดเจน ได้แก่ `handleOnboardButtons()` -> `updatePs2Link()` -> `sampleLowerMcu()` -> `updateStabilityMetrics()` -> `handlePs2ConfigCombos()` และตรวจเริ่มโหมด Auto -> `arbitrateDrive()` (จัดลำดับความสำคัญ `driveEstop` > `driveFailsafe` > `driveCrossBrake` > `driveFromSerial` > `driveFromPs2` > `driveCoastToStop`) -> `publishOutputs()` (ส่งค่าเซอร์โว อัปเดต `commHealthy` เรนเดอร์ OLED และสตรีม Telemetry)
 
-##### 7.2.18 [src/robot_logic.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/robot_logic.cpp) — อิมพลีเมนต์แบบจำลองฟิสิกส์ 5 ขั้นตอน, Slew, Sag, Failsafe และ CRC-16
+##### 7.2.19 [src/robot_logic.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/robot_logic.cpp) — อิมพลีเมนต์แบบจำลองฟิสิกส์ 5 ขั้นตอน, Slew, Sag, Failsafe และ CRC-16
 บรรจุขั้นตอนวิธีเชิงคณิตศาสตร์และวิศวกรรมควบคุมทั้งหมดของหุ่นยนต์ (100% Arduino-free):
-- อิมพลีเมนต์ไปป์ไลน์ขับเคลื่อน `computeKinodynamicDrive()` ที่ผสานแบบจำลองฟิสิกส์ทั้ง 5 ขั้นตอน (`applyCubicExpo`, `limitCentripetalTurn`, `computeCoMDynamicScale`, `applyCoulombStiction`, `apply2DofKinodynamicSlew`) ร่วมกับการสลับด้านหน้า-หลัง (`reverseDrive`), การหมุนตัวละเอียดด้วย D-Pad (`±26%`), และการปรับสมดุลล้อ (`applyMotorBalanceTrim`)
+- อิมพลีเมนต์ไปป์ไลน์ขับเคลื่อน `computeKinodynamicDrive()` ที่ผสานแบบจำลองฟิสิกส์ทั้ง 5 ขั้นตอน (`applyCubicExpo`, `limitCentripetalTurn`, `computeCoMDynamicScale`, `applyCoulombStiction`, `apply2DofKinodynamicSlew` พร้อมตัวคุมเพดานกำลัง Envelope กันโอเวอร์ชูต) ร่วมกับการสลับด้านหน้า-หลัง (`reverseDrive`), การหมุนตัวละเอียดด้วย D-Pad (`±26%` / `±18%`), และการปรับสมดุลล้อ (`applyMotorBalanceTrim`) ด้วยคณิตศาสตร์ 32-bit ปลอดภัยจาก Overflow
 - อิมพลีเมนต์การคำนวณ CRC-16-CCITT (`computeCrc16`) และการแพ็ก/แกะข้อมูล EEPROM (`packPersistentConfig`, `unpackPersistentConfig`)
 - อิมพลีเมนต์การจัดการเป้าหมายเซอร์โว `updateServoTargetsFromPs2()` รองรับทั้งปุ่ม `L1`/`R1`/`L2`/`R2`, `D-Pad UP/DOWN`, ปุ่ม `Square` ดันพื้นสลับสถานะ และปุ่ม `Circle` สลับท่าวาง/ท่าถือ
-- อิมพลีเมนต์การตรวจสอบแพ็กเก็ต 5 ชั้น (`isPs2FrameValid`), `FailsafeStateMachine`, `BatteryStabilizer`, และ `StabilityMonitor`
+- อิมพลีเมนต์การตรวจสอบแพ็กเก็ต 5 ชั้น (`isPs2FrameValid`), `FailsafeStateMachine` (ดูดซับ Glitch 1–3 เฟรมโดยไม่หลุดจาก `Operational`), `BatteryStabilizer`, และ `StabilityMonitor`
 
-##### 7.2.19 [src/serial_control.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/serial_control.cpp) — อิมพลีเมนต์ตัวแยกคำสั่ง Serial CLI, คีย์ลัดแข่งขัน และ `FakeSerialPort`
+##### 7.2.20 [src/serial_control.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/serial_control.cpp) — อิมพลีเมนต์ตัวแยกคำสั่ง Serial CLI, คีย์ลัดแข่งขัน และ `FakeSerialPort`
 อิมพลีเมนต์ระบบควบคุมและมอนิเตอร์ผ่านพอร์ต USB Serial:
 - มีคลาสจำลอง `FakeSerialPort` ภายใต้ `#ifndef ARDUINO` ทำให้ทดสอบการป้อนคำสั่งและตรวจข้อความตอบกลับบนเครื่องคอมพิวเตอร์ได้ครบทุกฟังก์ชัน
-- รองรับทั้งคำสั่งคีย์เดี่ยวทำงานทันที (`w/a/s/d`, `Space/x`, `!`, `r`, `g`, `z`, `b`, `q`, `y`, `,`/`.`/`0`, `[`/`]`, `i`/`k`, `j`/`l`, `o`/`p`, `t`, `v`, `u`, `?/h`) และคำสั่งแบบบรรทัด (`f1`, `f2`, `m <L> <R>`, `c <1..4> <deg>`) พร้อมระบบตัดบรรทัดค้างที่ `1500 ms`
+- รองรับทั้งคำสั่งคีย์เดี่ยวทำงานทันที (`w/a/s/d`, `Space/x`, `!`, `r`, `g`, `z`, `b`, `q`, `y`, `,`/`.`/`0`, `[`/`]`, `i`/`k`, `j`/`l`, `o`/`p`, `t`, `v`, `u`, `?/h`) และคำสั่งแบบบรรทัด (`f1`, `f2`, `m <L> <R>`, `c <1..4> <deg>`) พร้อมระบบตัดบรรทัดค้างที่ `1500 ms` และบังคับหยุดมอเตอร์เมื่อพบ `!` ในแบตช์เดียวกัน
 
-##### 7.2.20 [src/minir4_io.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/minir4_io.cpp) — อิมพลีเมนต์การสื่อสาร STM32 UART, Smart Hold-Brake, RC2 Smooth Slew และ EEPROM
+##### 7.2.21 [src/minir4_io.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/minir4_io.cpp) — อิมพลีเมนต์การสื่อสาร STM32 UART, Smart Hold-Brake, RC2 Smooth Slew และ EEPROM
 อิมพลีเมนต์การเชื่อมต่อกับชุดขับกำลังสูงและหน่วยความจำบนบอร์ด:
-- สั่งงานมอเตอร์พร้อมระบบ **Smart Hold-Brake** (`MiniR4.M1.setBrake(true)` / `MiniR4.M2.setBrake(true)`) เมื่อความเร็วเป็น `(0, 0)` และชะลอจังหวะ retry เมื่อ UART มีปัญหา (`100 ms` แทน `25 ms`)
-- สั่งงานเซอร์โวทั้ง 4 ช่อง โดยใช้ `RobotLogic::slewServoAngle()` เฉพาะกับช่อง `RC2` เมื่อเปิดโหมดสมูท (`rc2SmoothEnabled_`) ส่งคำสั่งทันทีสำหรับ `RC1`, `RC3`, `RC4` พร้อมส่ง `RC3+RC4` ในเฟรมเดียวด้วย `mmL.SetAllServoAngle()` ทั้งตอนเปิดเครื่อง (`staggerBootServos`) และตอนใช้งาน (fallback รายช่องอัตโนมัติ) พร้อมตั้งช่วงพัลส์ `SetServoPulseRange` เฉพาะช่อง `3`/`4` (`500–2500 µs` พร้อม fallback `544–2400` / `600–2400 µs`) และกลับทิศด้วย `applyServoDirection()`
+- สั่งงานมอเตอร์พร้อมระบบ **Smart Hold-Brake** (`MiniR4.M1.setBrake(true)` / `MiniR4.M2.setBrake(true)`) เมื่อความเร็วเป็น `(0, 0)`, สั่งหยุดฉุกเฉิน `forceMotorsStop()` ทันทีโดยไม่ติดตัวหน่วงเวลาเมื่อการสื่อสารปกติ (หรือเมื่อบังคับก่อนเข้า Bootloader), และชะลอจังหวะ retry หลัง timeout จริง (`100 ms` แบบ wrap-safe) เมื่อ UART มีปัญหา
+- สั่งงานเซอร์โวทั้ง 4 ช่อง โดยใช้ `RobotLogic::slewServoAngle()` เฉพาะกับช่อง `RC2` เมื่อเปิดโหมดสมูท (`rc2SmoothEnabled_`) ส่งคำสั่งทันทีสำหรับ `RC1`, `RC3`, `RC4` พร้อมส่ง `RC3+RC4` ในเฟรมเดียวแบบ Atomic ด้วย `mmL.SetAllServoAngle()` ทั้งตอนเปิดเครื่อง (`staggerBootServos`) และตอนใช้งานเพื่อไม่ให้แขนหน้าบิดเหลื่อมเวลา พร้อมตั้งช่วงพัลส์ `SetServoPulseRange` เฉพาะช่อง `3`/`4` (`500–2500 µs` พร้อม fallback `544–2400` / `600–2400 µs`) และกลับทิศด้วย `applyServoDirection()`
 - อ่านและเขียน EEPROM ที่แอดเดรส `128` แบบตรวจสอบไบต์ที่เปลี่ยน
-- อ่านปุ่มกด `BTN_UP`/`BTN_DOWN` แบบสลับรอบเพื่อประหยัดเวลา UART (ลดความถี่เป็น `250 ms` เมื่อ `!commHealthy_`) พร้อมตรวจจับทั้งการกดสั้น, การกดค้างเดี่ยว `BTN_UP` 1.2 วินาทีเพื่อเข้าโหมด Auto, และการกดค้างคู่ 2.5 วินาทีเพื่อเข้า Bootloader
-- กู้คืนการตั้งค่าพินจอย PS2, ช่วงความเร็ว `SetDCMotorSpeedRange(1/2, 0, 100)`, รีซิงก์พัลส์เซอร์โว (`rc34PulseSynced_ = false`) และทิศทางมอเตอร์หลังจบโหมด Auto (`restoreAfterAuto`)
+- อ่านปุ่มกด `BTN_UP`/`BTN_DOWN` แบบสลับรอบเพื่อประหยัดเวลา UART (ลดความถี่เป็น `250 ms` และล้างสถานะปุ่มค้างทันทีเมื่อ UART ขัดข้องเพื่อป้องกันการลั่น Bootloader/Auto จากค่าค้าง) พร้อมตรวจจับการกดฉุกเฉินทันที (`downPressEdge`), การกดค้างเดี่ยว `BTN_UP` 1.2 วินาทีเพื่อเข้าโหมด Auto, และการกดค้างคู่ 2.5 วินาทีเพื่อเข้า Bootloader
+- กู้คืนการตั้งค่าพินจอย PS2 ผ่าน `ps2_.restorePins()`, ช่วงความเร็ว `SetDCMotorSpeedRange(1/2, 0, 100)`, รีซิงก์พัลส์เซอร์โว (`rc34PulseSynced_ = false`) และทิศทางมอเตอร์หลังจบโหมด Auto (`restoreAfterAuto`)
 
-##### 7.2.21 [src/ps2_driver.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/ps2_driver.cpp) — อิมพลีเมนต์โพรโทคอล Bit-bang SPI ผ่านรีจิสเตอร์ฮาร์ดแวร์โดยตรง
+##### 7.2.22 [src/ps2_driver.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/ps2_driver.cpp) — อิมพลีเมนต์โพรโทคอล Bit-bang SPI ผ่านรีจิสเตอร์ฮาร์ดแวร์โดยตรง
 อิมพลีเมนต์ไดรเวอร์ความเร็วสูงสำหรับอ่านค่าตัวรับจอยสติ๊กไร้สายบนชิป Renesas RA4M1:
-- เข้าถึงรีจิสเตอร์ `R_PORTx->POSR` (ตั้งลอจิก HIGH), `R_PORTx->PORR` (ตั้งลอจิก LOW), และ `R_PORTx->PIDR` (อ่านค่าพิน) โดยตรง
+- เข้าถึงรีจิสเตอร์ `R_PORTx->POSR` (ตั้งลอจิก HIGH), `R_PORTx->PORR` (ตั้งลอจิก LOW), และ `R_PORTx->PIDR` (อ่านค่าพิน) โดยตรง พร้อมฟังก์ชัน `restorePins()` สำหรับคืนสถานะพินหลังจบโหมด Auto
 - ปิด Interrupt เฉพาะช่วงรับส่งระดับไบต์ (~130 µs) และเปิดให้ SysTick/UART ทำงานได้ตามปกติในช่วงช่องว่างระหว่างไบต์ (`20 µs`)
-- ใช้เวลารับส่งแพ็กเก็ต 9 ไบต์คงที่เพียง ~1.4 ms ต่อรอบ และตัดจบการโพรบเชื่อมต่อภายใน ~0.8 ms หากไม่ได้เสียบตัวรับสัญญาณ (`0xFF` ครบ 5 ไบต์แรก)
+- ใช้เวลารับส่งแพ็กเก็ต 9 ไบต์คงที่เพียง ~1.4 ms ต่อรอบ และตัดจบการโพรบเชื่อมต่อภายใน ~0.8 ms หากไม่ได้เสียบตัวรับสัญญาณหรือสาย DAT ช็อตกราวด์ (`0xFF` หรือ `0x00` ครบ 5 ไบต์แรก)
 
-##### 7.2.22 [src/oled_ui.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/oled_ui.cpp) — อิมพลีเมนต์การวาดจอ OLED, การกู้บัส I2C, ไฟ RGB และเสียง Buzzer
+##### 7.2.23 [src/oled_ui.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/oled_ui.cpp) — อิมพลีเมนต์การวาดจอ OLED, การกู้บัส I2C, ไฟ RGB และเสียง Buzzer
 อิมพลีเมนต์ส่วนติดต่อผู้ใช้งานทั้งหมดบนบอร์ด:
-- ส่งข้อมูลภาพออกจอ OLED ทีละก้อนขนาด 64 ไบต์ (`flushBufferChecked`) บนบัส `Wire1` ความเร็ว 400 kHz พร้อมตรวจสอบ ACK ทุกก้อน หากเกิดข้อผิดพลาดจะกู้คืนบัส (`recoverBus`) และปรับความเร็วลงเป็น 100 kHz อัตโนมัติ
-- ใช้ฟังก์ชันแฮช FNV-1a (`fnv1aHash`) ตรวจสอบการเปลี่ยนแปลงของข้อความทั้ง 4 บรรทัดเพื่อข้ามการส่งข้อมูลซ้ำผ่าน I2C หากหน้าจอไม่เปลี่ยน
+- ส่งข้อมูลภาพออกจอ OLED ทีละก้อนขนาด 64 ไบต์ (`flushBufferChecked`) บนบัส `Wire1` ความเร็ว 400 kHz พร้อมตรวจสอบ ACK ทุกก้อน หากเกิดข้อผิดพลาดจะสำรอง Framebuffer ไว้ก่อนกู้คืนบัส (`recoverBus`), ลดความเร็วลงเป็น 100 kHz และกู้ภาพกลับมาแสดงต่อโดยไม่จอดำ
+- ใช้ฟังก์ชันแฮช FNV-1a (`fnv1aHash`) ตรวจสอบการเปลี่ยนแปลงของข้อความทั้ง 4 บรรทัดเพื่อข้ามการส่งข้อมูลซ้ำผ่าน I2C หากหน้าจอไม่เปลี่ยน และล้างสถานะแคชอัตโนมัติเมื่อการส่ง I2C ล้มเหลวเพื่อให้ลองวาดใหม่ในรอบถัดไป
 - แสดงแถบกราฟิกความคืบหน้า (`drawRect`/`fillRect`) ทั้งขณะกดปุ่มคู่เข้า Bootloader และขณะกดปุ่ม `BTN_UP` ค้างเข้าโหมด Auto
 
-##### 7.2.23 [src/auto_mode.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/auto_mode.cpp) — อิมพลีเมนต์เอนจินโหมด Auto, การดักจับ `yield()` และระบบตรวจจับล้อติดขัด (Stall)
+##### 7.2.24 [src/auto_mode.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/auto_mode.cpp) — อิมพลีเมนต์เอนจินโหมด Auto, การดักจับ `yield()` และระบบตรวจจับล้อติดขัด (Stall)
 อิมพลีเมนต์ระบบควบคุมการรันโหมดอัตโนมัติ:
 - ใช้ `setjmp(s_abortEnv)` และ `longjmp(s_abortEnv, 1)` ร่วมกับการ Override ฟังก์ชัน `void yield()` ของ Arduino UNO R4 ทำให้สามารถดีดตัวออกจากลูป `delay()` หรือคำสั่งบล็อกกิ้ง `DriveDC` ได้ทันทีที่ผู้ใช้กดปุ่มยกเลิก
+- ดักจับคำสั่งหยุดฉุกเฉินทาง Serial (`!`, `x`, `X`, `Space`, `u`, `U`) ด้วยบัฟเฟอร์ผ่านต่อขนาด 32 ไบต์ ทำให้ปุ่มหยุดฉุกเฉินไม่ถูกบล็อกโดยอักขระ `\r`/`\n` หรือคีย์ที่ค้างอยู่ในบัฟเฟอร์ ขณะที่ยังส่งผ่านข้อมูลอื่นให้โค้ด Auto ที่อ่าน `Serial` ได้ตามปกติ
 - มีฟังก์ชัน `probeAndRunLoopIteration()` วัดเวลาการรัน `AutoBlockUser::loop()` เปรียบเทียบกับฟังก์ชันว่าง `emptyLoopStub()` เพื่อตรวจสอบว่าผู้ใช้ปล่อย `void loop() {}` ว่างไว้หรือไม่ หากว่างไว้ระบบจะจบโหมด Auto ทันทีที่ `setup()` ทำงานเสร็จ
-- มีฟังก์ชัน `checkDriveStall()` อ่านค่า `mmL.Get_Drive_isTaskDone()`, `mmL.GetAllEncoderCounter()`, และ `mmL.Get_Drive_Degrees()` ทุกๆ `200 ms` เพื่อตรวจจับภาวะล้อติดกำแพงและสั่งตัดการทำงานอัตโนมัติ (`AutoExitReason::StallTimeout`)
+- มีฟังก์ชัน `checkDriveStall()` อ่านค่า `mmL.Get_Drive_isTaskDone()`, `mmL.GetAllEncoderCounter()`, และ `mmL.Get_Drive_Degrees()` ทุกๆ `200 ms` ตามหมายเลขมอเตอร์ที่กำหนดใน `DriveDC.begin()` เพื่อตรวจจับภาวะล้อติดกำแพงและสั่งตัดการทำงานอัตโนมัติ (`AutoExitReason::StallTimeout`)
 
-##### 7.2.24 [src/auto_block_code.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/auto_block_code.cpp) — พื้นที่วางโค้ด Auto จาก MATRIXblock R4 พร้อมชั้น Proxy ความปลอดภัย
+##### 7.2.25 [src/auto_block_code.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/auto_block_code.cpp) — พื้นที่วางโค้ด Auto จาก MATRIXblock R4 พร้อมชั้น Proxy ความปลอดภัย
 ไฟล์สำหรับให้ผู้ใช้นำโค้ด C++ จากโปรแกรม MATRIXblock R4 มาวางใช้งาน:
 - ปิดคำเตือนคอมไพเลอร์เฉพาะส่วนโค้ดผู้ใช้ด้วย `#pragma GCC diagnostic ignored` เพื่อให้วางโค้ดจาก MATRIXblock R4 ที่มีตัวแปรไม่ได้ใช้หรือฟังก์ชันไม่มี `return` ได้โดยไม่ติด `-Werror`
 - นิยาม `AutoMiniR4Proxy`, `AutoPowerProxy`, `AutoI2cProxy`, `AutoMj5Proxy`, `AutoDriveDCProxy`, `AutoPs2Proxy`, `AutoRcProxy`, และ `AutoSerialProxy` ครอบตัวแปร `MiniR4` และ `Serial` ภายใน `namespace AutoBlockUser`
@@ -1011,18 +1036,18 @@ matrix_R4/
 
 #### กลุ่มที่ 5: โฟลเดอร์ไลบรารีส่วนตัว (`lib/` - 1 ไฟล์)
 
-##### 7.2.25 [lib/README](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/lib/README) — คู่มือมาตรฐาน PlatformIO สำหรับติดตั้งไลบรารีเสริมส่วนตัว
+##### 7.2.26 [lib/README](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/lib/README) — คู่มือมาตรฐาน PlatformIO สำหรับติดตั้งไลบรารีเสริมส่วนตัว
 เอกสารคำแนะนำมาตรฐานของ PlatformIO สำหรับการวางไลบรารีเฉพาะโปรเจกต์ (Private Libraries) เพื่อให้ระบบ Library Dependency Finder (LDF) นำไปคอมไพล์และลิงก์อัตโนมัติ
 
 ---
 
 #### กลุ่มที่ 6: ระบบการทดสอบอัตโนมัติ (`test/` - 2 ไฟล์)
 
-##### 7.2.26 [test/README](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/README) — คู่มือมาตรฐาน PlatformIO สำหรับระบบรันการทดสอบ Unit Testing
+##### 7.2.27 [test/README](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/README) — คู่มือมาตรฐาน PlatformIO สำหรับระบบรันการทดสอบ Unit Testing
 เอกสารคำแนะนำมาตรฐานของ PlatformIO สำหรับการสร้างและรันชุดแบบทดสอบ Unit Testing
 
-##### 7.2.27 [test/test_robot_logic/test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp) — ตัวรันชุดแบบทดสอบ Unity Unit Tests ครบทั้ง 36 รายการ (10 หมวดหมู่) บน Native Host
-ไฟล์ชุดแบบทดสอบอัตโนมัติขนาดกว่า 1,800 บรรทัดที่ใช้เฟรมเวิร์ก Unity Test Framework ตรวจสอบความถูกต้องของอัลกอริทึมทุกส่วนในโปรเจกต์ครบทั้ง 36 รายการ (ดูรายละเอียดทั้ง 36 รายการได้ในหัวข้อ [5.1](#51-การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์-pio-test--e-native))
+##### 7.2.28 [test/test_robot_logic/test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp) — ตัวรันชุดแบบทดสอบ Unity Unit Tests ครบทั้ง 38 รายการ (10 หมวดหมู่) บน Native Host
+ไฟล์ชุดแบบทดสอบอัตโนมัติขนาดกว่า 1,900 บรรทัดที่ใช้เฟรมเวิร์ก Unity Test Framework ตรวจสอบความถูกต้องของอัลกอริทึมทุกส่วนในโปรเจกต์ครบทั้ง 38 รายการ (ดูรายละเอียดทั้ง 38 รายการได้ในหัวข้อ [5.1](#51-การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์-pio-test--e-native))
 
 ---
 
@@ -1036,7 +1061,7 @@ flowchart TD
     B --> C["Stage 2: Dynamic CoM Anti-Tip Scaling\ncomputeCoMDynamicScale(rc2Deg) -> 65%..100%"]
     C --> D["Stage 3: Centripetal Traction Circle Limiter\nlimitCentripetalTurn (|v * w| / 100 <= 52 * CoMScale)"]
     D --> E["Stage 4: Inverse Kinematics + Sag Torque Comp + Motor Trim + Coulomb Stiction\ndesaturateAndClampDrive -> applyMotorBalanceTrim -> applyCoulombStiction (>= 12%)"]
-    E --> F["Stage 5: Coupled 2-DOF Rigid-Body Slew Limiter\napply2DofKinodynamicSlew (Linear v: +25/-50, Angular w: +35/-60)"]
+    E --> F["Stage 5: Coupled 2-DOF Rigid-Body Slew Limiter + Envelope Cap\napply2DofKinodynamicSlew (Linear v: +25/-50, Angular w: +35/-60)"]
     F --> G["Smart Hold-Brake & STM32 H-Bridge Output\nMiniR4IO::applyMotors(M1, M2)"]
 ```
 
@@ -1056,8 +1081,8 @@ flowchart TD
    - คำนวณกำลังล้อซ้าย $L = v + \omega$ และล้อขวา $R = v - \omega$ พร้อมคูณชดเชยแรงดันแบตเตอรี่ตก (`compPercent` สูงสุด `115%`) และปรับสเกลรักษาสัดส่วน (`desaturateAndClampDrive`)
    - ปรับชดเชยสมดุลล้อซ้าย-ขวาด้วย `applyMotorBalanceTrim(L, R, motorTrimPct)`
    - ชดเชยแรงเสียดทานสถิตของเฟืองเกียร์ด้วย `applyCoulombStiction()` โดยแมปคำสั่งที่ไม่ใช่ศูนย์จากช่วง `[1, limit]` ไปยัง `[12%, limit]` (`kMotorStictionMinPower = 12`)
-5. **Stage 5 — Coupled 2-DOF Rigid-Body Slew Limiter (`apply2DofKinodynamicSlew`)**:
-   - แทนที่จะจำกัดอัตราเร่งแยกล้อซ้าย-ขวาแบบอิสระ (ซึ่งทำให้รัศมีการเลี้ยวโค้งเพี้ยนขณะเร่งความเร็ว) ระบบจะแปลงสถานะเป็นพิกัดสองเท่า $V_2 = L + R = 2v$ และ $W_2 = L - R = 2\omega$ แล้วใช้ `applyAsymmetricSlewStep()` แยกควบคุมความเร็วเชิงเส้น (`linAccelStep = 25`, `linDecelStep = 50`) และความเร็วเชิงมุม (`angAccelStep = 35`, `angDecelStep = 60`) ก่อนแปลงกลับเป็น $(L, R)$ โดยไม่สูญเสียเศษจากการหารจำนวนเต็ม
+5. **Stage 5 — Coupled 2-DOF Rigid-Body Slew Limiter & Power Envelope Cap (`apply2DofKinodynamicSlew`)**:
+   - แทนที่จะจำกัดอัตราเร่งแยกล้อซ้าย-ขวาแบบอิสระ (ซึ่งทำให้รัศมีการเลี้ยวโค้งเพี้ยนขณะเร่งความเร็ว) ระบบจะแปลงสถานะเป็นพิกัดสองเท่า $V_2 = L + R = 2v$ และ $W_2 = L - R = 2\omega$ แล้วใช้ `applyAsymmetricSlewStep()` แยกควบคุมความเร็วเชิงเส้น (`linAccelStep = 25`, `linDecelStep = 50`) และความเร็วเชิงมุม (`angAccelStep = 35`, `angDecelStep = 60`) ก่อนแปลงกลับเป็น $(L, R)$ โดยไม่สูญเสียเศษจากการหารจำนวนเต็ม จากนั้นบังคับเพดานกำลัง Envelope (`envLimit = max(limit, max(|currentLeft|, |currentRight|))`) เพื่อไม่ให้การเปลี่ยนจากวิ่งตรงเป็นหมุนตัวกะทันหันพุ่งเกินเพดาน Precision (`55%`) หรือ Battery Emergency (`35%`)
 
 ---
 
@@ -1089,6 +1114,7 @@ flowchart TD
 | `kAngularAccelSlewStep` | `35` | %/tick | อัตราเร่งการหมุนตัวเชิงมุม (2-DOF Rotational Accel Slew) |
 | `kAngularDecelSlewStep` | `60` | %/tick | อัตราเบรกการหมุนตัวเชิงมุม (2-DOF Rotational Decel Slew) |
 | `kCoMHighMinScalePct` | `65` | % | ตัวคูณลดอัตราเร่งต่ำสุดเมื่อยกแขน `RC2` ขึ้นสูงสุดที่ `0°` |
+| `kCoMLowArmDeg` | `140` | deg | มุมแขน `RC2` ตั้งแต่ค่านี้ขึ้นไปถือว่าจุดศูนย์ถ่วงต่ำ (ตัวคูณ CoM = `100%`) |
 | `kMicroTurnPower` | `26` | % | กำลังหมุนตัวละเอียดเมื่อกดปุ่ม D-Pad ซ้าย/ขวา |
 | `kEnableSmartHoldBrake` | `true` | bool | เปิดใช้งานระบบล็อกเบรกแม่เหล็กไฟฟ้า H-Bridge เมื่อรถหยุดนิ่ง `(0,0)` |
 | `kMaxMotorTrimPct` | `15` | % | ขอบเขตสูงสุดของการปรับจูนสมดุลล้อซ้าย-ขวา (`±15%`) |
@@ -1111,6 +1137,7 @@ flowchart TD
 | `kSerialDefaultSpeed` | `100` | % | ความเร็วเริ่มต้นของการขับเคลื่อนผ่านคีย์บอร์ด Serial Monitor (`20%..100%`) |
 | `kUploadComboHoldMs` | `2500` | ms | เวลากดปุ่ม `BTN_UP + BTN_DOWN` ค้างพร้อมกันเพื่อเข้า Bootloader (2.5 วินาที) |
 | `kAutoStartBtnHoldMs` | `1200` | ms | เวลากดปุ่ม `BTN_UP` ค้างเดี่ยวเพื่อเริ่มโหมด Auto โดยไม่ใช้จอย (1.2 วินาที) |
+| `kAutoHoldBarDelayMs` | `250` | ms | เวลาหน่วงก่อนแสดงแถบกราฟิก `Hold UP->AUTO` บนจอ OLED |
 | `kAutoMaxDurationMs` | `60000` | ms | เวลาทำงานสูงสุดของโหมด Auto เพื่อความปลอดภัย (60 วินาที; ตั้ง `0` หากไม่จำกัด) |
 | `kAutoStallGraceMs` / `TimeoutMs`| `1250` / `1600` | ms | เวลาผ่อนผันเริ่มต้น (`1.25s`) และเวลาตรวจจับล้อติดขัดต่อเนื่อง (`1.6s`) ในโหมด Auto |
 
@@ -1163,7 +1190,7 @@ flowchart TD
 ---
 
 ### ปัญหาที่ 6: การตั้งค่าระบบป้องกันไฟตก (`kEnableBatterySagThrottle`) และอาการเมื่อแบตเตอรี่อ่อน
-- **พฤติกรรมเริ่มต้น (`kEnableBatterySagThrottle = false`)**: เฟิร์มแวร์ตั้งค่าเริ่มต้นให้คงกำลังมอเตอร์สูงสุด **100% เต็ม** ตลอดเวลาสำหรับการแข่งขัน พร้อมชดเชยแรงบิด (`compPercent` สูงสุด `115%`) โดยจะแจ้งเตือนระดับแบตอ่อนผ่านตัวอักษร `L`, `C`, `E` บนหน้าจอ OLED บรรทัดที่ 3 และไฟกะพริบสีส้ม/แดงที่ LED 2
+- **พฤติกรรมเริ่มต้น (`kEnableBatterySagThrottle = false`)**: เฟิร์มแวร์ตั้งค่าเริ่มต้นให้คงกำลังมอเตอร์สูงสุด **100% เต็ม** ตลอดเวลาสำหรับการแข่งขัน พร้อมชดเชยแรงบิด (`compPercent` สูงสุด `115%` ยกเว้นระดับ `Emergency` ที่คง `100%` เพื่อกันไฟตก) โดยจะแจ้งเตือนระดับแบตอ่อนผ่านตัวอักษร `L`, `C`, `E` บนหน้าจอ OLED บรรทัดที่ 3 และไฟกะพริบสีส้ม/แดงที่ LED 2
 - **กรณีแบตเตอรี่เสื่อมสภาพมากจนบอร์ดดับหรือรีบูตเองขณะออกตัวกระชาก**:
   1. นำแบตเตอรี่ไปชาร์จประจุให้เต็ม และตรวจสอบขั้วสายไฟให้แน่นหนา
   2. หากจำเป็นต้องใช้แบตเตอรี่ก้อนที่เสื่อมสภาพ สามารถเปิดระบบลดกำลังอัตโนมัติได้โดยเปิดไฟล์ [include/config.h](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/config.h) บรรทัดที่ 144 แล้วเปลี่ยนเป็น:
@@ -1189,6 +1216,20 @@ flowchart TD
   1. ตรวจสอบว่าแผงหน้าจอ OLED ขนาด 0.91 นิ้ว เสียบลงบนช่องต่อ I2C ของบอร์ด Carrier Shield แน่นสนิทครบทุกขา
   2. บอร์ดมีระบบกู้คืนบัส I2C อัตโนมัติ (`OledUI::recoverBus`) เมื่อเริ่มต้นเปิดเครื่องและเมื่อตรวจพบ I2C NACK/Timeout
   3. คุณสามารถเปิด Serial Monitor แล้วพิมพ์คำสั่งตัวอักษร **`v`** เพื่อสั่งให้ระบบทำการสแกนตรวจสอบแอดเดรสของหน้าจอ OLED บนบัส `Wire1` และ `Wire` โดยระบบจะตรวจสอบทั้งแอดเดรส `0x3D` และ `0x3C` และรายงานผลออกมาทางหน้าต่าง Serial
+
+---
+
+## 9. สรุปการยกระดับความปลอดภัยและความเสถียรล่าสุด (Security & Stability Hardening Summary)
+
+รายการปรับปรุงสำคัญจากการตรวจสอบโค้ดและฮาร์ดแวร์ครบทั้ง 28 ไฟล์ (ผ่าน `pio run -e uno_r4_wifi`, `pio test -e native` 38/38 เคส, และ `pio check` `0 HIGH, 0 MEDIUM` ใน `src/`):
+
+| หมวดงาน | ไฟล์หลักที่ปรับปรุง | สิ่งที่แก้ไขและพัฒนา |
+| :--- | :--- | :--- |
+| **ความปลอดภัยการหยุดฉุกเฉิน & บูตโหลดเดอร์** | [src/minir4_io.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/minir4_io.cpp), [src/main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/main.cpp), [src/serial_control.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/serial_control.cpp) | • `forceMotorsStop()` ส่งคำสั่งหยุดทันทีเมื่อ `commHealthy_` ปกติหรือระบุ `forceImmediate` (ก่อนเข้า Bootloader)<br>• `BTN_DOWN` ทำงานเป็น Rising-Edge E-Stop ทันทีที่กดผ่าน Debounce 30 ms<br>• บล็อกคำสั่งเซอร์โวจาก Serial ทั้งหมดระหว่าง `ESTOP` และบังคับหยุดเมื่อส่ง `!w` ในแบตช์เดียวกัน<br>• ล้างสถานะปุ่มและตัวจับเวลา hold ทันทีเมื่อ STM32 UART อ่านพลาด ป้องกันลั่น Bootloader/Auto จากค่าค้าง |
+| **ความเสถียรของลิงก์ PS2 และฟิสิกส์การขับเคลื่อน** | [src/robot_logic.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/robot_logic.cpp), [src/ps2_driver.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/ps2_driver.cpp) | • `FailsafeStateMachine` ดูดซับ RF Glitch 1–3 เฟรมขณะ `Operational` ได้โดยไม่หลุดเข้า `Stabilizing`<br>• เพิ่ม Power Envelope Cap หลัง 2-DOF Slew กันโอเวอร์ชูตเกินเพดาน `55%`/`35%` และใช้คณิตศาสตร์ 32-bit ป้องกัน `int16_t` overflow<br>• แยก `Ps2Driver::restorePins()`, เช็ก timeout ก่อน `delay()`, และตัดโพรบเร็วทั้งสายลอย `0xFF` และสายช็อต `0x00` |
+| **โหมด Auto, Stall Protection & Serial Abort** | [src/auto_mode.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/auto_mode.cpp), [src/auto_block_code.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/auto_block_code.cpp) | • `checkSerialAbort()` ดูดทุกไบต์และเก็บไบต์ทั่วไปลง Ring Buffer 32 ไบต์ (ส่งต่อให้ `AutoSerialProxy`) กัน `\r`/`\n` บล็อก `!`/`x`/`u`<br>• แยก baseline ระหว่าง Encoder กับ Drive Degrees, จดจำช่องมอเตอร์จริงของ `DriveDC.begin()`, และปัดเศษ/จำกัดช่วงเวลา `MoveTime` อย่างปลอดภัย |
+| **ความทนทานของ STM32 UART, OLED & Scheduler** | [src/minir4_io.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/minir4_io.cpp), [src/oled_ui.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/oled_ui.cpp), [src/main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/main.cpp) | • `noteCommFailure()` บันทึกเวลาหลัง timeout จริงพร้อม signed wrap-safe backoff<br>• `OledUI::flushBufferChecked()` สำรอง Framebuffer 512 ไบต์ก่อนกู้บัส I2C กันจอดำ และรีเซ็ต hash cache เมื่อส่งพลาด<br>• ล้างแฟลก `R_SYSTEM->RSTSR1_b.WDTRF` และรีเซ็ตนาฬิกาลูปหลังบูต/หลัง Auto เพื่อลด Jitter หลอก |
+| **การทดสอบอัตโนมัติ, Serial Telemetry & เครื่องมือพัฒนา** | [test/test_robot_logic/test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp), [.vscode/tasks.json](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/.vscode/tasks.json) | • เพิ่ม Unit Tests เป็น **38 เคส** ครอบคลุม 2-DOF Envelope, Overflow safety, Glitch absorption, `!w` E-Stop, Help `o/p` + `v`, และ Telemetry `rf=`/`com=`<br>• เพิ่ม VS Code Task `PIO: Test Native (matrix_R4)` |
 
 ---
 

@@ -30,6 +30,7 @@ private:
 
     uint32_t lastOledMs_      = 0;
     uint32_t lastDisplayHash_ = 0;
+    bool     hasDisplayHash_  = false;
     uint32_t lastLed1Color_   = 0xFFFFFFFFUL;
     uint32_t lastLed2Color_   = 0xFFFFFFFFUL;
     uint8_t  oledAddr_        = 0x3D;

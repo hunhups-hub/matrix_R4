@@ -5,6 +5,7 @@
 #include <WDT.h>
 #include <Wire.h>
 #include <stdio.h>
+#include <string.h>
 
 namespace {
 
@@ -110,6 +111,7 @@ void OledUI::recoverBus(uint8_t& sdaBefore, uint8_t& sdaAfter, uint8_t& clocksSe
 bool OledUI::begin() {
     lastOledMs_      = 0;
     lastDisplayHash_ = 0;
+    hasDisplayHash_  = false;
     lastLed1Color_   = 0xFFFFFFFFUL;
     lastLed2Color_   = 0xFFFFFFFFUL;
     oledAddr_        = MATRIXMINIR4_OLED_ADDRESS;
@@ -139,7 +141,9 @@ bool OledUI::begin() {
         }
     }
 
-    MiniR4.OLED.ssd1306_command(SSD1306_DISPLAYON);
+    if (lastI2cErr_ == 0U) {
+        MiniR4.OLED.ssd1306_command(SSD1306_DISPLAYON);
+    }
     MiniR4.OLED.setTextWrap(false);
     MiniR4.OLED.setTextSize(1);
     MiniR4.OLED.setTextColor(SSD1306_WHITE);
@@ -199,6 +203,12 @@ uint8_t OledUI::flushBufferChecked(const uint8_t* buf, uint16_t len) {
     uint8_t err = transferFrame();
     if (err != 0U) {
         // Fallback to 100 kHz ONLY on error transition instead of thrashing FSP I2C per frame.
+        // Preserve framebuffer because Adafruit_SSD1306::begin() calls clearDisplay().
+        constexpr uint16_t kMaxSavedBytes = 128U * (32U / 8U);
+        uint8_t            savedBuf[kMaxSavedBytes];
+        const uint16_t     copyLen = (len <= kMaxSavedBytes) ? len : kMaxSavedBytes;
+        memcpy(savedBuf, buf, copyLen);
+
         fastClockOk_ = false;
         uint8_t sdaB = 1U;
         uint8_t sdaA = 1U;
@@ -208,6 +218,12 @@ uint8_t OledUI::flushBufferChecked(const uint8_t* buf, uint16_t len) {
         Wire1.setClock(100000UL);
         Wire1.setWireTimeout(static_cast<unsigned int>(Config::kWireTimeoutUs), true);
         MiniR4.OLED.begin(SSD1306_SWITCHCAPVCC, oledAddr_, false, false);
+        Wire1.setClock(100000UL);
+
+        uint8_t* oledBuf = MiniR4.OLED.getBuffer();
+        if (oledBuf != nullptr) {
+            memcpy(oledBuf, savedBuf, copyLen);
+        }
         err = transferFrame();
     }
 
@@ -248,7 +264,7 @@ void OledUI::beepWarning() {
 }
 
 void OledUI::updateRgbLeds(const SystemSnapshot& snap, uint32_t nowMs) {
-    uint32_t c1 = packRgb(0, 0, 0);
+    uint32_t c1;
     uint32_t c2 = packRgb(0, 45, 0);
 
     if (snap.comboHolding) {
@@ -310,7 +326,8 @@ void OledUI::render(const SystemSnapshot& snap, uint32_t nowMs, bool force) {
     char line3[24];
     char line4[24];
 
-    const int vTenths = static_cast<int>(snap.battVolt * 10.0f + 0.5f);
+    const float clampedV = (snap.battVolt < 0.0f) ? 0.0f : ((snap.battVolt > 99.9f) ? 99.9f : snap.battVolt);
+    const int   vTenths  = static_cast<int>(clampedV * 10.0f + 0.5f);
     if (snap.extPower) {
         snprintf(line1, sizeof(line1), "%-8s %2d.%1dV %3u%%",
                  headerTag(snap),
@@ -342,12 +359,17 @@ void OledUI::render(const SystemSnapshot& snap, uint32_t nowMs, bool force) {
              modeChar,
              batteryTierChar(snap.batTier));
 
+    const bool showAutoHold = snap.autoHolding && (snap.sysState == SystemState::Ready);
+    auto clampHoldPct = [](float pct) -> float {
+        return (pct < 0.0f) ? 0.0f : ((pct > 1.0f) ? 1.0f : pct);
+    };
+
     if (snap.comboHolding) {
         snprintf(line4, sizeof(line4), "Upload in %3d%%",
-                 static_cast<int>(snap.uploadHoldPct * 100.0f));
-    } else if (snap.autoHolding && snap.sysState == SystemState::Ready) {
+                 static_cast<int>(clampHoldPct(snap.uploadHoldPct) * 100.0f + 0.5f));
+    } else if (showAutoHold) {
         snprintf(line4, sizeof(line4), "Hold UP->AUTO %3d%%",
-                 static_cast<int>(snap.autoHoldPct * 100.0f));
+                 static_cast<int>(clampHoldPct(snap.autoHoldPct) * 100.0f + 0.5f));
     } else if (!snap.commHealthy) {
         snprintf(line4, sizeof(line4), "!STM32 COMM RETRY!");
     } else if (snap.activeSource == ControlSource::Auto) {
@@ -370,16 +392,15 @@ void OledUI::render(const SystemSnapshot& snap, uint32_t nowMs, bool force) {
     h          = fnv1aHash(line3, h);
     h          = fnv1aHash(line4, h);
     if (snap.comboHolding) {
-        h ^= static_cast<uint32_t>(snap.uploadHoldPct * 32.0f);
-    } else if (snap.autoHolding) {
-        h ^= static_cast<uint32_t>(snap.autoHoldPct * 32.0f);
+        h ^= static_cast<uint32_t>(clampHoldPct(snap.uploadHoldPct) * 32.0f);
+    } else if (showAutoHold) {
+        h ^= static_cast<uint32_t>(clampHoldPct(snap.autoHoldPct) * 32.0f);
     }
 
-    if (!force && h == lastDisplayHash_) {
+    if (!force && hasDisplayHash_ && h == lastDisplayHash_) {
         return;
     }
-    lastOledMs_      = nowMs;
-    lastDisplayHash_ = h;
+    lastOledMs_ = nowMs;
 
     MiniR4.OLED.clearDisplay();
     MiniR4.OLED.setTextWrap(false);
@@ -390,11 +411,14 @@ void OledUI::render(const SystemSnapshot& snap, uint32_t nowMs, bool force) {
     MiniR4.OLED.setCursor(0, 8);
     MiniR4.OLED.print(line2);
 
-    if (snap.comboHolding || (snap.autoHolding && snap.sysState == SystemState::Ready)) {
-        const float holdPct = snap.comboHolding ? snap.uploadHoldPct : snap.autoHoldPct;
+    if (snap.comboHolding || showAutoHold) {
+        const float holdPct = clampHoldPct(snap.comboHolding ? snap.uploadHoldPct : snap.autoHoldPct);
         MiniR4.OLED.setCursor(0, 17);
         MiniR4.OLED.print(line4);
-        const int barW = static_cast<int>(holdPct * 124.0f);
+        int barW = static_cast<int>(holdPct * 124.0f + 0.5f);
+        if (barW > 124) {
+            barW = 124;
+        }
         MiniR4.OLED.drawRect(0, 27, 126, 4, SSD1306_WHITE);
         if (barW > 0) {
             MiniR4.OLED.fillRect(1, 28, barW, 2, SSD1306_WHITE);
@@ -406,7 +430,13 @@ void OledUI::render(const SystemSnapshot& snap, uint32_t nowMs, bool force) {
         MiniR4.OLED.print(line4);
     }
 
-    flushBufferChecked(MiniR4.OLED.getBuffer(), 128U * (32U / 8U));
+    const uint8_t flushErr = flushBufferChecked(MiniR4.OLED.getBuffer(), 128U * (32U / 8U));
+    if (flushErr == 0U) {
+        lastDisplayHash_ = h;
+        hasDisplayHash_  = true;
+    } else {
+        hasDisplayHash_ = false;
+    }
 }
 
 namespace {
@@ -427,12 +457,20 @@ void scanBusAddrs(const char* label, TwoWire& bus) {
             }
             Serial.print(addr, HEX);
             found++;
-        } else if (addr == 0x3CU || addr == 0x3DU || addr == 0x70U) {
+        } else if (addr == 0x3CU || addr == 0x3DU) {
             const uint8_t txErr = probeSsd1306Cmd(bus, addr, 0xE3);
             if (txErr == 0U) {
                 Serial.print(F(" 0x"));
                 Serial.print(addr, HEX);
                 Serial.print(F("(w)"));
+                found++;
+            }
+        } else if (addr == 0x70U) {
+            // Probe PCA9548A by disabling all channels (0x00) instead of writing SSD1306 commands.
+            bus.beginTransmission(addr);
+            bus.write(static_cast<uint8_t>(0x00U));
+            if (bus.endTransmission() == 0U) {
+                Serial.print(F(" 0x70(w)"));
                 found++;
             }
         }

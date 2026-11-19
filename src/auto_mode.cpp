@@ -21,6 +21,7 @@ jmp_buf                 s_abortEnv;
 volatile bool           s_running              = false;
 volatile bool           s_inService            = false;
 volatile bool           s_yieldCalled          = false;
+volatile bool           s_pollPs2Called        = false;
 volatile bool           s_inYieldContext       = false;
 bool                    s_entryTrianglePending   = false;
 bool                    s_exitAfterLoopIteration = false;
@@ -35,15 +36,42 @@ uint32_t                s_lastWheelMoveMs        = 0UL;
 int32_t                 s_prevEncL               = 0;
 int32_t                 s_prevEncR               = 0;
 int32_t                 s_prevDriveDeg           = 0;
-bool                    s_hasStallBaseline       = false;
+bool                    s_hasEncBaseline         = false;
+bool                    s_hasDegBaseline         = false;
+uint8_t                 s_driveEncIdxL           = Config::kMotorLeftId - 1U;
+uint8_t                 s_driveEncIdxR           = Config::kMotorRightId - 1U;
+bool                    s_driveTaskActive        = false;
+bool                    s_expectWheelMotion      = false;
+
+constexpr uint8_t       kSerialPassCap           = 32U;
+uint8_t                 s_serialBuf[kSerialPassCap]{};
+uint8_t                 s_serialHead             = 0U;
+uint8_t                 s_serialTail             = 0U;
+uint8_t                 s_serialCount            = 0U;
+
+void clearSerialPassthrough() {
+    s_serialHead  = 0U;
+    s_serialTail  = 0U;
+    s_serialCount = 0U;
+}
+
+void pushSerialPassthrough(uint8_t b) {
+    if (s_serialCount >= kSerialPassCap) {
+        s_serialHead = static_cast<uint8_t>((s_serialHead + 1U) % kSerialPassCap);
+        s_serialCount--;
+    }
+    s_serialBuf[s_serialTail] = b;
+    s_serialTail              = static_cast<uint8_t>((s_serialTail + 1U) % kSerialPassCap);
+    s_serialCount++;
+}
 
 __attribute__((noinline)) void emptyLoopStub() {
     asm volatile("" ::: "memory");
 }
 
-// Detects whether user's AutoBlockUser::loop() is empty `{}` (e.g., all MATRIXblock steps
-// live in setup()) so finished linear Auto sequences return straight to Manual control,
-// while non-empty loop() routines keep repeating until X or autoExit().
+// Detects whether user's AutoBlockUser::loop() is empty `{}` or only contains MATRIXblock's
+// boilerplate `MiniR4.PS2.read_gamepad(false, 0);` so finished linear Auto sequences return
+// straight to Manual control, while active loop() routines keep repeating until X or autoExit().
 bool probeAndRunLoopIteration() {
     constexpr uint8_t  kBurstCalls   = 16U;
     constexpr uint32_t kFirstMaxUs   = 25UL;
@@ -56,11 +84,15 @@ bool probeAndRunLoopIteration() {
     const uint32_t baseUs = static_cast<uint32_t>(micros() - b0);
 
     s_yieldCalled         = false;
+    s_pollPs2Called       = false;
     const uint32_t t0     = micros();
     AutoBlockUser::loop();
     const uint32_t firstUs = static_cast<uint32_t>(micros() - t0);
 
     if (!s_running || s_exitAfterLoopIteration) {
+        return false;
+    }
+    if (s_pollPs2Called && !s_yieldCalled) {
         return false;
     }
     if (s_yieldCalled || firstUs >= kFirstMaxUs) {
@@ -69,6 +101,7 @@ bool probeAndRunLoopIteration() {
 
     for (uint8_t round = 0U; round < 2U && s_running; ++round) {
         s_yieldCalled     = false;
+        s_pollPs2Called   = false;
         const uint32_t r0 = micros();
         for (uint8_t i = 0U; i < kBurstCalls; ++i) {
             AutoBlockUser::loop();
@@ -77,7 +110,7 @@ bool probeAndRunLoopIteration() {
         if (s_yieldCalled) {
             return true;
         }
-        if (rUs <= (baseUs + kEmptySlackUs)) {
+        if ((s_pollPs2Called && !s_yieldCalled) || rUs <= (baseUs + kEmptySlackUs)) {
             return false;
         }
     }
@@ -85,10 +118,12 @@ bool probeAndRunLoopIteration() {
 }
 
 [[noreturn]] void abortAuto(AutoExitReason reason) {
-    s_exitReason     = reason;
-    s_running        = false;
-    s_inService      = false;
-    s_inYieldContext = false;
+    s_exitReason        = reason;
+    s_running           = false;
+    s_inService         = false;
+    s_inYieldContext    = false;
+    s_driveTaskActive   = false;
+    s_expectWheelMotion = false;
     longjmp(s_abortEnv, 1);
 }
 
@@ -99,7 +134,8 @@ void resetStallTracker(uint32_t nowMs) {
     s_prevEncL         = 0;
     s_prevEncR         = 0;
     s_prevDriveDeg     = 0;
-    s_hasStallBaseline = false;
+    s_hasEncBaseline   = false;
+    s_hasDegBaseline   = false;
 }
 
 void checkDriveStall(uint32_t nowMs) {
@@ -111,10 +147,28 @@ void checkDriveStall(uint32_t nowMs) {
     s_lastStallCheckMs = nowMs;
 
     bool taskStats[2] = {false, false};
-    if (mmL.Get_Drive_isTaskDone(1U, taskStats) != MMLower::Drive_RESULT::OK || !taskStats[0]) {
+    const bool taskDoneOk =
+        (mmL.Get_Drive_isTaskDone(1U, taskStats) == MMLower::Drive_RESULT::OK);
+    if ((taskDoneOk && !taskStats[0]) || (!taskDoneOk && !s_driveTaskActive)) {
         // No blocking DriveDC task is active (e.g. inside regular delay()).
-        s_hasStallBaseline = false;
-        s_lastWheelMoveMs  = nowMs;
+        s_hasEncBaseline  = false;
+        s_hasDegBaseline  = false;
+        s_lastWheelMoveMs = nowMs;
+        return;
+    }
+
+    if (!taskDoneOk) {
+        // STM32 UART timed out during a blocking DriveDC wait: abort if unrecovered.
+        if (static_cast<uint32_t>(nowMs - s_lastWheelMoveMs) >= Config::kAutoStallTimeoutMs) {
+            abortAuto(AutoExitReason::StallTimeout);
+        }
+        return;
+    }
+
+    if (!s_expectWheelMotion) {
+        s_hasEncBaseline  = false;
+        s_hasDegBaseline  = false;
+        s_lastWheelMoveMs = nowMs;
         return;
     }
 
@@ -123,33 +177,48 @@ void checkDriveStall(uint32_t nowMs) {
     const bool encOk    = (mmL.GetAllEncoderCounter(enc) == MMLower::RESULT::OK);
     const bool degOk    = (mmL.Get_Drive_Degrees(1U, driveDeg) == MMLower::Drive_RESULT::OK);
     if (!encOk && !degOk) {
+        if (static_cast<uint32_t>(nowMs - s_lastWheelMoveMs) >= Config::kAutoStallTimeoutMs) {
+            abortAuto(AutoExitReason::StallTimeout);
+        }
         return;
     }
 
-    if (!s_hasStallBaseline) {
-        s_prevEncL         = enc[0];
-        s_prevEncR         = enc[1];
-        s_prevDriveDeg     = driveDeg;
-        s_lastWheelMoveMs  = nowMs;
-        s_hasStallBaseline = true;
-        return;
+    const int32_t curEncL        = enc[s_driveEncIdxL];
+    const int32_t curEncR        = enc[s_driveEncIdxR];
+    const bool    hadAnyBaseline = s_hasEncBaseline || s_hasDegBaseline;
+    bool          moved          = false;
+
+    if (encOk) {
+        if (!s_hasEncBaseline) {
+            s_prevEncL       = curEncL;
+            s_prevEncR       = curEncR;
+            s_hasEncBaseline = true;
+        } else if (RobotLogic::hasEncoderProgressed(s_prevEncL, curEncL, Config::kAutoStallMinDeltaDeg) ||
+                   RobotLogic::hasEncoderProgressed(s_prevEncR, curEncR, Config::kAutoStallMinDeltaDeg)) {
+            moved = true;
+        }
     }
 
-    const bool movedL = encOk && RobotLogic::hasEncoderProgressed(
-                                     s_prevEncL, enc[0], Config::kAutoStallMinDeltaDeg);
-    const bool movedR = encOk && RobotLogic::hasEncoderProgressed(
-                                     s_prevEncR, enc[1], Config::kAutoStallMinDeltaDeg);
-    const bool movedD = degOk && RobotLogic::hasEncoderProgressed(
-                                     s_prevDriveDeg, driveDeg, Config::kAutoStallMinDeltaDeg);
+    if (degOk) {
+        if (!s_hasDegBaseline) {
+            s_prevDriveDeg   = driveDeg;
+            s_hasDegBaseline = true;
+        } else if (RobotLogic::hasEncoderProgressed(s_prevDriveDeg, driveDeg, Config::kAutoStallMinDeltaDeg)) {
+            moved = true;
+        }
+    }
 
-    if (movedL || movedR || movedD) {
+    if (moved) {
         if (encOk) {
-            s_prevEncL = enc[0];
-            s_prevEncR = enc[1];
+            s_prevEncL = curEncL;
+            s_prevEncR = curEncR;
         }
         if (degOk) {
             s_prevDriveDeg = driveDeg;
         }
+        s_lastWheelMoveMs = nowMs;
+    } else if (!hadAnyBaseline) {
+        // First baseline sample captured: start the stall timeout window from now.
         s_lastWheelMoveMs = nowMs;
     } else if (static_cast<uint32_t>(nowMs - s_lastWheelMoveMs) >= Config::kAutoStallTimeoutMs) {
         abortAuto(AutoExitReason::StallTimeout);
@@ -158,21 +227,21 @@ void checkDriveStall(uint32_t nowMs) {
 
 void checkSerialAbort() {
     while (Serial.available() > 0) {
-        const int ch = Serial.peek();
+        const int ch = Serial.read();
+        if (ch < 0) {
+            break;
+        }
         if (ch == '!') {
-            (void)Serial.read();
             abortAuto(AutoExitReason::SerialEstop);
         }
         if (ch == 'u' || ch == 'U') {
-            (void)Serial.read();
             abortAuto(AutoExitReason::SerialUpload);
         }
         if (ch == 'x' || ch == 'X' || ch == ' ') {
-            (void)Serial.read();
             abortAuto(AutoExitReason::SerialStop);
         }
-        // Leave other Serial bytes intact for Auto block code that reads Serial.
-        break;
+        // Buffer non-abort bytes so stray CR/LF or keys never block emergency '!'/'x'/'u'.
+        pushSerialPassthrough(static_cast<uint8_t>(ch));
     }
 }
 
@@ -185,10 +254,10 @@ void pollExitControls(uint32_t nowMs) {
     if (btn.uploadRequested) {
         abortAuto(AutoExitReason::UploadCombo);
     }
-    if (btn.shortDown) {
+    if (btn.downPressEdge || btn.shortDown) {
         abortAuto(AutoExitReason::BtnEstop);
     }
-    if (s_sawUpReleased && btn.shortUp) {
+    if (s_sawUpReleased && (btn.shortUp || btn.autoStartRequested)) {
         abortAuto(AutoExitReason::BtnStop);
     }
 
@@ -214,6 +283,7 @@ void pollExitControls(uint32_t nowMs) {
     s_snap->ps2Sync      = s_lastFrame->syncByte;
     s_snap->ps2Ly        = s_lastFrame->ly;
     s_snap->ps2Rx        = s_lastFrame->rx;
+    s_snap->commHealthy  = s_io->commHealthy();
 
     if (RobotLogic::shouldAbortAutoMode(valid, s_lastFrame->cross)) {
         abortAuto(AutoExitReason::Ps2Cross);
@@ -247,6 +317,11 @@ AutoExitReason execute(MiniR4IO& io,
     s_autoStartMs            = startMs;
     s_lastOledAutoMs         = startMs;
     s_inYieldContext         = false;
+    s_driveTaskActive        = false;
+    s_expectWheelMotion      = false;
+    s_driveEncIdxL           = Config::kMotorLeftId - 1U;
+    s_driveEncIdxR           = Config::kMotorRightId - 1U;
+    clearSerialPassthrough();
     resetStallTracker(startMs);
     s_entryTrianglePending   = true;
     s_exitAfterLoopIteration = false;
@@ -276,6 +351,8 @@ AutoExitReason execute(MiniR4IO& io,
     s_running                = false;
     s_inService              = false;
     s_inYieldContext         = false;
+    s_driveTaskActive        = false;
+    s_expectWheelMotion      = false;
     s_entryTrianglePending   = false;
     s_exitAfterLoopIteration = false;
     s_oled                   = nullptr;
@@ -307,7 +384,7 @@ void service() {
         abortAuto(AutoExitReason::Timeout);
     }
 
-    if (!s_inYieldContext) {
+    if (!s_inYieldContext && !s_driveTaskActive) {
         resetStallTracker(nowMs);
     }
 
@@ -327,6 +404,7 @@ bool isRunning() {
 }
 
 void recordServoAngle(uint8_t channel, uint16_t angleDeg) {
+    s_yieldCalled = true;
     if (s_snap == nullptr) {
         return;
     }
@@ -363,13 +441,14 @@ const char* exitReasonStr(AutoExitReason reason) {
         case AutoExitReason::Timeout:      return "Auto timeout -> Manual ready";
         case AutoExitReason::StallTimeout: return "Wheel stall -> Manual ready";
         case AutoExitReason::UserExit:     return "autoExit() -> Manual ready";
+        case AutoExitReason::DriveInitFail: return "DriveDC init failed (STM32 comm) -> Manual ready";
         case AutoExitReason::None:
         default:                           return "Finished -> Manual ready";
     }
 }
 
 bool pollPs2ForAuto(Ps2Frame& outFrame, bool& outEntryTrianglePulse) {
-    s_yieldCalled = true;
+    s_pollPs2Called = true;
     service();
 
     outEntryTrianglePulse = false;
@@ -395,6 +474,69 @@ void notifyPs2TriangleMatched() {
     s_exitAfterLoopIteration = true;
 }
 
+void resolveDrivePolarity(uint8_t leftMotorID,
+                          uint8_t rightMotorID,
+                          bool& ioLeftReverse,
+                          bool& ioRightReverse) {
+    if (leftMotorID >= 1U && leftMotorID <= 4U) {
+        s_driveEncIdxL = static_cast<uint8_t>(leftMotorID - 1U);
+    }
+    if (rightMotorID >= 1U && rightMotorID <= 4U) {
+        s_driveEncIdxR = static_cast<uint8_t>(rightMotorID - 1U);
+    }
+    if (s_snap == nullptr) {
+        return;
+    }
+    RobotLogic::resolveAutoDrivePolarity(leftMotorID,
+                                         rightMotorID,
+                                         s_snap->leftReversed,
+                                         s_snap->rightReversed,
+                                         ioLeftReverse,
+                                         ioRightReverse);
+}
+
+void beginBlockingDriveTask(bool expectWheelMotion) {
+    s_yieldCalled       = true;
+    s_driveTaskActive   = true;
+    s_expectWheelMotion = expectWheelMotion;
+    resetStallTracker(millis());
+}
+
+void endBlockingDriveTask() {
+    s_driveTaskActive   = false;
+    s_expectWheelMotion = false;
+    s_hasEncBaseline    = false;
+    s_hasDegBaseline    = false;
+}
+
+void noteUserLoopActivity() {
+    s_yieldCalled = true;
+}
+
+int serialAvailable() {
+    service();
+    return static_cast<int>(s_serialCount);
+}
+
+int serialRead() {
+    service();
+    if (s_serialCount == 0U) {
+        return -1;
+    }
+    const uint8_t b = s_serialBuf[s_serialHead];
+    s_serialHead    = static_cast<uint8_t>((s_serialHead + 1U) % kSerialPassCap);
+    s_serialCount--;
+    return static_cast<int>(b);
+}
+
+int serialPeek() {
+    service();
+    if (s_serialCount == 0U) {
+        return -1;
+    }
+    return static_cast<int>(s_serialBuf[s_serialHead]);
+}
+
 } // namespace AutoMode
 
 bool autoShouldExit() {
@@ -405,6 +547,14 @@ bool autoShouldExit() {
 void autoExit() {
     if (AutoMode::isRunning()) {
         abortAuto(AutoExitReason::UserExit);
+    }
+    for (;;) {
+    }
+}
+
+void autoAbortDriveInit() {
+    if (AutoMode::isRunning()) {
+        abortAuto(AutoExitReason::DriveInitFail);
     }
     for (;;) {
     }

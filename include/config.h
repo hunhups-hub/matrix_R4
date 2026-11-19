@@ -22,7 +22,6 @@ constexpr uint32_t kSerialBaud               = 115200UL;
 constexpr uint32_t kControlPeriodMs          = 25UL;    // 40 Hz control loop
 constexpr uint32_t kButtonPollPeriodMs       = 25UL;    // Alternating UP/DOWN poll
 constexpr uint32_t kButtonUnhealthyPollPeriodMs = 250UL; // Throttled button polling when comm is unhealthy
-constexpr uint32_t kBatteryPollPeriodMs      = 100UL;   // STM32 voltage read period (active)
 constexpr uint32_t kLowerHealthIntervalMs    = 500UL;   // Idle STM32 health check period
 constexpr uint32_t kLowerFastHealthMs        = 100UL;   // Fast STM32 check while moving/healing
 constexpr uint32_t kLowerResyncConfigMs      = 2500UL;  // Periodic config defense vs silent brownout
@@ -59,6 +58,7 @@ constexpr int16_t  kMotorStictionMinPower  = 12;      // Coulomb static friction
 constexpr int16_t  kAngularAccelSlewStep   = 35;      // Rotational 2-DOF slew step
 constexpr int16_t  kAngularDecelSlewStep   = 60;      // Rotational 2-DOF braking slew step
 constexpr uint8_t  kCoMHighMinScalePct     = 65U;     // Min accel/centripetal scale when arm raised (RC2->0)
+constexpr int16_t  kCoMLowArmDeg           = 140;     // RC2 angle >= this has low CoM (100% dynamic scale)
 constexpr int16_t  kMicroTurnPower         = 26;      // D-Pad Left/Right fine alignment pivot power (%)
 constexpr bool     kEnableSmartHoldBrake   = true;    // Lock M1/M2 with H-bridge brake when stationary (0,0)
 constexpr int8_t   kMaxMotorTrimPct        = 15;      // Max straight-line L/R balance trim (+/-15%)
@@ -154,7 +154,7 @@ constexpr int16_t  kBattEmergDecelSlew     = 18;
 constexpr uint8_t  kBattCompMaxPct         = 115U;    // Bounded torque compensation cap
 
 // --- Serial Backup Manual Control -------------------------------------------
-constexpr int16_t  kSerialDefaultSpeed     = 100;     // Full 100% speed by default (15..100%)
+constexpr int16_t  kSerialDefaultSpeed     = 100;     // Full 100% speed by default (20..100%)
 constexpr int16_t  kSerialMinSpeed         = 20;
 constexpr int16_t  kSerialSpeedStep        = 15;
 constexpr uint32_t kSerialKeyHoldMs        = 650UL;   // Bridges OS key-repeat gap
@@ -165,6 +165,7 @@ constexpr uint32_t kLineTimeoutMs          = 1500UL;  // Expiration window for l
 constexpr uint32_t kButtonDebounceMs       = 30UL;
 constexpr uint32_t kUploadComboHoldMs      = 2500UL;
 constexpr uint32_t kAutoStartBtnHoldMs     = 1200UL;  // Single BTN_UP hold to start Auto without PS2
+constexpr uint32_t kAutoHoldBarDelayMs     = 250UL;   // Hold delay before showing BTN_UP->AUTO bar on OLED
 constexpr uint32_t kAutoMaxDurationMs      = 60000UL; // Max Auto safety duration (60s; 0 = unlimited)
 constexpr uint32_t kAutoOledRefreshMs      = 250UL;   // Live stopwatch OLED refresh during Auto
 constexpr uint32_t kAutoStallGraceMs       = 1250UL;  // Initial grace window per Auto command before stall check
