@@ -608,11 +608,6 @@ struct AutoSerialProxy {
 inline constexpr AutoMiniR4Proxy MiniR4{};
 inline constexpr AutoSerialProxy Serial{};
 
-// ============================================================================
-// >>>>> วางโค้ด AUTO จาก MATRIXblock R4 ด้านล่างนี้ได้เลย <<<<<
-// >>>>> PASTE MATRIXblock R4 AUTO CODE BELOW THIS LINE <<<<<
-// ============================================================================
-
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wreturn-type"
 #pragma GCC diagnostic ignored "-Wunused-variable"
@@ -623,6 +618,11 @@ inline constexpr AutoSerialProxy Serial{};
 #pragma GCC diagnostic ignored "-Wsign-compare"
 #pragma GCC diagnostic ignored "-Wtype-limits"
 #pragma GCC diagnostic ignored "-Wparentheses"
+
+// ============================================================================
+// >>>>> วางโค้ด AUTO จาก MATRIXblock R4 ด้านล่างนี้ได้เลย <<<<<
+// >>>>> PASTE MATRIXblock R4 AUTO CODE BELOW THIS LINE <<<<<
+// ============================================================================
 
 #define ENABLE_DRIVEDC_BRAKE_DELAY
 #include "MatrixMiniR4.h"
