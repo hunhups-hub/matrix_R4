@@ -118,11 +118,6 @@ constexpr uint32_t kAutoHoldBarDelayMs     = 250UL;   // หน่วงก่�
 constexpr uint32_t kAutoOledRefreshMs      = 250UL;   // รีเฟรช OLED นาฬิกาจับเวลาสดระหว่าง Auto
 constexpr uint32_t kAutoStallPollMs        = 200UL;   // คาบอ่านความคืบหน้า encoder ระหว่าง DriveDC แบบบล็อก
 
-// --- ชื่อโหมด Gyro ช่วย Auto (ค่าที่เลือกอยู่ใน user_settings.h: kAutoGyroMode) ---
-constexpr uint8_t  kAutoGyroOff                 = 0U;
-constexpr uint8_t  kAutoGyroStraightHold        = 1U;
-constexpr uint8_t  kAutoGyroStraightHoldAndTurn = 2U;
-
 // --- ดัชนีความน่าจะเป็นความเสถียรสด (0..100%) -------------------------------
 constexpr uint8_t  kStabilityLinkMaxPen      = 35U;
 constexpr uint8_t  kStabilityLinkDropPen     = 25U;

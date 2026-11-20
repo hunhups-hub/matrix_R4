@@ -13,21 +13,12 @@
 //   - โค้ดภารกิจ Auto จาก MATRIXblock R4            -> src/auto_block_code.cpp
 //   - คีย์พิมพ์ผ่าน Serial Monitor                  -> src/serial_control.cpp
 //   - พิน/คาบเวลา/ขีดจำกัดฮาร์ดแวร์                 -> include/config.h
-//  หลังแก้ ให้รัน:  pio test -e native  แล้ว  pio run -e uno_r4_wifi  (หรือ _field)
-//
-//  เปิดฟีเจอร์ Gyro/ตัดกำลัง/Heading Hold โดยไม่แก้ไฟล์: ใช้ env:uno_r4_wifi_field
-//  (platformio.ini ส่ง -DMATRIX_AUTO_GYRO_MODE=2 ฯลฯ ทับค่าด้านล่าง)
+//  หลังแก้ ให้รัน:  pio test -e native  แล้ว  pio run -e uno_r4_wifi
 // ============================================================================
 
-// ค่าที่ถูกทับตอน build (แฟลก -D ใน platformio.ini) ค่าเริ่มต้นปิดฟีเจอร์ Gyro ทั้งหมด
-#ifndef MATRIX_AUTO_GYRO_MODE
-#define MATRIX_AUTO_GYRO_MODE 0
-#endif
+// ค่าที่ถูกทับตอน build ได้ด้วยแฟลก -D ใน platformio.ini (ค่าเริ่มต้นปิดการตัดกำลังเมื่อล้อติด)
 #ifndef MATRIX_MANUAL_STALL_CUT
 #define MATRIX_MANUAL_STALL_CUT 0
-#endif
-#ifndef MATRIX_TELEOP_HEADING_HOLD
-#define MATRIX_TELEOP_HEADING_HOLD 0
 #endif
 
 namespace Config {
@@ -79,9 +70,6 @@ constexpr int16_t  kRc4L1Deg               = 30;      // L1 กดลง (30 อ
 constexpr int16_t  kRc4R1Deg               = 140;     // R1 ยกขึ้น / เก็บกลาง (140 องศา)
 constexpr int16_t  kRc4SquareDeg           = 30;      // Square สลับกดพื้น (30 องศา)
 constexpr bool     kRc4InvertDir           = true;    // กลับมุมที่ส่งออกฮาร์ดแวร์ของ RC4 (องศา -> 180 - องศา)
-constexpr bool     kEnableRc34CustomPulse  = true;    // ใช้ SetServoPulseRange เฉพาะ RC3 และ RC4
-constexpr uint16_t kRc34PulseMinUs         = 500U;    // พัลส์ต่ำสุดแบบกว้าง (us) ของ RC3/RC4
-constexpr uint16_t kRc34PulseMaxUs         = 2500U;   // พัลส์สูงสุดแบบกว้าง (us) ของ RC3/RC4
 
 // --- 3) แบตเตอรี่  นโยบายกำลังขับเมื่อไฟตก ---
 constexpr bool     kEnableBatterySagThrottle = false; // คงกำลังมอเตอร์และ slew 100% แม้แบตต่ำ
@@ -97,30 +85,11 @@ constexpr uint32_t kAutoStallGraceMs       = 1250UL;  // ช่วงผ่อ�
 constexpr uint32_t kAutoStallTimeoutMs     = 1600UL;  // ช่วงที่ล้อติดต่อเนื่องโดยเปลี่ยนน้อยกว่า kAutoStallMinDeltaDeg
 constexpr int32_t  kAutoStallMinDeltaDeg   = 3L;      // ค่าเปลี่ยนแปลง encoder ขั้นต่ำที่รีเซ็ตตัวจับเวลาล้อติด
 
-// --- 5) Gyro ช่วย Auto (IMU บนบอร์ด)  ปิดเป็นค่าเริ่มต้น  เปิดด้วย env:uno_r4_wifi_field ---
-// 0 = ปิด (MoveDegs ทำงานเหมือนเดิมทุกอย่าง)
-// 1 = วิ่งตรงด้วย MoveGyroDegs + จำทิศจริงจาก IMU หลังหมุน
-// 2 = ข้อ 1 + หมุนด้วย TurnGyro ไปมุมที่ปัดเป็นขั้น
-constexpr uint8_t  kAutoGyroMode           = MATRIX_AUTO_GYRO_MODE;  // เริ่มต้นปิด; env:uno_r4_wifi_field ตั้งเป็น 2 (ดู CLAUDE.md)
-constexpr int16_t  kAutoPivotWheelDegPerYawDegX100 = 283;   // องศาล้อต่อ yaw 1 องศา x100 (ภารกิจ: ล้อ 255 องศา ~ หมุน 90 องศา)
-constexpr int16_t  kAutoPivotYawSign       = 1;       // +1/-1: เครื่องหมาย yaw เมื่อล้อขวาไปหน้า ล้อซ้ายถอยหลัง
-constexpr int16_t  kAutoTurnSnapStepDeg    = 45;      // ปัดค่าประมาณการหมุนเป็นขั้นนี้ (<= 0 = ปิดการปัด)
-constexpr uint8_t  kAutoTurnGyroMode       = 1U;      // โหมด TurnGyro: 0 = มอเตอร์เดียว, 1 = สองมอเตอร์ (pivot)
-constexpr bool     kAutoMoveTelemetry      = true;    // พิมพ์บรรทัด [AUTO] หนึ่งบรรทัดต่อการสั่ง DriveDC หนึ่งครั้งทาง Serial
-
-// --- 6) ตัดกำลังเมื่อล้อติดขัดตอนขับ Manual  (ปิดเป็นค่าเริ่มต้น) ---
+// --- 5) ตัดกำลังเมื่อล้อติดขัดตอนขับ Manual  (ปิดเป็นค่าเริ่มต้น) ---
 constexpr bool     kEnableManualStallCut   = (MATRIX_MANUAL_STALL_CUT != 0);
 constexpr int16_t  kManualStallMinCmdPct   = 60;      // ตัดสินล้อติดเฉพาะเมื่อ |คำสั่งล้อ| >= ค่านี้
 constexpr int16_t  kManualStallRearmCmdPct = 15;      // คงสถานะตัดกำลังไว้จนกว่า |คำสั่ง| <= ค่านี้ (ก้านใกล้กลาง)
 constexpr uint32_t kManualStallTimeoutMs   = 1500UL;  // encoder ไม่ขยับนานเท่านี้ -> ตัดกำลัง
 constexpr uint32_t kManualStallPollMs      = 200UL;   // คาบอ่าน encoder (5 Hz) ขณะสั่งกำลังอยู่
-
-// --- 7) ล็อกทิศด้วย Gyro ตอนขับ Teleop  (ปิดเป็นค่าเริ่มต้น) ---
-constexpr bool     kEnableTeleopHeadingHold = (MATRIX_TELEOP_HEADING_HOLD != 0);
-constexpr uint32_t kTeleopHoldLatchDelayMs  = 250UL;  // ต้องโยกตรงนานเท่านี้ก่อนล็อกทิศ
-constexpr uint32_t kTeleopHoldPollMs        = 100UL;  // คาบอ่าน IMU (10 Hz) ขณะล็อกทิศ
-constexpr int16_t  kTeleopHoldDeadbandDeg   = 2;      // ไม่แก้ไขเมื่อ yaw คลาดเคลื่อนภายใน +/- ค่านี้
-constexpr int16_t  kTeleopHoldKpX10         = 15;     // % แก้การเลี้ยวต่อ yaw คลาดเคลื่อน 1 องศา x10
-constexpr int16_t  kTeleopHoldMaxCorrPct    = 15;     // ค่าแก้สูงสุดที่บวก/ลบต่อล้อ
 
 } // namespace Config

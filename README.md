@@ -21,7 +21,7 @@
    - การเปิดโปรเจกต์และการโหลด Toolchain อัตโนมัติ
    - การเรียกใช้งาน PlatformIO ผ่าน Terminal และ CLI
 5. [คู่มือการคอมไพล์ ทดสอบ และอัปโหลดโปรแกรม (Build, Test & Upload Step-by-Step)](#5-คู่มือการคอมไพล์-ทดสอบ-และอัปโหลดโปรแกรม-build-test--upload-step-by-step)
-   - 5.1 การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์ (`pio test -e native` — ครบ 44 รายการ 12 หมวดหมู่)
+   - 5.1 การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์ (`pio test -e native` — ครบ 40 รายการ 11 หมวดหมู่)
    - 5.2 การคอมไพล์โค้ดสำหรับฮาร์ดแวร์ (`pio run -e uno_r4_wifi`)
    - 5.3 การอัปโหลดเฟิร์มแวร์ลงบอร์ด (`pio run -e uno_r4_wifi --target upload`)
    - 5.4 ทางลัดเข้าสู่โหมดอัปโหลด Bootloader (Upload Bootloader Mode Shortcut)
@@ -186,7 +186,7 @@
 | **M3, M4** | Motor Driver | **มอเตอร์เสริม** | ขับด้วย STM32 (เฟิร์มแวร์สั่งล็อกกำลังเป็น 0 เพื่อความปลอดภัยที่จุดเริ่มต้นและหลังจบโหมด Auto) |
 | **RC1** | PWM Output | **เซอร์โวเสริม / มือจับ (Aux/Gripper)** | ควบคุมด้วย STM32 (ตอบสนองทันที 100%): ค่าเริ่มต้น `180°`, ปุ่ม `L2` = `180°` (กาง/เปิด), ปุ่ม `R2` = `0°` (หุบ/ปิด), ปุ่ม `Circle` = สลับท่าวาง `145°` / ท่าถือ `75°` |
 | **RC2** | PWM Output | **เซอร์โวยกแขน (Arm Lifter)** | ควบคุมด้วย STM32: ค่าเริ่มต้น `90°`, ปรับมุมด้วย D-Pad ขึ้น/ลง ทีละ `10°` (`kRc2InvertDir = true`: กด UP ลดองศาเพื่อยื่น/ยกแขน, กด DOWN เพิ่มองศาเพื่อดึงกลับ), ปุ่ม `Circle` = สลับท่าวาง `140°` / ท่าถือ `70°`, รองรับโหมดกวาดมุมสมูท `240°/s` (เปิด/ปิดด้วย `L3` หรือ `y`) |
-| **RC3** | PWM Output | **แขนหน้าซ้าย (Front Left)** | ควบคุมด้วย STM32 (ตอบสนองทันที 100%, ซิงก์ 1 เฟรมคู่ `RC4` ผ่าน `SetAllServoAngle` และตั้งช่วงพัลส์ `500–2500 µs`): ค่าเริ่มต้น `30°`, ปุ่ม `L1` = `30°` (ก้มลง), ปุ่ม `R1` = `140°` (ยกขึ้น), ปุ่ม `Square` = สลับดันพื้น `30°` / คืนค่าเดิม |
+| **RC3** | PWM Output | **แขนหน้าซ้าย (Front Left)** | ควบคุมด้วย STM32 (ตอบสนองทันที 100%): ค่าเริ่มต้น `30°`, ปุ่ม `L1` = `30°` (ก้มลง), ปุ่ม `R1` = `140°` (ยกขึ้น), ปุ่ม `Square` = สลับดันพื้น `30°` / คืนค่าเดิม |
 | **RC4** | PWM Output | **แขนหน้าขวา (Front Right)** | ควบคุมด้วย STM32 (ตอบสนองทันที 100%, ซิงก์ 1 เฟรมคู่ `RC3` และกลับทิศอัตโนมัติ `kRc4InvertDir = true`): ค่าเริ่มต้น `30°`, ปุ่ม `L1` = `30°` (ก้มลง), ปุ่ม `R1` = `140°` (ยกขึ้น), ปุ่ม `Square` = สลับดันพื้น `30°` / คืนค่าเดิม |
 | **BTN_UP** | User Input | **ปุ่มกดด้านบน (ID 2)** | กดสั้น: ปลด ESTOP หรือหยุดโหมด Auto / กดค้างเดี่ยว 1.2s: เริ่มโหมด Auto / กดค้างคู่ `BTN_DOWN` 2.5s: เข้า Bootloader |
 | **BTN_DOWN** | User Input | **ปุ่มกดด้านล่าง (ID 1)** | กดทันที (Rising-Edge 30 ms): สั่งหยุดฉุกเฉิน (ESTOP) ทันทีทั้งในโหมด Manual และ Auto โดยไม่ต้องรอปล่อยนิ้ว / กดค้างคู่ `BTN_UP` 2.5s: เข้า Bootloader |
@@ -327,16 +327,16 @@
 ```
 *(หรือพิมพ์ `pio test -e native` หากตั้งค่า Environment Path แล้ว)*
 
-**ผลลัพธ์ที่คาดหวัง**: ระบบจะรันชุดทดสอบ Unity Unit Tests ครบทั้ง **44 รายการ (12 หมวดหมู่)** โดยจะผ่านทั้งหมด (`[PASSED]`) 100% ภายในเวลาไม่กี่วินาที:
+**ผลลัพธ์ที่คาดหวัง**: ระบบจะรันชุดทดสอบ Unity Unit Tests ครบทั้ง **40 รายการ (11 หมวดหมู่)** โดยจะผ่านทั้งหมด (`[PASSED]`) 100% ภายในเวลาไม่กี่วินาที:
 ```text
 =================================== SUMMARY ===================================
 Environment    Test              Status    Duration
 -------------  ----------------  --------  ------------
 native         test_robot_logic  PASSED    00:00:02.729
-================= 44 test cases: 44 succeeded in 00:00:02.729 =================
+================= 40 test cases: 40 succeeded in 00:00:02.729 =================
 ```
 
-**คำอธิบายชุดทดสอบทั้ง 44 รายการ (12 หมวดหมู่หลัก)** ใน [test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp):
+**คำอธิบายชุดทดสอบทั้ง 40 รายการ (11 หมวดหมู่หลัก)** ใน [test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp):
 1. **การคำนวณจลนศาสตร์ล้อและการตัด Deadzone (Differential Drive Kinematics - 4 รายการ)**:
    - `test_axis_deadzone_and_extremes`: ตรวจสอบว่าช่วง Deadband ตรงกลางของจอยสติ๊ก (`109..146`) ตัดเป็น `0` อย่างสมบูรณ์ และเมื่อโยกสุดจะได้ `±100%` แน่นอน
    - `test_differential_drive_zero_speed_boundary`: ตรวจสอบว่าเมื่อขีดจำกัดความเร็วเป็น `0` หรือติดลบ มอเตอร์จะไม่ขยับหรือค่อยๆ ลดความเร็วสู่ `0`
@@ -382,18 +382,13 @@ native         test_robot_logic  PASSED    00:00:02.729
     - `test_persistent_config_crc16_pack_unpack`: ตรวจสอบการแพ็กและถอดรหัส `PersistentConfig` ขนาด 8 ไบต์พร้อม CRC-16-CCITT และการปฏิเสธข้อมูลที่บิตเพี้ยนหรือ EEPROM ว่าง (`0xFF`)
     - `test_auto_encoder_stall_progress_logic`: ตรวจสอบฟังก์ชัน `hasEncoderProgressed()` สำหรับตรวจจับความก้าวหน้าของ Encoder ล้อ (`>= 3°`) และ `resolveAutoDrivePolarity()` สำหรับซิงก์ทิศมอเตอร์ EEPROM เข้า `DriveDC`
     - `test_serial_phase2_trim_and_rc2_smooth_keys`: ตรวจสอบคีย์ลัด Serial `,`, `.`, `0` (Motor Trim) และ `y` (สลับโหมดสมูท `RC2`)
-    - `test_servo_direction_inversion`: ตรวจสอบฟังก์ชัน `applyServoDirection()` (`deg -> 180 - deg`), ความสมมาตรเมื่อแปลงกลับสองครั้ง, ค่าคงที่เริ่มต้นของ `RC3`/`RC4` และช่วงพัลส์ `kRc34PulseMinUs < kRc34PulseMaxUs`
+    - `test_servo_direction_inversion`: ตรวจสอบฟังก์ชัน `applyServoDirection()` (`deg -> 180 - deg`), ความสมมาตรเมื่อแปลงกลับสองครั้ง และค่าคงที่เริ่มต้นของ `RC3`/`RC4`
     - `test_kinodynamic_envelope_and_overflow_safety`: ตรวจสอบว่าไปป์ไลน์ 2-DOF Slew ไม่พุ่งเกินเพดาน Precision (`55%`) หรือ Battery Emergency (`35%`) เมื่อเปลี่ยนจากวิ่งตรงเป็นหมุนตัวทันที พร้อมตรวจป้องกัน `int16_t` overflow ใน `applyDriveTargetsWithSlew`, `applyAsymmetricSlewStep`, `slewServoAngle`, `applyMotorBalanceTrim` และความทนทานต่อ `nullptr` ใน `decodePs2Payload`
     - `test_serial_estop_batch_help_and_telemetry_fields`: ตรวจสอบว่า `!w` ในแบตช์เดียวกันยังหยุดมอเตอร์สนิท, ข้อความ Help แสดง `Aux RC1 180 / 0 deg` และ `v` ถูกต้อง, `printEvent(nullptr, nullptr)` ปลอดภัย และ Telemetry `[STAT]` แสดงฟิลด์ `rf=` และ `com=`
 
-11. **ตัวช่วยคำนวณมุมหันสำหรับ Auto Gyro Assist (Heading Math - 2 รายการ)**:
-    - `test_yaw_wrap_error_and_snap`: ตรวจสอบ `wrapYawDeg()` (ช่วง `-180..180`, ทนค่าสุดขอบ `INT32_MIN`), `yawErrorDeg()` ที่เลือกเส้นทางสั้นสุดข้ามรอยต่อ `±180`, และ `snapYawDeg()` ปัดมุมเข้าขั้น `45°`
-    - `test_pivot_yaw_estimate_and_move_classification`: ตรวจสอบ `estimatePivotYawDeg()` (ประมาณมุมหมุนจากองศาล้อ) และ `classifyAutoMove()` แยกคำสั่ง `MoveDegs` เป็น Straight / Pivot / Other
-12. **ตัดกำลังเมื่อล้อติดขัดโหมด Manual, Heading Hold ขณะขับ Teleop และการแก้ทิศ (Opt-in - 4 รายการ)**:
+11. **ตัดกำลังเมื่อล้อติดขัดโหมด Manual (Opt-in - 2 รายการ)**:
     - `test_manual_stall_detector_trip_rearm_and_fail_open`: ตรวจสอบ `ManualStallDetector` ตัดกำลังหลัง `kManualStallTimeoutMs`, ค้างสถานะจนปล่อยก้านโยก (re-arm) และไม่ตัดซ้ำทันที
     - `test_manual_stall_detector_progress_low_cmd_and_invalid_sample`: ตรวจสอบว่าล้อหมุนอยู่, คำสั่งต่ำกว่า `kManualStallMinCmdPct`, หรืออ่าน Encoder ไม่สำเร็จ จะไม่ตัดกำลัง (Fail-open)
-    - `test_heading_hold_correction_and_state_machine`: ตรวจสอบ `computeHeadingHoldCorrection()` (Deadband, สัดส่วน, Clamp, ข้ามรอยต่อ `±180`) และ `TeleopHeadingHold` (หน่วงก่อนล็อกมุม, ถือค่าระหว่างตัวอย่าง, ยกเลิกเมื่อเลี้ยว/IMU อ่านพลาด)
-    - `test_turn_correction_envelope_and_difference`: ตรวจสอบ `applyTurnCorrection()` ไม่ให้กำลังล้อเกินเพดานคำสั่งปัจจุบัน โดยยังรักษาผลต่างล้อซ้าย/ขวา
 
 ---
 
@@ -410,14 +405,6 @@ RAM:   [====      ]  43.9% (used 14396 bytes from 32768 bytes)
 Flash: [====      ]  41.5% (used 108820 bytes from 262144 bytes)
 ========================= [SUCCESS] Took 14.86 seconds =========================
 ```
-
----
-
-**บิลด์ทดสอบหน้างาน (`uno_r4_wifi_field`)**: เปิด Gyro Assist ใน Auto (โหมด 2), ตัดกำลังเมื่อล้อติดขัดใน Manual และ Heading Hold ตอนขับ Teleop โดยไม่ต้องแก้โค้ด (ส่ง `-DMATRIX_AUTO_GYRO_MODE=2 -DMATRIX_MANUAL_STALL_CUT=1 -DMATRIX_TELEOP_HEADING_HOLD=1`):
-```powershell
-& "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" run -e uno_r4_wifi_field --target upload
-```
-ขั้นตอนทดสอบ: ยกล้อลอยจากพื้น → รัน Auto แล้วดูบรรทัด `[AUTO] #n ... yaw= err=` ใน Serial Monitor → ตรวจว่าทิศของ `kAutoPivotYawSign` และโหมด `TurnGyro` ถูกต้อง → จูน `kAutoPivotWheelDegPerYawDegX100` → จึงค่อยขึ้นพื้นจริง ส่วนบิลด์แข่ง (`uno_r4_wifi`) ปิดฟีเจอร์เหล่านี้ทั้งหมดโดยค่าเริ่มต้น
 
 ---
 
@@ -849,7 +836,7 @@ Flash: [====      ]  41.5% (used 108820 bytes from 262144 bytes)
 ```text
 matrix_R4/
 ├── .gitignore                                  # [1] กฎการคัดออกไฟล์ชั่วคราวและ Build Artifacts จาก Git
-├── platformio.ini                              # [2] ไฟล์กำหนดค่าหลักของโปรเจกต์ PlatformIO (uno_r4_wifi, uno_r4_wifi_field และ native)
+├── platformio.ini                              # [2] ไฟล์กำหนดค่าหลักของโปรเจกต์ PlatformIO (uno_r4_wifi และ native)
 ├── README.md                                   # [3] คู่มือการใช้งานและเอกสารวิศวกรรมฉบับสมบูรณ์ภาษาไทย
 ├── CLAUDE.md                                   # [4] คำแนะนำสถาปัตยกรรมและกฎการแก้โค้ดสำหรับ Claude Code
 ├── MATRIX_MARC_READINESS.md                    # [5] รายงานประเมินความพร้อมเฟิร์มแวร์สำหรับการแข่งขัน Matrix MARC
@@ -861,7 +848,7 @@ matrix_R4/
 ├── include/                                    # ส่วนหัวโปรแกรม ประกาศ Interface, โครงสร้างข้อมูล และค่าที่ปรับได้ (11 ไฟล์)
 │   ├── README                                  # [10] คำอธิบายมาตรฐานของ PlatformIO สำหรับการใช้งาน Header Files
 │   ├── config.h                                # [11] พิน คาบเวลา และขีดจำกัดฮาร์ดแวร์ (แก้ไม่บ่อย)
-│   ├── user_settings.h                         # [12] ค่าที่ผู้ขับปรับได้: ความเร็ว expo slew มุมเซอร์โว นโยบายแบต เวลา Auto และสวิตช์ฟีเจอร์ gyro/stall
+│   ├── user_settings.h                         # [12] ค่าที่ผู้ขับปรับได้: ความเร็ว expo slew มุมเซอร์โว นโยบายแบต เวลา Auto และสวิตช์ฟีเจอร์ stall
 │   ├── controls.h                              # [13] แผนที่ปุ่ม PS2 -> ฟังก์ชัน (Controls::kXxx) และ Controls::held()
 │   ├── types.h                                 # [14] นิยามโครงสร้างข้อมูล (Enums, Structs) และสถานะระบบที่ใช้ร่วมกัน
 │   ├── robot_logic.h                           # [15] ประกาศฟังก์ชันอัลกอริทึมทั้งหมดของ RobotLogic (Pure C++11) อิมพลีเมนต์แยกใน 6 ไฟล์
@@ -874,7 +861,7 @@ matrix_R4/
 │   ├── main.cpp                                # [21] จุดเริ่มต้นโปรแกรม (setup/loop), 40 Hz Scheduler, Auto และ Bootloader
 │   ├── robot_logic.cpp                         # [22] [Pure] จลนพลศาสตร์การขับ, Slew, Sag และการคำนวณมอเตอร์
 │   ├── persistent_config.cpp                   # [23] [Pure] CRC-16 และแพ็ก/ถอดรหัส EEPROM
-│   ├── auto_heading.cpp                        # [24] [Pure] คณิตศาสตร์มุมหัน, ManualStallDetector, TeleopHeadingHold, applyTurnCorrection
+│   ├── auto_heading.cpp                        # [24] [Pure] ManualStallDetector และซิงก์ทิศมอเตอร์ Auto
 │   ├── servo_logic.cpp                         # [25] [Pure] เป้าหมายเซอร์โว, พรีเซ็ต, ท่ากลับทิศ
 │   ├── link_failsafe.cpp                       # [26] [Pure] ถอดรหัสแพ็กเก็ต PS2 และ FailsafeStateMachine
 │   ├── power_stability.cpp                     # [27] [Pure] BatteryStabilizer และ StabilityMonitor
@@ -889,13 +876,13 @@ matrix_R4/
 └── test/                                       # ส่วนการทดสอบซอฟต์แวร์อัตโนมัติ (Automated Unit Tests - 2 ไฟล์)
     ├── README                                  # [35] คำแนะนำมาตรฐานของ PlatformIO สำหรับ Test Runner และ Unit Testing
     └── test_robot_logic/
-        └── test_main.cpp                       # [36] ชุดแบบทดสอบอัตโนมัติ 44 รายการ บน Native Host ด้วย Unity
+        └── test_main.cpp                       # [36] ชุดแบบทดสอบอัตโนมัติ 40 รายการ บน Native Host ด้วย Unity
 ```
 
 > **อัปเดตโครงสร้าง**: `src/robot_logic.cpp` ถูกแยกเป็น 6 ไฟล์ลอจิกบริสุทธิ์ (Pure C++11, คอมไพล์ใน `env:native` ทั้งหมด) โดย `robot_logic.h` ยังเป็นอินเทอร์เฟซเดียวเหมือนเดิม:
 > - `robot_logic.cpp` — จลนพลศาสตร์การขับและ Slew
 > - `persistent_config.cpp` — CRC-16 และแพ็ก/ถอดรหัส EEPROM
-> - `auto_heading.cpp` — คณิตศาสตร์มุมหัน, `ManualStallDetector`, `TeleopHeadingHold`, `applyTurnCorrection`, ซิงก์ทิศมอเตอร์ Auto
+> - `auto_heading.cpp` — `ManualStallDetector`, ซิงก์ทิศมอเตอร์ Auto
 > - `servo_logic.cpp` — เป้าหมายเซอร์โว, พรีเซ็ต, ท่ากลับทิศ
 > - `link_failsafe.cpp` — ถอดรหัสแพ็กเก็ต PS2 และ `FailsafeStateMachine`
 > - `power_stability.cpp` — `BatteryStabilizer` และ `StabilityMonitor`
@@ -915,7 +902,7 @@ matrix_R4/
 2. **`[env:native]` (Target จำลองบนคอมพิวเตอร์โฮสต์)**:
    - `platform = native`, `platform_packages = platformio/toolchain-gccmingw32@^1.40900.0`
    - `build_flags = -std=c++11 -Wall -Wextra -Werror -Iinclude`
-   - `build_src_filter` รวม 7 ไฟล์ (`robot_logic`, `persistent_config`, `auto_heading`, `servo_logic`, `link_failsafe`, `power_stability`, `serial_control`) และ `test_build_src = yes`: ดึงโมดูลลอจิกบริสุทธิ์และตัวแยกคำสั่ง Serial มาคอมไพล์รันชุดทดสอบทั้ง 44 ข้อบนคอมพิวเตอร์ได้โดยตรงโดยไม่ต้องต่อบอร์ดจริง
+   - `build_src_filter` รวม 7 ไฟล์ (`robot_logic`, `persistent_config`, `auto_heading`, `servo_logic`, `link_failsafe`, `power_stability`, `serial_control`) และ `test_build_src = yes`: ดึงโมดูลลอจิกบริสุทธิ์และตัวแยกคำสั่ง Serial มาคอมไพล์รันชุดทดสอบทั้ง 40 ข้อบนคอมพิวเตอร์ได้โดยตรงโดยไม่ต้องต่อบอร์ดจริง
 
 ##### 7.2.2 [README.md](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/README.md) — คู่มือการใช้งานและเอกสารวิศวกรรมฉบับสมบูรณ์ภาษาไทย
 ไฟล์เอกสารคู่มือฉบับสมบูรณ์ที่คุณกำลังอ่านอยู่นี้ ครอบคลุมตั้งแต่สถาปัตยกรรมระบบ, ผังพิน, การติดตั้ง PlatformIO, คู่มือการบังคับด้วยจอยสติ๊กและคีย์บอร์ด, การวางโค้ดโหมดอัตโนมัติจาก MATRIXblock R4, แบบจำลองฟิสิกส์จลนพลศาสตร์ 5 ขั้นตอน, คำอธิบายโค้ดครบทั้ง 36 ไฟล์ ไปจนถึงการแก้ไขปัญหาหน้างาน
@@ -959,7 +946,7 @@ matrix_R4/
 - พารามิเตอร์มอเตอร์ `M1`/`M2` และพารามิเตอร์ฟิสิกส์จลนพลศาสตร์ (`kThrottleExpoPct`, `kTurnExpoPct`, `kMaxCentripetalLatAccel`, `kMotorStictionMinPower`, `kCoMHighMinScalePct`, `kCoMLowArmDeg`, `kMicroTurnPower`, `kEnableSmartHoldBrake`, `kMaxMotorTrimPct`)
 - แอดเดรสและส่วนหัวของ EEPROM (`kEepromConfigAddr = 128`, Magic `'M'`, `'R'`, Version `1`)
 - พินและไทม์มิ่งของไดรเวอร์จอยสติ๊ก PS2 (`D11`, `D4`, `D12`, `D5`, Mode `0x73`, Sync `0x5A`, Deadzone `18`)
-- มุมเริ่มต้นและมุม Preset ของเซอร์โว `RC1..RC4` (ค่าเริ่มต้น `RC1=180°, RC2=90°, RC3=30°, RC4=30°`, ท่า Hold/Drop ของปุ่ม `Circle`, ท่าดันพื้น `30°` ของปุ่ม `Square`, อัตราการกวาดมุมสมูทของ `RC2` ที่ `6°/25ms`, ช่วงพัลส์ `kEnableRc34CustomPulse` และ `kRc3InvertDir`/`kRc4InvertDir`)
+- มุมเริ่มต้นและมุม Preset ของเซอร์โว `RC1..RC4` (ค่าเริ่มต้น `RC1=180°, RC2=90°, RC3=30°, RC4=30°`, ท่า Hold/Drop ของปุ่ม `Circle`, ท่าดันพื้น `30°` ของปุ่ม `Square`, อัตราการกวาดมุมสมูทของ `RC2` ที่ `6°/25ms` และ `kRc3InvertDir`/`kRc4InvertDir`)
 - เกณฑ์แรงดันแบตเตอรี่ (`kPowerFullVolt`, `kPowerCutoffVolt`, `kEnableBatterySagThrottle`) และความเร็วเริ่มต้นของ Serial (`kSerialDefaultSpeed = 100%`)
 - ค่าคงที่ของโหมด Auto (`kAutoStartBtnHoldMs = 1200 ms`, `kAutoHoldBarDelayMs = 250 ms`, `kAutoMaxDurationMs = 60000 ms`, และพารามิเตอร์ตรวจจับล้อติดขัด `kAutoStallGraceMs`, `kAutoStallTimeoutMs`, `kAutoStallMinDeltaDeg`)
 - น้ำหนักคะแนนหักสำหรับดัชนีความเสถียร (`StabilityMonitor`)
@@ -995,7 +982,7 @@ matrix_R4/
 ##### 7.2.14 [include/minir4_io.h](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/minir4_io.h) — ประกาศคลาสติดต่อฮาร์ดแวร์บอร์ด Carrier, ชิป STM32 และ EEPROM
 ประกาศคลาส `MiniR4IO` ทำหน้าที่เป็น Hardware Abstraction Layer (HAL):
 - ควบคุมมอเตอร์ (`applyMotors`, `forceMotorsStop`, `isBrakeEngaged`) พร้อมระบบเบรกแม่เหล็กไฟฟ้า H-Bridge
-- ควบคุมเซอร์โว (`applyServos`, `setRc2SmoothEnabled`, `syncServoCache`, `servoRangeErr`) พร้อมตัวช่วยตั้งพัลส์ `configureRc34PulseRange()` และสตาร์ตเซอร์โวที่จุดบูต `staggerBootServos()`
+- ควบคุมเซอร์โว (`applyServos`, `setRc2SmoothEnabled`, `syncServoCache`, `servoRangeErr`) และสตาร์ตเซอร์โวที่จุดบูต `staggerBootServos()`
 - กู้คืนฮาร์ดแวร์หลังจบโหมด Auto (`restoreAfterAuto`)
 - อ่านและบันทึกข้อมูลการตั้งค่าลง EEPROM (`loadConfigFromEeprom`, `saveConfigToEeprom`)
 - โพลปุ่มกดแบบสลับฝั่ง (`pollButtons`) และตรวจสอบ/ฟื้นฟูชิป STM32 อัตโนมัติ (`verifyAndHealLowerMcu`)
@@ -1038,10 +1025,10 @@ matrix_R4/
 ##### 7.2.21 [src/minir4_io.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/minir4_io.cpp) — อิมพลีเมนต์การสื่อสาร STM32 UART, Smart Hold-Brake, RC2 Smooth Slew และ EEPROM
 อิมพลีเมนต์การเชื่อมต่อกับชุดขับกำลังสูงและหน่วยความจำบนบอร์ด:
 - สั่งงานมอเตอร์พร้อมระบบ **Smart Hold-Brake** (`MiniR4.M1.setBrake(true)` / `MiniR4.M2.setBrake(true)`) เมื่อความเร็วเป็น `(0, 0)`, สั่งหยุดฉุกเฉิน `forceMotorsStop()` ทันทีโดยไม่ติดตัวหน่วงเวลาเมื่อการสื่อสารปกติ (หรือเมื่อบังคับก่อนเข้า Bootloader), และชะลอจังหวะ retry หลัง timeout จริง (`100 ms` แบบ wrap-safe) เมื่อ UART มีปัญหา
-- สั่งงานเซอร์โวทั้ง 4 ช่อง โดยใช้ `RobotLogic::slewServoAngle()` เฉพาะกับช่อง `RC2` เมื่อเปิดโหมดสมูท (`rc2SmoothEnabled_`) ส่งคำสั่งทันทีสำหรับ `RC1`, `RC3`, `RC4` พร้อมส่ง `RC3+RC4` ในเฟรมเดียวแบบ Atomic ด้วย `mmL.SetAllServoAngle()` ทั้งตอนเปิดเครื่อง (`staggerBootServos`) และตอนใช้งานเพื่อไม่ให้แขนหน้าบิดเหลื่อมเวลา พร้อมตั้งช่วงพัลส์ `SetServoPulseRange` เฉพาะช่อง `3`/`4` (`500–2500 µs` พร้อม fallback `544–2400` / `600–2400 µs`) และกลับทิศด้วย `applyServoDirection()`
+- สั่งงานเซอร์โวทั้ง 4 ช่อง โดยใช้ `RobotLogic::slewServoAngle()` เฉพาะกับช่อง `RC2` เมื่อเปิดโหมดสมูท (`rc2SmoothEnabled_`) ส่งคำสั่งทันทีสำหรับ `RC1`, `RC3`, `RC4` ทีละช่อง (หยุดที่ช่องแรกที่ส่งไม่สำเร็จ) ทั้งตอนเปิดเครื่อง (`staggerBootServos`) และตอนใช้งาน และกลับทิศด้วย `applyServoDirection()`
 - อ่านและเขียน EEPROM ที่แอดเดรส `128` แบบตรวจสอบไบต์ที่เปลี่ยน
 - อ่านปุ่มกด `BTN_UP`/`BTN_DOWN` แบบสลับรอบเพื่อประหยัดเวลา UART (ลดความถี่เป็น `250 ms` และล้างสถานะปุ่มค้างทันทีเมื่อ UART ขัดข้องเพื่อป้องกันการลั่น Bootloader/Auto จากค่าค้าง) พร้อมตรวจจับการกดฉุกเฉินทันที (`downPressEdge`), การกดค้างเดี่ยว `BTN_UP` 1.2 วินาทีเพื่อเข้าโหมด Auto, และการกดค้างคู่ 2.5 วินาทีเพื่อเข้า Bootloader
-- กู้คืนการตั้งค่าพินจอย PS2 ผ่าน `ps2_.restorePins()`, ช่วงความเร็ว `SetDCMotorSpeedRange(1/2, 0, 100)`, รีซิงก์พัลส์เซอร์โว (`rc34PulseSynced_ = false`) และทิศทางมอเตอร์หลังจบโหมด Auto (`restoreAfterAuto`)
+- กู้คืนการตั้งค่าพินจอย PS2 ผ่าน `ps2_.restorePins()`, ช่วงความเร็ว `SetDCMotorSpeedRange(1/2, 0, 100)`, และทิศทางมอเตอร์หลังจบโหมด Auto (`restoreAfterAuto`)
 
 ##### 7.2.22 [src/ps2_driver.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/ps2_driver.cpp) — อิมพลีเมนต์โพรโทคอล Bit-bang SPI ผ่านรีจิสเตอร์ฮาร์ดแวร์โดยตรง
 อิมพลีเมนต์ไดรเวอร์ความเร็วสูงสำหรับอ่านค่าตัวรับจอยสติ๊กไร้สายบนชิป Renesas RA4M1:
@@ -1081,8 +1068,8 @@ matrix_R4/
 ##### 7.2.27 [test/README](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/README) — คู่มือมาตรฐาน PlatformIO สำหรับระบบรันการทดสอบ Unit Testing
 เอกสารคำแนะนำมาตรฐานของ PlatformIO สำหรับการสร้างและรันชุดแบบทดสอบ Unit Testing
 
-##### 7.2.28 [test/test_robot_logic/test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp) — ตัวรันชุดแบบทดสอบ Unity Unit Tests ครบทั้ง 44 รายการ (12 หมวดหมู่) บน Native Host
-ไฟล์ชุดแบบทดสอบอัตโนมัติขนาดกว่า 1,900 บรรทัดที่ใช้เฟรมเวิร์ก Unity Test Framework ตรวจสอบความถูกต้องของอัลกอริทึมทุกส่วนในโปรเจกต์ครบทั้ง 44 รายการ (ดูรายละเอียดทั้ง 44 รายการได้ในหัวข้อ [5.1](#51-การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์-pio-test--e-native))
+##### 7.2.28 [test/test_robot_logic/test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp) — ตัวรันชุดแบบทดสอบ Unity Unit Tests ครบทั้ง 40 รายการ (11 หมวดหมู่) บน Native Host
+ไฟล์ชุดแบบทดสอบอัตโนมัติขนาดกว่า 1,900 บรรทัดที่ใช้เฟรมเวิร์ก Unity Test Framework ตรวจสอบความถูกต้องของอัลกอริทึมทุกส่วนในโปรเจกต์ครบทั้ง 40 รายการ (ดูรายละเอียดทั้ง 40 รายการได้ในหัวข้อ [5.1](#51-การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์-pio-test--e-native))
 
 ---
 
@@ -1161,8 +1148,6 @@ flowchart TD
 | `kRc2InvertDir` | `true` | bool | กลับทิศปุ่ม D-Pad ของ `RC2` (กด UP ลดองศา, กด DOWN เพิ่มองศา) |
 | `kRc2PresetHoldDeg` / `DropDeg` | `70` / `140` | deg | มุมเซอร์โว `RC2` สำหรับท่าถือเก็บ (`70°`) และท่าวางปล่อย (`140°`) เมื่อกดปุ่ม `Circle` |
 | `kRc2SmoothStepDeg` / `Default` | `6` / `true` | deg/tick | ก้าวการกวาดมุมสมูทของ `RC2` (`6°/25ms = 240°/s`) และค่าเริ่มต้นเปิดใช้งาน |
-| `kEnableRc34CustomPulse` | `true` | bool | เปิดตั้งช่วงพัลส์ `SetServoPulseRange` เฉพาะ `RC3` และ `RC4` |
-| `kRc34PulseMinUs` / `MaxUs` | `500` / `2500` | µs | ช่วงความกว้างพัลส์เป้าหมายสำหรับ `RC3`/`RC4` (fallback อัตโนมัติไป `544–2400` / `600–2400` หาก STM32 จำกัดช่วง) |
 | `kRc3InitDeg` / `kRc4InitDeg` | `30` | deg | มุมเริ่มต้นของแขนหน้าซ้าย `RC3` และขวา `RC4` |
 | `kRc3L1Deg` / `kRc4L1Deg` | `30` | deg | มุมก้มแขนหน้าลงเมื่อกดปุ่ม `L1` |
 | `kRc3R1Deg` / `kRc4R1Deg` | `140` | deg | มุมยกแขนหน้าขึ้นเมื่อกดปุ่ม `R1` |
@@ -1175,16 +1160,9 @@ flowchart TD
 | `kAutoHoldBarDelayMs` | `250` | ms | เวลาหน่วงก่อนแสดงแถบกราฟิก `Hold UP->AUTO` บนจอ OLED |
 | `kAutoMaxDurationMs` | `60000` | ms | เวลาทำงานสูงสุดของโหมด Auto เพื่อความปลอดภัย (60 วินาที; ตั้ง `0` หากไม่จำกัด) |
 | `kAutoStallGraceMs` / `TimeoutMs`| `1250` / `1600` | ms | เวลาผ่อนผันเริ่มต้น (`1.25s`) และเวลาตรวจจับล้อติดขัดต่อเนื่อง (`1.6s`) ในโหมด Auto |
-| `kAutoGyroMode` | `0` (Off) | enum | โหมด Gyro Assist ใน Auto: `0`=Off (เหมือนเดิม), `1`=StraightHold (วิ่งตรงด้วย `MoveGyroDegs`), `2`=StraightHoldAndTurn (หมุนด้วย `TurnGyro`) — ต้องตรวจเครื่องหมาย/โหมดบนหุ่นจริงก่อนเปิด |
-| `kAutoPivotWheelDegPerYawDegX100` / `kAutoPivotYawSign` | `283` / `1` | x100 / sign | องศาล้อต่อ 1° yaw (x100) และทิศ yaw เมื่อล้อขวาเดินหน้า ใช้ประมาณมุมเลี้ยว |
-| `kAutoTurnSnapStepDeg` / `kAutoTurnGyroMode` | `45` / `1` | deg / mode | ขั้นปัดมุมเป้าหมาย (`<= 0` = ไม่ปัด) และโหมด `TurnGyro` (`0`=ล้อเดียว, `1`=สองล้อ) |
-| `kAutoMoveTelemetry` | `true` | bool | พิมพ์บรรทัด `[AUTO] #n ...` ทุกคำสั่งขับใน Auto (เมื่อ Gyro Assist ทำงาน) |
 | `kEnableManualStallCut` | `false` | bool | ตัดกำลังเมื่อล้อติดขัดขณะขับ Manual (ปิดไว้เพราะการแข่งดันต้องใช้แรงบิดเต็ม) |
 | `kManualStallMinCmdPct` / `RearmCmdPct` | `60` / `15` | % | กำลังสั่งขั้นต่ำเพื่อตรวจติดขัด / ระดับที่ปลดล็อกการตัด |
 | `kManualStallTimeoutMs` / `PollMs` | `1500` / `200` | ms | เวลาไม่มีความคืบหน้าของ Encoder ก่อนตัด / คาบอ่าน Encoder |
-| `kEnableTeleopHeadingHold` | `false` | bool | ล็อกทิศด้วย Gyro เมื่อดันคันเร่งโดยไม่เลี้ยว |
-| `kTeleopHoldLatchDelayMs` / `PollMs` | `250` / `100` | ms | เวลาขับตรงก่อนล็อกมุม / คาบอ่าน IMU |
-| `kTeleopHoldDeadbandDeg` / `KpX10` / `MaxCorrPct` | `2` / `15` / `15` | deg / x10 / % | Deadband, อัตราขยายแก้มุม (%/° x10) และเพดานแก้ต่อล้อ |
 
 ---
 
@@ -1198,7 +1176,7 @@ flowchart TD
 | คีย์ที่พิมพ์ใน Serial Monitor | [src/serial_control.cpp](src/serial_control.cpp) | สวิตช์ `case 'w':` ฯลฯ |
 | พิน คาบเวลา ขีดจำกัดฮาร์ดแวร์ | [include/config.h](include/config.h) | `kControlPeriodMs`, `kPs2ClkPin` |
 
-หลังแก้ให้รัน `pio test -e native` แล้ว `pio run -e uno_r4_wifi` (หรือ `uno_r4_wifi_field` สำหรับบิลด์ทดสอบ Gyro) ตารางพารามิเตอร์ในหัวข้อ 7.4 ด้านบนยังใช้ชื่อค่าคงที่เดิมทุกตัว เพียงแต่ค่าที่ปรับบ่อยย้ายไปอยู่ใน `user_settings.h`
+หลังแก้ให้รัน `pio test -e native` แล้ว `pio run -e uno_r4_wifi` ตารางพารามิเตอร์ในหัวข้อ 7.4 ด้านบนยังใช้ชื่อค่าคงที่เดิมทุกตัว เพียงแต่ค่าที่ปรับบ่อยย้ายไปอยู่ใน `user_settings.h`
 
 ---
 
@@ -1280,7 +1258,7 @@ flowchart TD
 
 ## 9. สรุปการยกระดับความปลอดภัยและความเสถียรล่าสุด (Security & Stability Hardening Summary)
 
-รายการปรับปรุงสำคัญจากการตรวจสอบโค้ดและฮาร์ดแวร์ครบทั้ง 36 ไฟล์ (ผ่าน `pio run -e uno_r4_wifi`, `pio test -e native` 44/44 เคส, และ `pio check` `0 HIGH, 0 MEDIUM` ใน `src/`):
+รายการปรับปรุงสำคัญจากการตรวจสอบโค้ดและฮาร์ดแวร์ครบทั้ง 36 ไฟล์ (ผ่าน `pio run -e uno_r4_wifi`, `pio test -e native` 40/40 เคส, และ `pio check` `0 HIGH, 0 MEDIUM` ใน `src/`):
 
 | หมวดงาน | ไฟล์หลักที่ปรับปรุง | สิ่งที่แก้ไขและพัฒนา |
 | :--- | :--- | :--- |

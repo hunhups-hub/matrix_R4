@@ -41,9 +41,7 @@ RobotLogic::FailsafeStateMachine g_linkSm;
 RobotLogic::BatteryStabilizer    g_battStab;
 RobotLogic::StabilityMonitor     g_stabMon;
 RobotLogic::ManualStallDetector  g_stallDet;
-RobotLogic::TeleopHeadingHold    g_headingHold;
 uint32_t                         g_lastStallPollMs = 0;
-uint32_t                         g_lastHoldPollMs  = 0;
 
 SystemSnapshot   g_snap{};
 Ps2Frame         g_lastPs2Frame{};
@@ -123,34 +121,10 @@ void maybeCutStalledDrive(uint32_t nowMs) {
     }
 }
 
-/** Sends the current drive output; turnCorrPct (heading hold) is added on top without touching g_snap.drive. */
-void applyDriveToMotors(uint32_t nowMs, int16_t turnCorrPct = 0) {
+/** Sends the current drive output to the motors. */
+void applyDriveToMotors(uint32_t nowMs) {
     maybeCutStalledDrive(nowMs);
-    int16_t left  = g_snap.drive.left;
-    int16_t right = g_snap.drive.right;
-    RobotLogic::applyTurnCorrection(
-        left, right, static_cast<int16_t>(turnCorrPct * Config::kAutoPivotYawSign));
-    g_io.applyMotors(left, right, Config::kEnableSmartHoldBrake, nowMs);
-}
-
-/**
- * Opt-in (Config::kEnableTeleopHeadingHold): when the driver pushes throttle with no turn input,
- * returns a gyro correction (percent turn) that keeps the latched heading. 0 when not holding.
- */
-int16_t updateHeadingHold(uint32_t nowMs, const Ps2Frame& f, bool microLeft, bool microRight) {
-    const bool throttle = RobotLogic::computeAxisWithDeadzone(f.ly) != 0;
-    const bool turning  = RobotLogic::computeAxisWithDeadzone(f.rx) != 0 || microLeft || microRight;
-    const bool straight = throttle && !turning;
-
-    bool    fresh = false;
-    bool    valid = false;
-    int16_t yaw   = 0;
-    if (straight && static_cast<uint32_t>(nowMs - g_lastHoldPollMs) >= Config::kTeleopHoldPollMs) {
-        g_lastHoldPollMs = nowMs;
-        fresh            = true;
-        valid            = g_io.readYawDeg(nowMs, yaw);
-    }
-    return g_headingHold.update(straight, fresh, valid, yaw, nowMs);
+    g_io.applyMotors(g_snap.drive.left, g_snap.drive.right, Config::kEnableSmartHoldBrake, nowMs);
 }
 
 /** Effective max drive power = min(mode cap [precision/normal], battery power cap). */
@@ -628,7 +602,6 @@ void runAutoSession(uint32_t nowMs) {
 
     g_io.restoreAfterAuto(exitMs);
     g_stallDet.reset();
-    g_headingHold.reset();
     g_snap.drive           = {0, 0};
     g_snap.holdBrakeActive = g_io.isBrakeEngaged();
     g_snap.comboHolding    = false;
@@ -809,7 +782,6 @@ bool driveFromPs2(uint32_t nowMs, LinkState prevLink, bool valid, const MotorPow
 
     if (!valid) {
         // Brief wireless glitch (<100ms): preserve last safe drive & servo state without overwrite.
-        g_headingHold.reset();
         applyDriveToMotors(nowMs);
         return false;
     }
@@ -843,9 +815,7 @@ bool driveFromPs2(uint32_t nowMs, LinkState prevLink, bool valid, const MotorPow
                                                                 microRight,
                                                                 g_snap.motorTrimPct,
                                                                 g_snap.precisionMode);
-    const int16_t holdCorrPct =
-        Config::kEnableTeleopHeadingHold ? updateHeadingHold(nowMs, f, microLeft, microRight) : 0;
-    applyDriveToMotors(nowMs, holdCorrPct);
+    applyDriveToMotors(nowMs);
     return true;
 }
 
@@ -870,7 +840,6 @@ void driveCoastToStop(uint32_t nowMs, const MotorPowerProfile& pwr) {
  */
 bool arbitrateDrive(uint32_t nowMs, LinkState prevLink, bool valid, const MotorPowerProfile& pwr) {
     bool ps2ServosUpdated = false;
-    bool ps2Drive         = false;
     if (g_snap.sysState == SystemState::Estop) {
         driveEstop(nowMs);
     } else if (g_linkSm.isFailsafe()) {
@@ -880,13 +849,9 @@ bool arbitrateDrive(uint32_t nowMs, LinkState prevLink, bool valid, const MotorP
     } else if (g_serialDrive.latched) {
         driveFromSerial(nowMs, pwr);
     } else if (g_linkSm.isOperational()) {
-        ps2Drive         = true;
         ps2ServosUpdated = driveFromPs2(nowMs, prevLink, valid, pwr);
     } else {
         driveCoastToStop(nowMs, pwr);
-    }
-    if (!ps2Drive) {
-        g_headingHold.reset(); // Any non-PS2 source ends the hold; it re-latches on the next straight run.
     }
     g_snap.holdBrakeActive = g_io.isBrakeEngaged();
     return ps2ServosUpdated;

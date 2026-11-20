@@ -153,26 +153,6 @@ void resolveAutoDrivePolarity(uint8_t leftMotorID,
                               bool& ioLeftReverse,
                               bool& ioRightReverse);
 
-/** Wraps any yaw angle (deg) into [-180, 180]. */
-int16_t wrapYawDeg(int32_t yawDeg);
-
-/** Shortest signed error (deg, [-180, 180]) from actualYawDeg to targetYawDeg. */
-int16_t yawErrorDeg(int16_t targetYawDeg, int16_t actualYawDeg);
-
-/** Rounds yawDeg to the nearest multiple of stepDeg (ties away from 0); stepDeg <= 0 returns yawDeg. */
-int16_t snapYawDeg(int16_t yawDeg, int16_t stepDeg);
-
-/**
- * Estimates yaw change (deg) of a pivot MoveDegs(left, right, wheelDegs): applies when
- * left == -right != 0. Returns 0 for any other power pair or zero degrees.
- * Positive result = Config::kAutoPivotYawSign direction (right wheel forward).
- */
-int16_t estimatePivotYawDeg(int16_t leftPower, int16_t rightPower, uint16_t wheelDegs);
-
-/** Classification of a pasted MoveDegs(left, right, ...) for gyro assist. */
-enum class AutoMoveKind : uint8_t { Other = 0, Straight, Pivot };
-AutoMoveKind classifyAutoMove(int16_t leftPower, int16_t rightPower, uint16_t wheelDegs);
-
 /**
  * Manual-drive wheel stall detector (opt-in via Config::kEnableManualStallCut).
  * Trips when |wheel cmd| >= kManualStallMinCmdPct and no encoder progress for kManualStallTimeoutMs.
@@ -201,44 +181,6 @@ private:
     int32_t  prevRight_  = 0;
     uint32_t lastMoveMs_ = 0UL;
 };
-
-/**
- * Proportional heading-hold correction (percent turn power): kTeleopHoldKpX10/10 % per degree of
- * yaw error (target - actual), zero inside kTeleopHoldDeadbandDeg, clamped to +/-kTeleopHoldMaxCorrPct.
- * Positive result = rotate toward increasing yaw.
- */
-int16_t computeHeadingHoldCorrection(int16_t targetYawDeg, int16_t actualYawDeg);
-
-/**
- * Teleop heading hold (opt-in via Config::kEnableTeleopHeadingHold). Latches the IMU yaw after
- * kTeleopHoldLatchDelayMs of straight-only input, then returns a turn correction until the
- * driver turns, stops, or an IMU read fails (fail open: correction 0).
- */
-class TeleopHeadingHold {
-public:
-    void reset();
-    int16_t update(bool straightCmd,
-                   bool sampleFresh,
-                   bool sampleValid,
-                   int16_t yawDeg,
-                   uint32_t nowMs);
-    bool latched() const { return latched_; }
-
-private:
-    bool     straight_      = false;
-    bool     latched_       = false;
-    int16_t  targetYawDeg_  = 0;
-    int16_t  corrPct_       = 0;
-    uint32_t straightSince_ = 0UL;
-};
-
-/**
- * Adds a turn correction to a wheel pair without exceeding the current command envelope
- * (max(|left|, |right|)). corrPct > 0 drives the right wheel forward and the left wheel back.
- * Overflow on one wheel is moved onto the other so the L/R difference (the turn) is preserved.
- * Unchanged when both wheels are 0 or corrPct is 0.
- */
-void applyTurnCorrection(int16_t& left, int16_t& right, int16_t corrPct);
 
 /** Steps the D-pad (RC2) servo angle within safe mechanical bounds. */
 int16_t computeArmStep(int16_t currentDeg, bool upPressed, bool downPressed);

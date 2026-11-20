@@ -21,11 +21,10 @@ carrier, using the `matrix-robotics/MatrixMiniR4@^1.2.6` library.
 
 ```powershell
 $pio = "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe"
-& $pio test -e native                          # Unity host tests, expect 44/44 pass
+& $pio test -e native                          # Unity host tests, expect 40/40 pass
 & $pio test -e native -f test_robot_logic      # the only test suite
 & $pio run -e uno_r4_wifi                      # firmware build, -Werror on src/
-& $pio run -e uno_r4_wifi --target upload      # flash board (competition build, gyro features off)
-& $pio run -e uno_r4_wifi_field --target upload  # bench/field-test build: gyro Auto + stall cut + heading hold ON
+& $pio run -e uno_r4_wifi --target upload      # flash board
 & $pio device monitor -b 115200                # serial CLI and telemetry
 & $pio check -e uno_r4_wifi --skip-packages    # cppcheck; target 0 HIGH, 0 MEDIUM in src/
 & $pio check -e native --skip-packages
@@ -49,7 +48,7 @@ Bootloader entry if upload cannot find the port: hold BTN_UP + BTN_DOWN for
   - `main.cpp`: `setup()`/`loop()`, scheduler, bootloader shortcut.
 - **Where to edit what**:
   - `include/user_settings.h`: values a driver tunes (speeds, expo, slew, servo angles and
-    inversion, motor reverse, battery policy, Auto timing, gyro/stall/heading-hold flags).
+    inversion, motor reverse, battery policy, Auto timing, stall-cut flag).
   - `include/controls.h`: PS2 button -> function map (`Controls::kXxx = Btn::...`). Logic
     reads buttons only through `Controls::held()`; never hard-code `frame.l1` etc.
   - `include/config.h`: pins, loop/comm timings, hardware limits (rarely edited).
@@ -63,20 +62,13 @@ Bootloader entry if upload cannot find the port: hold BTN_UP + BTN_DOWN for
   inverse kinematics + sag compensation + motor trim + stiction, then 2-DOF
   slew with power envelope cap.
 - **EEPROM**: `PersistentConfig` is 8 bytes with CRC-16-CCITT at address 128.
-- **Opt-in gyro features** (off in `env:uno_r4_wifi`; `env:uno_r4_wifi_field` turns them on via
-  `-DMATRIX_AUTO_GYRO_MODE=2 -DMATRIX_MANUAL_STALL_CUT=1 -DMATRIX_TELEOP_HEADING_HOLD=1`; the
-  robot has only the STM32 onboard IMU, no external sensors):
-  - `kAutoGyroMode` 1/2: `AutoDriveDCProxy::MoveDegs` routes straight moves to
-    `MoveGyroDegs` and tracks a virtual heading (`AutoMode::headingTargetDeg()`); mode 2
-    also turns pivots into `TurnGyro` to a snapped heading. IMU is zeroed on Auto entry;
-    if that fails Auto silently stays open-loop. `[AUTO] #n ...` telemetry shows yaw error.
-  - `kEnableManualStallCut`: `ManualStallDetector` cuts both wheels after
-    `kManualStallTimeoutMs` of no encoder progress (fails open on read errors).
-  - `kEnableTeleopHeadingHold`: `TeleopHeadingHold` + `applyTurnCorrection` add a P turn
-    correction while throttle-only.
-  - Not hardware-verified: the sign of yaw vs wheel direction (`kAutoPivotYawSign`), the
-    `TurnGyro` mode/power sign, and `kAutoPivotWheelDegPerYawDegX100`. Bench-check with
-    wheels lifted and read the `[AUTO]` lines before enabling in a match.
+- **Opt-in manual stall cut** (`kEnableManualStallCut`, off by default; enable with
+  `-DMATRIX_MANUAL_STALL_CUT=1`): `ManualStallDetector` cuts both wheels after
+  `kManualStallTimeoutMs` of no encoder progress (fails open on read errors).
+- Gyro is only for pasted MATRIXblock code. Firmware gyro features (auto-routed `MoveDegs`, teleop
+  heading hold, `uno_r4_wifi_field` env) were removed. `AutoDriveDCProxy` forwards
+  `MoveGyro*`/`TurnGyro`/`set*GyroPID` with stall/abort handling, `MiniR4.Motion` is direct, and
+  `AutoMode::begin` zeroes the IMU on Auto entry so block-code yaw starts at 0.
 
 ## Rules
 
@@ -93,5 +85,5 @@ Bootloader entry if upload cannot find the port: hold BTN_UP + BTN_DOWN for
   goes below the diagnostic pragmas, inside `namespace AutoBlockUser`. Proxy
   classes there wrap `MiniR4` and `Serial`. Do not remove the pragmas or proxies.
 - `src/` must build warning-free (`-Wall -Wextra -Werror`).
-- The README states the test count (44), the file count (28), and the
+- The README states the test count (40), the file count (28), and the
   `config.h` parameter table. Update the README when any of these change.

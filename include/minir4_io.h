@@ -70,16 +70,7 @@ public:
     /** Saves PersistentConfig to UNO R4 EEPROM (writes only changed bytes). */
     void saveConfigToEeprom(const PersistentConfig& cfg);
 
-    /**
-     * Raw IMU yaw read (rounded, wrapped to -180..180). No health gating or comm bookkeeping:
-     * used by Auto mode, which has its own abort handling. False on any read failure.
-     */
-    static bool readImuYawDeg(int16_t& outYawDeg);
-
-    /** Gated yaw read for Manual mode: false when comm is unhealthy/backing off or the read fails. */
-    bool readYawDeg(uint32_t nowMs, int16_t& outYawDeg);
-
-    /** Gated read of drive-wheel encoder counts (M1/M2 positions). Same failure semantics as readYawDeg(). */
+    /** Gated read of drive-wheel encoder counts (M1/M2 positions). Fails (returns false) when comm is unhealthy/backing off or the read fails. */
     bool readDriveEncoders(uint32_t nowMs, int32_t& outLeft, int32_t& outRight);
 
     /** Non-zero MMLower::RESULT code from servo angle range config, or 0 if OK. */
@@ -99,7 +90,6 @@ private:
                               bool& outShortRelease,
                               bool& outPressEdge);
     bool applyLowerMcuConfig(bool zeroAuxMotors);
-    bool     configureRc34PulseRange(uint8_t ch);
     bool     configureServoRanges();
     void     staggerBootServos();
     uint32_t noteCommFailure();
@@ -142,8 +132,6 @@ private:
     bool         motorsSynced_             = false;
     ServoTargets lastServos_               = {};
     bool         servosSynced_             = false;
-    bool         rc34PulseSynced_          = false;
-    uint8_t      rc34PulseErr_             = 0U;
     bool         rc2SmoothEnabled_         = Config::kRc2SmoothDefault;
     uint8_t      servoRangeErr_            = 0U;
 };

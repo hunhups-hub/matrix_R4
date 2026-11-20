@@ -194,33 +194,6 @@ bool MiniR4IO::isCommBackoffActive(uint32_t nowMs, uint32_t backoffMs) const {
            static_cast<int32_t>(nowMs - lastCommFailMs_) < static_cast<int32_t>(backoffMs);
 }
 
-bool MiniR4IO::readImuYawDeg(int16_t& outYawDeg) {
-    double roll  = 0.0;
-    double pitch = 0.0;
-    double yaw   = 0.0;
-    if (mmL.GetIMUEuler(roll, pitch, yaw) != MMLower::RESULT::OK) {
-        return false;
-    }
-    // Rejects NaN/garbage before the float->int conversion.
-    if (!(yaw > -1.0e6 && yaw < 1.0e6)) {
-        return false;
-    }
-    const int32_t rounded = static_cast<int32_t>(yaw >= 0.0 ? yaw + 0.5 : yaw - 0.5);
-    outYawDeg             = RobotLogic::wrapYawDeg(rounded);
-    return true;
-}
-
-bool MiniR4IO::readYawDeg(uint32_t nowMs, int16_t& outYawDeg) {
-    if (!commHealthy_ || isCommBackoffActive(nowMs, Config::kCommUnhealthyRetryIntervalMs)) {
-        return false;
-    }
-    if (!readImuYawDeg(outYawDeg)) {
-        (void)noteCommFailure();
-        return false;
-    }
-    return true;
-}
-
 bool MiniR4IO::readDriveEncoders(uint32_t nowMs, int32_t& outLeft, int32_t& outRight) {
     if (!commHealthy_ || isCommBackoffActive(nowMs, Config::kCommUnhealthyRetryIntervalMs)) {
         return false;
@@ -281,51 +254,9 @@ void MiniR4IO::saveConfigToEeprom(const PersistentConfig& cfg) {
     }
 }
 
-bool MiniR4IO::configureRc34PulseRange(uint8_t ch) {
-    struct PulseCandidate {
-        uint16_t minUs;
-        uint16_t maxUs;
-    };
-    const PulseCandidate candidates[] = {
-        {Config::kRc34PulseMinUs, Config::kRc34PulseMaxUs},
-        {544U, 2400U},
-        {600U, 2400U},
-    };
-
-    MMLower::RESULT lastRes = MMLower::RESULT::OK;
-    for (const PulseCandidate& c : candidates) {
-        lastRes = mmL.SetServoPulseRange(ch, c.minUs, c.maxUs);
-        if (lastRes == MMLower::RESULT::OK) {
-            return true;
-        }
-        if (lastRes != MMLower::RESULT::ERROR_SERVO_MIN_PULSE &&
-            lastRes != MMLower::RESULT::ERROR_SERVO_MAX_PULSE) {
-            if (isServoParamError(lastRes) && rc34PulseErr_ == 0U) {
-                rc34PulseErr_ = static_cast<uint8_t>(lastRes);
-            }
-            return false;
-        }
-    }
-
-    // Parameter-range rejection by STM32: expose via rngErr telemetry without flagging UART dead.
-    if (rc34PulseErr_ == 0U) {
-        rc34PulseErr_ = static_cast<uint8_t>(lastRes);
-    }
-    return true;
-}
-
 bool MiniR4IO::configureServoRanges() {
     servoRangeErr_ = 0U;
-    if (Config::kEnableRc34CustomPulse && !rc34PulseSynced_) {
-        rc34PulseErr_ = 0U;
-    }
     for (uint8_t ch = 1U; ch <= 4U; ++ch) {
-        if (Config::kEnableRc34CustomPulse && !rc34PulseSynced_ && (ch == 3U || ch == 4U)) {
-            if (!configureRc34PulseRange(ch)) {
-                servoRangeErr_ = rc34PulseErr_;
-                return false;
-            }
-        }
         const MMLower::RESULT angleRes = mmL.SetServoAngleRange(
             ch,
             static_cast<uint16_t>(Config::kServoMinDeg),
@@ -334,17 +265,8 @@ bool MiniR4IO::configureServoRanges() {
             if (isServoParamError(angleRes) && servoRangeErr_ == 0U) {
                 servoRangeErr_ = static_cast<uint8_t>(angleRes);
             }
-            if (servoRangeErr_ == 0U) {
-                servoRangeErr_ = rc34PulseErr_;
-            }
             return false;
         }
-    }
-    if (Config::kEnableRc34CustomPulse && !rc34PulseSynced_) {
-        rc34PulseSynced_ = true;
-    }
-    if (servoRangeErr_ == 0U) {
-        servoRangeErr_ = rc34PulseErr_;
     }
     return true;
 }
@@ -362,15 +284,14 @@ void MiniR4IO::staggerBootServos() {
         delay(Config::kServoBootStaggerMs);
     }
 
-    // Engage paired RC3+RC4 together in a single UART frame to avoid one-sided twist at boot.
-    const bool ok34 = ok2 &&
-                      (mmL.SetAllServoAngle(static_cast<uint16_t>(safeInit.rc1Deg),
-                                            static_cast<uint16_t>(safeInit.rc2Deg),
-                                            static_cast<uint16_t>(hwRc3),
-                                            static_cast<uint16_t>(hwRc4)) == MMLower::RESULT::OK);
+    const bool ok3 = ok2 && MiniR4.RC3.setAngle(static_cast<uint16_t>(hwRc3));
+    if (ok3) {
+        delay(Config::kServoBootStaggerMs);
+    }
+    const bool ok4 = ok3 && MiniR4.RC4.setAngle(static_cast<uint16_t>(hwRc4));
 
     lastServos_   = safeInit;
-    servosSynced_ = ok1 && ok2 && ok34;
+    servosSynced_ = ok1 && ok2 && ok3 && ok4;
     if (servosSynced_) {
         lastServoSendMs_ = millis();
     } else {
@@ -582,7 +503,6 @@ bool MiniR4IO::verifyAndHealLowerMcu(uint32_t nowMs,
     if (!commHealthy_ || commNeedsHeal_ || brownoutRecovered || periodicIdleResync) {
         if (!commHealthy_ || commNeedsHeal_ || brownoutRecovered) {
             invalidateActuatorCaches();
-            rc34PulseSynced_ = false;
         }
         const bool cfgOk    = applyLowerMcuConfig(brownoutRecovered || !commHealthy_ || commNeedsHeal_);
         lastConfigResyncMs_ = millis();
@@ -730,7 +650,6 @@ void MiniR4IO::restoreAfterAuto(uint32_t nowMs) {
     // Restore deterministic PS2 bit-bang SPI pins & DAT pull-up in case D2/D3 or MiniR4.PS2 ran.
     ps2_.restorePins();
 
-    rc34PulseSynced_ = false;
     auxMotorsZeroed_ = false;
     invalidateActuatorCaches();
     lastLeftPower_    = 0;
@@ -790,39 +709,36 @@ void MiniR4IO::applyServos(const ServoTargets& targets, uint32_t nowMs) {
     }
     lastServoAttemptMs_ = nowMs;
 
-    bool allOk = false;
-
-    const uint8_t sendCount = static_cast<uint8_t>(send1) +
-                              static_cast<uint8_t>(send2) +
-                              static_cast<uint8_t>(send3) +
-                              static_cast<uint8_t>(send4);
-
-    // Send all 4 channels in a single atomic UART frame whenever paired RC3/RC4 move
-    // or 2+ channels change, preventing left/right arm desync and multi-timeout cascades.
-    if (send3 || send4 || sendCount >= 2U) {
-        const uint16_t hwRc1 = static_cast<uint16_t>(safe.rc1Deg);
-        const uint16_t hwRc2 = static_cast<uint16_t>(cmdRc2);
-        const uint16_t hwRc3 = static_cast<uint16_t>(
-            RobotLogic::applyServoDirection(safe.rc3Deg, Config::kRc3InvertDir));
-        const uint16_t hwRc4 = static_cast<uint16_t>(
-            RobotLogic::applyServoDirection(safe.rc4Deg, Config::kRc4InvertDir));
-
-        if (mmL.SetAllServoAngle(hwRc1, hwRc2, hwRc3, hwRc4) == MMLower::RESULT::OK) {
-            lastServos_.rc1Deg = safe.rc1Deg;
-            lastServos_.rc2Deg = cmdRc2;
-            lastServos_.rc3Deg = safe.rc3Deg;
-            lastServos_.rc4Deg = safe.rc4Deg;
-            allOk              = true;
-        }
-    } else if (send1) {
+    // Per-channel sends; stop at first failure so a dead UART blocks at most one timeout per cycle.
+    bool allOk = true;
+    if (send1) {
         if (MiniR4.RC1.setAngle(static_cast<uint16_t>(safe.rc1Deg))) {
             lastServos_.rc1Deg = safe.rc1Deg;
-            allOk              = true;
+        } else {
+            allOk = false;
         }
-    } else if (send2) {
+    }
+    if (allOk && send2) {
         if (MiniR4.RC2.setAngle(static_cast<uint16_t>(cmdRc2))) {
             lastServos_.rc2Deg = cmdRc2;
-            allOk              = true;
+        } else {
+            allOk = false;
+        }
+    }
+    if (allOk && send3) {
+        const int16_t hwRc3 = RobotLogic::applyServoDirection(safe.rc3Deg, Config::kRc3InvertDir);
+        if (MiniR4.RC3.setAngle(static_cast<uint16_t>(hwRc3))) {
+            lastServos_.rc3Deg = safe.rc3Deg;
+        } else {
+            allOk = false;
+        }
+    }
+    if (allOk && send4) {
+        const int16_t hwRc4 = RobotLogic::applyServoDirection(safe.rc4Deg, Config::kRc4InvertDir);
+        if (MiniR4.RC4.setAngle(static_cast<uint16_t>(hwRc4))) {
+            lastServos_.rc4Deg = safe.rc4Deg;
+        } else {
+            allOk = false;
         }
     }
 

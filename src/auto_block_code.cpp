@@ -20,8 +20,7 @@
 //    - ถ้าเขียน while(...) วนรอเอง ให้ใส่ delay(1); ข้างใน หรือเช็ก if (autoShouldExit()) break;
 //    - การออกกลางคัน (กด X / E-Stop / Timeout) ใช้ longjmp จึงห้ามประกาศตัวแปรที่มี destructor
 //      (เช่น String, std::string) ในโค้ดที่วาง — ใช้ char[] หรือชนิดพื้นฐานแทน
-//    - มีฟังก์ชันช่วยเขียนภารกิจด้วย C++ เอง (driveStraight, turnTo, turnBy, servoTo, headingNow)
-//      อยู่เหนือโซนวางโค้ด และเปิด Gyro Assist ได้ที่ Config::kAutoGyroMode ใน include/user_settings.h
+//    - มีฟังก์ชันช่วยเขียนภารกิจด้วย C++ เอง (driveStraight, servoTo) อยู่เหนือโซนวางโค้ด
 // ============================================================================
 
 #ifndef ENABLE_DRIVEDC_BRAKE_DELAY
@@ -223,9 +222,6 @@ struct AutoDriveDCProxy {
                      uint16_t degrees,
                      bool brakeOnStop,
                      bool asyncWait = false) const {
-        if (Config::kAutoGyroMode != Config::kAutoGyroOff && AutoMode::gyroAssistActive()) {
-            return moveDegsGyroAssist(leftPower, rightPower, degrees, brakeOnStop, asyncWait);
-        }
         return moveDegsLegacy(leftPower, rightPower, degrees, brakeOnStop, asyncWait);
     }
     static uint32_t secondsToMs(float seconds) {
@@ -279,16 +275,10 @@ struct AutoDriveDCProxy {
                 leftPower, rightPower, timeMs, brakeOnStop, asyncWait, 1U);
         });
     }
-    // Explicit gyro calls from the user's mission also move the virtual heading, so later
-    // gyro-assisted straights keep following the direction the user asked for.
     uint8_t MoveGyro(int16_t power, int16_t targetYawDeg) const {
-        const uint8_t res = sendDriveCmd([&]() {
+        return sendDriveCmd([&]() {
             return mmL.Set_Drive_MoveGyro_Func(power, targetYawDeg, 1U);
         });
-        if (res == 0x00U) {
-            AutoMode::setHeadingTargetDeg(targetYawDeg);
-        }
-        return res;
     }
     uint8_t MoveGyroDegs(int16_t power,
                          int16_t targetYawDeg,
@@ -300,9 +290,6 @@ struct AutoDriveDCProxy {
             return mmL.Set_Drive_MoveGyro_Degs(
                 power, targetYawDeg, degrees, brakeOnStop, asyncWait, 1U);
         });
-        if (res == 0x00U) {
-            AutoMode::setHeadingTargetDeg(targetYawDeg);
-        }
         return res;
     }
     uint8_t MoveGyroTime(int16_t power,
@@ -316,9 +303,6 @@ struct AutoDriveDCProxy {
             return mmL.Set_Drive_MoveGyro_Time(
                 power, targetYawDeg, timeMs, brakeOnStop, asyncWait, 1U);
         });
-        if (res == 0x00U) {
-            AutoMode::setHeadingTargetDeg(targetYawDeg);
-        }
         return res;
     }
     uint8_t TurnGyro(int16_t power,
@@ -331,9 +315,6 @@ struct AutoDriveDCProxy {
             return mmL.Set_Drive_TurnGyro(
                 power, targetYawDeg, mode, brakeOnStop, asyncWait, 1U);
         });
-        if (res == 0x00U) {
-            AutoMode::setHeadingTargetDeg(targetYawDeg);
-        }
         return res;
     }
 
@@ -380,60 +361,6 @@ private:
             return mmL.Set_Drive_Move_Degs(
                 leftPower, rightPower, degrees, brakeOnStop, asyncWait, 1U);
         });
-    }
-
-    // Gyro-assisted MoveDegs (Config::kAutoGyroMode != Off, IMU zeroed at Auto entry):
-    //  - straight (L == R)      -> MoveGyroDegs holding the virtual heading
-    //  - pivot (L == -R)        -> legacy pivot then re-latch heading from IMU (StraightHold), or
-    //                              TurnGyro to a snapped absolute heading (StraightHoldAndTurn)
-    //  - arcs / single wheel    -> legacy, heading re-latched from IMU afterwards
-    // An IMU read failure never aborts: the heading falls back to the pivot estimate.
-    uint8_t moveDegsGyroAssist(int16_t leftPower,
-                               int16_t rightPower,
-                               uint16_t degrees,
-                               bool brakeOnStop,
-                               bool asyncWait) const {
-        const RobotLogic::AutoMoveKind kind =
-            RobotLogic::classifyAutoMove(leftPower, rightPower, degrees);
-
-        if (kind == RobotLogic::AutoMoveKind::Straight) {
-            const uint8_t res =
-                MoveGyroDegs(leftPower, AutoMode::headingTargetDeg(), degrees, brakeOnStop, asyncWait);
-            AutoMode::logMove("STR", leftPower, rightPower, degrees, res);
-            return res;
-        }
-
-        if (kind == RobotLogic::AutoMoveKind::Pivot) {
-            const int16_t estimate = RobotLogic::estimatePivotYawDeg(leftPower, rightPower, degrees);
-            if (Config::kAutoGyroMode == Config::kAutoGyroStraightHoldAndTurn) {
-                const int16_t target = RobotLogic::snapYawDeg(
-                    RobotLogic::wrapYawDeg(static_cast<int32_t>(AutoMode::headingTargetDeg()) + estimate),
-                    Config::kAutoTurnSnapStepDeg);
-                int16_t power = (leftPower < 0) ? static_cast<int16_t>(-leftPower) : leftPower;
-                if (power > 100) {
-                    power = 100;
-                }
-                const uint8_t res =
-                    TurnGyro(power, target, Config::kAutoTurnGyroMode, brakeOnStop, asyncWait);
-                AutoMode::logMove("TURN", leftPower, rightPower, degrees, res);
-                return res;
-            }
-            const int16_t estTarget = RobotLogic::wrapYawDeg(
-                static_cast<int32_t>(AutoMode::headingTargetDeg()) + estimate);
-            const uint8_t res = moveDegsLegacy(leftPower, rightPower, degrees, brakeOnStop, asyncWait);
-            if (res == 0x00U && !(!asyncWait && AutoMode::latchHeadingFromImu())) {
-                AutoMode::setHeadingTargetDeg(estTarget);
-            }
-            AutoMode::logMove("PIV", leftPower, rightPower, degrees, res);
-            return res;
-        }
-
-        const uint8_t res = moveDegsLegacy(leftPower, rightPower, degrees, brakeOnStop, asyncWait);
-        if (res == 0x00U && !asyncWait) {
-            (void)AutoMode::latchHeadingFromImu();
-        }
-        AutoMode::logMove("OTH", leftPower, rightPower, degrees, res);
-        return res;
     }
 
     template <typename SendFn>
@@ -698,57 +625,15 @@ inline constexpr AutoSerialProxy Serial{};
 // ----------------------------------------------------------------------------
 // Optional C++ mission helpers (alternative to pasting MATRIXblock code).
 // They go through the same proxies, so stall detection, X/ESTOP abort and WDT keep working.
-// turnTo()/turnBy() use the onboard IMU: set Config::kAutoGyroMode to 1 or 2 in include/config.h
-// (with Off, turnBy() falls back to an open-loop pivot and turnTo() returns 0x01).
 //
 // Example (inside setup() in the paste zone, replacing MoveDegs/delay chains):
-//   driveStraight(-50, 415);          // reverse 415 wheel deg, holds heading
+//   driveStraight(-50, 415);          // reverse 415 wheel deg
 //   servoTo(2, 165);                  // RC2 to 165 deg, waits 300 ms
-//   turnBy(90);                       // pivot ~90 deg (sign: Config::kAutoPivotYawSign)
-//   turnTo(0);                        // back to the heading at Auto start
 // ----------------------------------------------------------------------------
 
-// Current heading (deg) from the IMU, or the held virtual heading if the read fails.
-inline int16_t headingNow() {
-    int16_t yaw = 0;
-    return AutoMode::readYawDeg(yaw) ? yaw : AutoMode::headingTargetDeg();
-}
-
-// Drives both wheels `wheelDegs` encoder degrees; negative power reverses. Holds heading when the
-// gyro is active, otherwise plain MoveDegs.
+// Drives both wheels `wheelDegs` encoder degrees; negative power reverses.
 inline uint8_t driveStraight(int16_t power, uint16_t wheelDegs, bool brake = true) {
-    if (AutoMode::gyroAssistActive()) {
-        return MiniR4.DriveDC.MoveGyroDegs(power, AutoMode::headingTargetDeg(), wheelDegs, brake);
-    }
     return MiniR4.DriveDC.MoveDegs(power, power, wheelDegs, brake);
-}
-
-// Pivots to an absolute heading (-180..180, 0 = heading at Auto start). Needs the gyro active.
-inline uint8_t turnTo(int16_t absoluteYawDeg, int16_t power = 40) {
-    if (!AutoMode::gyroAssistActive()) {
-        return 0x01U;
-    }
-    const int16_t p = (power < 0) ? static_cast<int16_t>(-power) : power;
-    return MiniR4.DriveDC.TurnGyro(p > 100 ? static_cast<int16_t>(100) : p,
-                                   RobotLogic::wrapYawDeg(absoluteYawDeg),
-                                   Config::kAutoTurnGyroMode,
-                                   true);
-}
-
-// Pivots by a relative angle (+ = Config::kAutoPivotYawSign direction). Gyro off -> open-loop pivot.
-inline uint8_t turnBy(int16_t deltaDeg, int16_t power = 40) {
-    if (AutoMode::gyroAssistActive()) {
-        return turnTo(static_cast<int16_t>(AutoMode::headingTargetDeg() + deltaDeg), power);
-    }
-    const int32_t mag32 = ((deltaDeg < 0) ? -static_cast<int32_t>(deltaDeg) : deltaDeg) *
-                          static_cast<int32_t>(Config::kAutoPivotWheelDegPerYawDegX100) / 100L;
-    const uint16_t wheelDegs = static_cast<uint16_t>(mag32 > 65535L ? 65535L : mag32);
-    const int16_t  p         = (power < 0) ? static_cast<int16_t>(-power) : power;
-    const bool     rightFwd  = ((deltaDeg > 0) == (Config::kAutoPivotYawSign > 0));
-    return MiniR4.DriveDC.MoveDegs(rightFwd ? static_cast<int16_t>(-p) : p,
-                                   rightFwd ? p : static_cast<int16_t>(-p),
-                                   wheelDegs,
-                                   true);
 }
 
 // Moves RC1..RC4 to `deg`, then waits `settleMs` (abort-safe delay). Returns false for bad channel.

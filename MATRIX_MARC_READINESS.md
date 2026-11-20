@@ -2,7 +2,7 @@
 
 - **โปรเจกต์**: `matrix_R4` (`Arduino UNO R4 WiFi` + `MATRIX Mini R4 Carrier Shield`)
 - **ฐานโค้ดที่ตรวจสอบ (Codebase State)**: Branch `main` พร้อมชุดปรับปรุงเสถียรภาพฮาร์ดแวร์และโหมดแข่งขันเต็มกำลัง 100% (`Post-Stability & Full-Power Hardening`) `[Verified: Build/Test Run]`
-- **ประเมินล่าสุด**: 2026-11-20 (หลังเพิ่ม Gyro-assisted Auto แบบ opt-in, Manual Stall Cut, Teleop Heading Hold, Drive stability category และการตรวจจับชุดแบตเตอรี่อัตโนมัติ)
+- **ประเมินล่าสุด**: 2026-11-20 (หลังนำฟีเจอร์ Gyro ออก: Gyro-assisted Auto และ Teleop Heading Hold; คง Manual Stall Cut แบบ opt-in)
 - **คะแนนความพร้อมรวม (Overall Readiness Score)**: **`85.88 / 100`** *(เดิม `85.13` → ก่อนปรับปรุงเสถียรภาพ `78.50`)*
 - **ระดับความพร้อม (Readiness Tier)**: **`Firmware-Ready (Track Calibration / Field Validation Required)`** — *เฟิร์มแวร์มีความเสถียรสูงและคงกำลังขับเต็ม 100% พร้อมลงสนาม เหลือเฉพาะการปรับจูนระยะทาง/มุมบนสนามแข่งจริง (HIL)*
 
@@ -15,11 +15,11 @@
 
 | องค์ประกอบหลัก | ผลลัพธ์ | ป้ายสถานะการตรวจสอบ |
 |---|---|---|
-| **คอมไพล์เฟิร์มแวร์จริง (`uno_r4_wifi`)** | ผ่าน (`SUCCESS`, 0 warnings/errors ภายใต้ `-Werror`), RAM `44.1%`, Flash `41.8%`; `uno_r4_wifi_field` ก็ผ่าน | `[Verified: Build/Test Run]` |
-| **ชุดทดสอบอัตโนมัติ (`native` Unity)** | ผ่าน **`44 / 44`** เคส (0 Failures, 0 Ignored) ครอบคลุมครบทุกสาขาของ `robot_logic` และ `serial_control` | `[Verified: Build/Test Run]` |
+| **คอมไพล์เฟิร์มแวร์จริง (`uno_r4_wifi`)** | ผ่าน (`SUCCESS`, 0 warnings/errors ภายใต้ `-Werror`), RAM `44.1%`, Flash `41.5%` | `[Verified: Build/Test Run]` |
+| **ชุดทดสอบอัตโนมัติ (`native` Unity)** | ผ่าน **`40 / 40`** เคส (0 Failures, 0 Ignored) ครอบคลุมครบทุกสาขาของ `robot_logic` และ `serial_control` | `[Verified: Build/Test Run]` |
 | **การวิเคราะห์โค้ดเชิงสถิต (`pio check`)** | ผ่านสะอาด (`src/`: **`0 HIGH, 0 MEDIUM`** ทั้งบน `uno_r4_wifi` และ `native`) | `[Verified: Build/Test Run]` |
 | **สถาปัตยกรรม Teleop, Failsafe & Auto Supervisor** | แข็งแรงระดับแข่งขัน (40 Hz scheduler, 5-stage kinodynamics 100% power, 1.4 ms SPI, 3s WDT, Rising-Edge E-Stop, Bounded STM32 Init/Guard) | `[Verified: Static Code Inspection]` |
-| **ตรรกะภารกิจ Autonomous ปัจจุบัน (`auto_block_code.cpp`)** | ภารกิจยังเขียนด้วย `MoveDegs` (14 ครั้ง) + `delay()` (27 ครั้ง) แบบ Open-Loop; มี Gyro proxy (`kAutoGyroMode`) แล้วแต่ปิดใน build แข่งจนกว่าจะยืนยันทิศ yaw บนฮาร์ดแวร์ | `[Verified: Static Code Inspection]` |
+| **ตรรกะภารกิจ Autonomous ปัจจุบัน (`auto_block_code.cpp`)** | ภารกิจยังเขียนด้วย `MoveDegs` (14 ครั้ง) + `delay()` (27 ครั้ง) แบบ Open-Loop; ไม่มี Gyro assist (นำออกแล้ว) | `[Verified: Static Code Inspection]` |
 | **พฤติกรรมบนฮาร์ดแวร์และสนามแข่งจริง (HIL)** | ยังไม่ได้เชื่อมต่อบอร์ด UNO R4 WiFi, STM32, มอเตอร์, เซอร์โว และจอย PS2/MJ2 จริง | `[Unverified: Requires Physical Hardware/Field Test]` |
 
 ### 1.2 จุดแข็งหลักและรายการเสถียรภาพที่ได้รับการยกระดับ (Key Strengths & Hardened Stability Features)
@@ -31,7 +31,7 @@
    - ตรวจจับทั้งล้อติดกำแพงและสาย UART หลุดกลางคันระหว่างคำสั่งบล็อกกิ้ง `DriveDC` (`beginBlockingDriveTask` / `checkDriveStall`, `src/auto_mode.cpp:141-226`) พร้อมรักษาสัญญาณ `PSB_TRIANGLE` แม้โค้ดผู้ใช้เรียก `read_gamepad()` ซ้ำ (`src/auto_block_code.cpp:487-513`) `[Verified: Static Code Inspection]`
 4. **ความทนทานต่อความผิดพลาดของฮาร์ดแวร์และปุ่มฉุกเฉินทันที (Hardware Fault Isolation & Instant E-Stop)**:
    - ปุ่ม `BTN_DOWN` ทำงานเป็น **Rising-Edge E-Stop ทันทีที่กด (`downPressEdge`)** หลังผ่าน Debounce 30 ms โดยไม่ต้องรอปล่อยนิ้ว ทั้งในโหมด Manual และ Auto (`src/minir4_io.cpp:426-429`, `src/main.cpp:593`, `src/auto_mode.cpp:257`) ขณะที่ยังรองรับการกดค้างคู่ `BTN_UP + BTN_DOWN` 2.5 วินาทีเพื่อเข้า Bootloader `[Verified: Static Code Inspection]`
-   - บูตระบบแบบจำกัดเวลา (`MiniR4IO::begin()`, `src/minir4_io.cpp:41-149`) โดยไม่ใช้ลูป `while` ไม่รู้จบของ `MiniR4.begin()`, ส่งเซอร์โว `RC3+RC4` แบบ Atomic เฟรมเดียวด้วย `mmL.SetAllServoAngle` โดยไม่มี fallback รายช่องที่ทำให้แขนบิดเหลื่อมเวลา และมี `noteCommFailure()` ป้องกันการบล็อก UART ซ้อนกันหลายคำสั่งในรอบเดียวเมื่อสาย STM32 หลุด (`~100–110 ms` สูงสุดต่อรอบ แทน `~1.0 s` เดิม) `[Verified: Static Code Inspection]`
+   - บูตระบบแบบจำกัดเวลา (`MiniR4IO::begin()`, `src/minir4_io.cpp:41-149`) โดยไม่ใช้ลูป `while` ไม่รู้จบของ `MiniR4.begin()`, ส่งเซอร์โวทีละช่อง (`MiniR4.RC1..RC4.setAngle`) และมี `noteCommFailure()` ป้องกันการบล็อก UART ซ้อนกันหลายคำสั่งในรอบเดียวเมื่อสาย STM32 หลุด (`~100–110 ms` สูงสุดต่อรอบ แทน `~1.0 s` เดิม) `[Verified: Static Code Inspection]`
    - คงเพดานกำลังขับสูงสุด **100% เต็ม** (`kEnableBatterySagThrottle = false`) พร้อมชดเชยแรงบิดสูงสุด `115%` ในระดับ `Normal`/`Low`/`Critical` และตัดบูสต์ส่วนเกินเหลือ `100%` เฉพาะเมื่อแรงดันตกถึงระดับฉุกเฉิน `Emergency` (`<= 6.4V` หรือ `<= 69%` ของแรงดันฐาน) เพื่อลดความเสี่ยงไฟตกโดยหุ่นไม่หนืด (`src/robot_logic.cpp:1049-1058`) `[Verified: Build/Test Run]`
 
 ### 1.3 ความเสี่ยงและข้อจำกัดที่เหลืออยู่ก่อนลงแข่ง (Remaining Risks & Field Calibration Items)
@@ -80,13 +80,12 @@ $$\text{Weighted Points} = \left(\frac{\text{Category Score}}{10}\right) \times 
 - **คำสั่ง**: `& "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" run -e uno_r4_wifi`
 - **สถานะ**: `SUCCESS` (Exit code `0`), **0 Warnings / 0 Errors** ภายใต้ `-Wall -Wextra -Werror` (`platformio.ini:22-25`)
 - **การใช้หน่วยความจำ**:
-  - **RAM**: **`44.1%`** (`used 14436 bytes from 32768 bytes`) — เหลือพื้นที่ Heap/Stack อีก `18,332 bytes`
-  - **Flash**: **`41.8%`** (`used 109516 bytes from 262144 bytes`) — เหลือพื้นที่โปรแกรมอีก `152,628 bytes`
-- **`pio run -e uno_r4_wifi_field`** (Gyro Auto mode 2 + Stall Cut + Heading Hold): `SUCCESS`
+  - **RAM**: **`44.1%`** (`used 14460 bytes from 32768 bytes`) — เหลือพื้นที่ Heap/Stack อีก `18,332 bytes`
+  - **Flash**: **`41.5%`** (`used 108828 bytes from 262144 bytes`) — เหลือพื้นที่โปรแกรมอีก `152,628 bytes`
 
 ### 3.2 การรันชุดทดสอบอัตโนมัติบนโฮสต์ (`pio test -e native -v`) `[Verified: Build/Test Run]`
 - **คำสั่ง**: `& "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" test -e native -v`
-- **สถานะ**: `PASSED` (Exit code `0`), ผ่านครบ **`44 Tests 0 Failures 0 Ignored`** ใน 12 หมวดหมู่ (`test/test_robot_logic/test_main.cpp:1887-1951`) รวมถึงการทดสอบ Glitch absorption โดยไม่หลุดจาก `Operational`, การคุมเพดานกำลัง 2-DOF Slew (`55%`/`35%`), ความปลอดภัยจาก `int16_t` overflow, การหยุด `!w` ในแบตช์เดียว, ข้อความ Help `o/p` + `v`, และฟิลด์ Telemetry `rf=`/`com=`
+- **สถานะ**: `PASSED` (Exit code `0`), ผ่านครบ **`40 Tests 0 Failures 0 Ignored`** ใน 11 หมวดหมู่ (`test/test_robot_logic/test_main.cpp:1887-1951`) รวมถึงการทดสอบ Glitch absorption โดยไม่หลุดจาก `Operational`, การคุมเพดานกำลัง 2-DOF Slew (`55%`/`35%`), ความปลอดภัยจาก `int16_t` overflow, การหยุด `!w` ในแบตช์เดียว, ข้อความ Help `o/p` + `v`, และฟิลด์ Telemetry `rf=`/`com=`
 
 ### 3.3 การวิเคราะห์โค้ดเชิงสถิตด้วย `cppcheck` (`pio check`) `[Verified: Build/Test Run]`
 1. **`pio check -e uno_r4_wifi --skip-packages`**: Exit code `255` เพราะพบคำเตือนในไลบรารี `.pio/libdeps/.../MatrixMiniR4` (ไม่ใช่โค้ดโปรเจกต์)
@@ -102,7 +101,7 @@ $$\text{Weighted Points} = \left(\frac{\text{Category Score}}{10}\right) \times 
 - **หลักฐานยืนยัน**:
   - คอมไพล์ผ่านภายใต้ `-Wall -Wextra -Werror` ทั้งบน `uno_r4_wifi` และ `native`; ขอบเขต `#pragma GCC diagnostic` ใน `src/auto_block_code.cpp:616-699` ถูกจำกัดเฉพาะโซนโค้ดที่ผู้ใช้คัดลอกมาจาก MATRIXblock เท่านั้น ทำให้ชั้น Proxy ความปลอดภัยทั้งหมดอยู่ภายใต้ `-Werror` เต็มรูปแบบ `[Verified: Build/Test Run]`
   - `pio check` รายงาน `0 HIGH, 0 MEDIUM` ใน `src/` ทั้งสองสภาพแวดล้อม `[Verified: Build/Test Run]`
-  - `pio test -e native -v` ผ่าน `44 / 44` เคส พร้อมอัปเดตคอมเมนต์และเพิ่ม assertion ครอบคลุมครบทุกสาขาของ `robot_logic.cpp` และ `serial_control.cpp` `[Verified: Build/Test Run]`
+  - `pio test -e native -v` ผ่าน `40 / 40` เคส พร้อมอัปเดตคอมเมนต์และเพิ่ม assertion ครอบคลุมครบทุกสาขาของ `robot_logic.cpp` และ `serial_control.cpp` `[Verified: Build/Test Run]`
 - **เหตุผลการหักคะแนน (`-1.0`)**:
   - โมดูลฮาร์ดแวร์ (`main.cpp`, `minir4_io.cpp`, `ps2_driver.cpp`, `oled_ui.cpp`, `auto_mode.cpp`, `auto_block_code.cpp`) ยังไม่มีชุดทดสอบจำลองฮาร์ดแวร์หรือ HIL อัตโนมัติ (`-1.0`) `[Verified: Static Code Inspection]`
 
@@ -115,19 +114,18 @@ $$\text{Weighted Points} = \left(\frac{\text{Category Score}}{10}\right) \times 
 ### หมวดที่ 3: Manipulator & Servo Actuation (`RC1..RC4`) (`10%`) — คะแนน **`8.50 / 10`** (`8.50 / 10.00` คะแนน)
 - **หลักฐานยืนยัน**:
   - `updateServoTargetsFromPs2` (`src/robot_logic.cpp:554-636`) ทดสอบครบทั้ง `L1`, `R1`, `L2`, `R2`, `D-Pad U/D`, `Square` และ `Circle` `[Verified: Build/Test Run]`
-  - `MiniR4IO::applyServos` (`src/minir4_io.cpp:722-795`) และ `staggerBootServos` (`lines 311-338`) ส่งคำสั่ง `mmL.SetAllServoAngle` แบบ Atomic เฟรมเดียวเมื่อ `RC3`/`RC4` ขยับหรือมีการเปลี่ยนหลายช่อง โดยไม่ตกลงไปสั่งแยกทีละช่องที่อาจทำให้แขนหน้าซ้าย/ขวาบิดเหลื่อมเวลา `[Verified: Static Code Inspection]`
+  - `MiniR4IO::applyServos` และ `staggerBootServos` ส่งเซอร์โวทีละช่อง (`MiniR4.RC1..RC4.setAngle`) และหยุดที่ช่องแรกที่ส่งไม่สำเร็จ เพื่อจำกัดการบล็อก UART ไม่เกิน 1 timeout ต่อรอบ `[Verified: Static Code Inspection]`
 - **เหตุผลการหักคะแนน (`-1.5`)**:
   - `kRc3InitDeg`, `kRc3L1Deg`, `kRc3SquareDeg` (และ `RC4`) ตั้งไว้ที่ `30°` เท่ากัน (`include/config.h:115-123`) จึงเกิดการขยับสลับเฉพาะเมื่อกด `Square` หลังจากยกแขนด้วย `R1` (`140°`) (`-0.5`) `[Verified: Static Code Inspection]`
-  - ขอบเขตกลไกจริงและช่วงพัลส์ `500–2500 us` บนเซอร์โวตัวจริงต้องตรวจบนหุ่นยนต์ (`-1.0`) `[Unverified: Requires Physical Hardware/Field Test]`
+  - ขอบเขตกลไกจริงของเซอร์โวต้องตรวจบนหุ่นยนต์ (`-1.0`) `[Unverified: Requires Physical Hardware/Field Test]`
 
 ### หมวดที่ 4: Autonomous Mode & MARC Match Readiness (`20%`) — คะแนน **`7.00 / 10`** (`14.00 / 20.00` คะแนน)
 - **หลักฐานยืนยัน**:
   - `AutoDriveDCProxy::begin` (`src/auto_block_code.cpp:169-197`) ซิงก์ทิศทางมอเตอร์ `f1`/`f2` จาก EEPROM อัตโนมัติผ่าน `RobotLogic::resolveAutoDrivePolarity` (`src/robot_logic.cpp:402-415`) `[Verified: Build/Test Run]` และสั่งเบรกตัดจบเข้า `AutoExitReason::DriveInitFail` ทันทีหากตั้งค่า `DriveDC` ไม่สำเร็จภายใน ~3 วินาที `[Verified: Static Code Inspection]`
   - `checkDriveStall` (`src/auto_mode.cpp:141-226`) ทำงานร่วมกับ `beginBlockingDriveTask()`/`endBlockingDriveTask()` สามารถตัดจบ `StallTimeout` ได้ทั้งเมื่อล้อติดกำแพงและเมื่อสาย UART ของ STM32 หลุดระหว่างรอคำสั่ง `DriveDC` `[Verified: Static Code Inspection]`
   - `AutoPs2Proxy::pollInternal` (`src/auto_block_code.cpp:487-513`) รักษาสัญญาณ `PSB_TRIANGLE` แม้มีการเรียก `read_gamepad()` ซ้ำก่อนตรวจ `Button(PSB_TRIANGLE)` `[Verified: Static Code Inspection]`
-  - `AutoDriveDCProxy::MoveDegs` รองรับ `kAutoGyroMode` 1/2: ส่งการเดินตรงไป `MoveGyroDegs` และเปลี่ยนการหมุนเป็น `TurnGyro` ตาม virtual heading (เปิดใน `env:uno_r4_wifi_field`, ปิดใน build แข่ง) `[Verified: Build/Test Run]`
 - **เหตุผลการหักคะแนน (`-3.00`)**:
-  - ภารกิจ Auto ใน `src/auto_block_code.cpp` ยังเขียนด้วย `MoveDegs(±50, ±50)` 14 ครั้ง และ `delay()` 27 ครั้ง; build แข่งยังวิ่ง Open-Loop เพราะทิศ `kAutoPivotYawSign`, เครื่องหมายกำลังของ `TurnGyro` และ `kAutoPivotWheelDegPerYawDegX100` ยังไม่ได้ยืนยันบนฮาร์ดแวร์ (`-2.75`) `[Unverified: Requires Physical Hardware/Field Test]`
+  - ภารกิจ Auto ใน `src/auto_block_code.cpp` ยังเขียนด้วย `MoveDegs(±50, ±50)` 14 ครั้ง และ `delay()` 27 ครั้ง; Auto วิ่ง Open-Loop ทั้งหมดเพราะนำ Gyro assist ออกแล้ว (`-2.75`) `[Unverified: Requires Physical Hardware/Field Test]`
   - การตัดจบด้วย `longjmp` มีข้อจำกัดห้ามประกาศตัวแปรที่มี C++ destructor ในโซนวางโค้ด Auto (`-0.25`) `[Verified: Static Code Inspection]`
 
 ### หมวดที่ 5: Wireless Link, Coprocessor & Failsafe Reliability (`15%`) — คะแนน **`9.25 / 10`** (`13.88 / 15.00` คะแนน)
@@ -168,7 +166,7 @@ $$\text{Weighted Points} = \left(\frac{\text{Category Score}}{10}\right) \times 
 | **Medium** | **เปิดโหมดกำลังขับ 100% (`kEnableBatterySagThrottle = false`)** (`include/config.h:144`, `src/robot_logic.cpp:1049-1058`) | **ปรับปรุงแล้ว + วินัยแบต** | คงกำลัง 100% และบูสต์ 115% ในระดับ `Normal`/`Low`/`Critical` เพื่อให้หุ่นแรงเต็มพิกัด และตัดบูสต์เหลือ `100%` ที่ระดับ `Emergency` (`<= 6.4V`) ให้เปลี่ยนแบตใหม่เมื่อจอแสดงต่ำกว่า `75%` `[Verified: Build/Test Run]` |
 | **Resolved** | **`BTN_DOWN` E-Stop ทำงานทันทีที่กด (`downPressEdge`)** (`src/minir4_io.cpp:426-429`, `src/main.cpp:593`, `src/auto_mode.cpp:257`) | **แก้ไขสมบูรณ์** | เปลี่ยนเป็น Rising-Edge E-Stop ทันทีที่กดปุ่มผ่าน Debounce 30 ms ทั้งในโหมด Manual และ Auto โดยยังกดค้างคู่ `BTN_UP + BTN_DOWN` 2.5s เข้า Bootloader ได้ตามปกติ `[Verified: Static Code Inspection]` |
 | **Resolved** | **ซิงก์ทิศมอเตอร์ EEPROM และตรวจ `DriveDC.begin()` ใน Auto** (`src/auto_block_code.cpp:169-197`, `src/robot_logic.cpp:402-415`) | **แก้ไขสมบูรณ์** | `AutoDriveDCProxy::begin()` นำค่ากลับทิศ `f1`/`f2` จาก EEPROM มาปรับทิศให้อัตโนมัติ และหากตั้งค่า STM32 ไม่สำเร็จภายใน ~3s จะสั่งเบรกและออกด้วย `DriveInitFail` ทันที `[Verified: Build/Test Run]` |
-| **Resolved** | **จำกัดเวลาเริ่มต้น `MiniR4IO::begin()` และป้องกัน UART บล็อกซ้อน** (`src/minir4_io.cpp:41-149, 184-190, 722-795`) | **แก้ไขสมบูรณ์** | แทนที่ `MiniR4.begin()` ด้วยการเริ่มต้นที่มีขอบเขตเวลา, ส่งเซอร์โวด้วย `SetAllServoAngle` แบบ Atomic และใช้ `noteCommFailure()` จำกัดการบล็อก UART สูงสุดไม่เกิน 1 คำสั่ง (`~100 ms`) ต่อรอบ `[Verified: Static Code Inspection]` |
+| **Resolved** | **จำกัดเวลาเริ่มต้น `MiniR4IO::begin()` และป้องกัน UART บล็อกซ้อน** (`src/minir4_io.cpp:41-149, 184-190, 722-795`) | **แก้ไขสมบูรณ์** | แทนที่ `MiniR4.begin()` ด้วยการเริ่มต้นที่มีขอบเขตเวลา, ส่งเซอร์โวทีละช่อง และใช้ `noteCommFailure()` จำกัดการบล็อก UART สูงสุดไม่เกิน 1 คำสั่ง (`~100 ms`) ต่อรอบ `[Verified: Static Code Inspection]` |
 | **Resolved** | **คำเตือน `cppcheck` (`0 HIGH, 0 MEDIUM`) และขอบเขต `#pragma GCC diagnostic`** (`src/auto_block_code.cpp`, `src/ps2_driver.cpp`, `src/oled_ui.cpp`, `src/robot_logic.cpp`) | **แก้ไขสมบูรณ์** | แก้ไขคำเตือน `cppcheck` ใน `src/` จนเหลือ `0 HIGH, 0 MEDIUM` และย้าย `#pragma GCC diagnostic` ลงไปครอบเฉพาะโซนวางโค้ดของผู้ใช้ `[Verified: Build/Test Run]` |
 | **Resolved** | **แก้ไขบั๊กความปลอดภัยและความเสถียรระดับลึกครบทุกโมดูล (Full-Repo Audit)** (`src/minir4_io.cpp`, `src/robot_logic.cpp`, `src/auto_mode.cpp`, `src/oled_ui.cpp`, `src/main.cpp`, `src/serial_control.cpp`, `src/ps2_driver.cpp`) | **แก้ไขสมบูรณ์** | ปิดจุดเสี่ยงสำคัญ: (1) `forceMotorsStop` ไม่ถูกหน่วงเมื่อ `commHealthy_` ปกติหรือก่อน Bootloader (2) `noteCommFailure` ใช้เวลาหลัง timeout จริงพร้อม signed wrap-safe backoff (3) ล้างสถานะปุ่มเมื่อ STM32 UART ล้ม (4) `FailsafeStateMachine` ดูดซับ Glitch 1–3 เฟรมโดยไม่หลุดจาก `Operational` (5) `AutoMode::checkSerialAbort` ใช้ ring buffer 32 ไบต์กัน `\r`/`\n` บล็อก `!`/`x`/`u` (6) บล็อกคำสั่งเซอร์โว Serial ระหว่าง `ESTOP` (7) สำรอง Framebuffer OLED ตอนกู้ I2C กันจอดำและล้าง hash cache เมื่อส่งพลาด (8) ป้องกัน `int16_t` overflow และ 2-DOF slew overshoot เกินเพดาน `55%`/`35%` (9) ล้าง `WDTRF` และรีเซ็ตตัวจับเวลาลูปหลังบูต/หลัง Auto `[Verified: Build/Test Run]` |
 | **Low** | **ข้อควรระวัง `longjmp` ใน `auto_block_code.cpp` และมุมปุ่ม `Square` (`30°`)** (`src/auto_mode.cpp:127`, `include/config.h:115-123`) | **รับทราบตามการออกแบบ** | หลีกเลี่ยงการใช้ `String` หรือตัวแปรที่มี destructor ในโซนวางโค้ด Auto และปุ่ม `Square` จะสลับระหว่างมุม `R1` (`140°`) กับมุมดันพื้น (`30°`) `[Verified: Static Code Inspection]` |
