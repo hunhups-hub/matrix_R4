@@ -194,6 +194,47 @@ bool MiniR4IO::isCommBackoffActive(uint32_t nowMs, uint32_t backoffMs) const {
            static_cast<int32_t>(nowMs - lastCommFailMs_) < static_cast<int32_t>(backoffMs);
 }
 
+bool MiniR4IO::readImuYawDeg(int16_t& outYawDeg) {
+    double roll  = 0.0;
+    double pitch = 0.0;
+    double yaw   = 0.0;
+    if (mmL.GetIMUEuler(roll, pitch, yaw) != MMLower::RESULT::OK) {
+        return false;
+    }
+    // Rejects NaN/garbage before the float->int conversion.
+    if (!(yaw > -1.0e6 && yaw < 1.0e6)) {
+        return false;
+    }
+    const int32_t rounded = static_cast<int32_t>(yaw >= 0.0 ? yaw + 0.5 : yaw - 0.5);
+    outYawDeg             = RobotLogic::wrapYawDeg(rounded);
+    return true;
+}
+
+bool MiniR4IO::readYawDeg(uint32_t nowMs, int16_t& outYawDeg) {
+    if (!commHealthy_ || isCommBackoffActive(nowMs, Config::kCommUnhealthyRetryIntervalMs)) {
+        return false;
+    }
+    if (!readImuYawDeg(outYawDeg)) {
+        (void)noteCommFailure();
+        return false;
+    }
+    return true;
+}
+
+bool MiniR4IO::readDriveEncoders(uint32_t nowMs, int32_t& outLeft, int32_t& outRight) {
+    if (!commHealthy_ || isCommBackoffActive(nowMs, Config::kCommUnhealthyRetryIntervalMs)) {
+        return false;
+    }
+    int32_t enc[4] = {0, 0, 0, 0};
+    if (mmL.GetAllEncoderCounter(enc) != MMLower::RESULT::OK) {
+        (void)noteCommFailure();
+        return false;
+    }
+    outLeft  = enc[Config::kMotorLeftId - 1U];
+    outRight = enc[Config::kMotorRightId - 1U];
+    return true;
+}
+
 bool MiniR4IO::isElapsed(uint32_t nowMs, uint32_t sinceMs, uint32_t periodMs) {
     return static_cast<int32_t>(nowMs - sinceMs) >= static_cast<int32_t>(periodMs);
 }

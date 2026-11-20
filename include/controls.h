@@ -1,0 +1,94 @@
+#pragma once
+
+#include <stdint.h>
+
+#include "types.h"
+
+// ============================================================================
+//  controls.h  --  แผนผังปุ่มจอย PS2 (เปลี่ยนปุ่มแก้ที่ไฟล์นี้ที่เดียว)
+//  PS2 button map: every PS2 button -> function assignment lives in this file.
+// ============================================================================
+//  วิธีเปลี่ยนปุ่ม: แก้ค่าทางขวาของ  constexpr Btn kXxx = Btn::...;
+//  ตัวอย่าง: ให้ปุ่ม Triangle เป็นตัวสลับ Precision แทน Select ->
+//      constexpr Btn kPrecisionToggle = Btn::Triangle;
+//  ข้อควรระวัง:
+//   - ห้ามให้ปุ่มสองหน้าที่ซ้ำกัน ถ้าหน้าที่นั้นอยู่ในกลุ่ม "ใช้พร้อมกันได้" (เช่น
+//     kFrontArmsDown กับ kFrontArmsUp ต้องเป็นคนละปุ่ม; kTrimLeft ซ้ำ kMicroTurnLeft ได้
+//     เพราะตัวหนึ่งต้องกด kTrimModifier ค้าง)
+//   - kBrakeOrExit (Cross) ยังเป็นปุ่มหยุดฉุกเฉินของ Auto ด้วย: ถ้าย้าย ให้ทดสอบ X-abort ในโหมด Auto
+//   - ปุ่มหยุด/ฉุกเฉินบนบอร์ด (BTN_UP / BTN_DOWN) และคีย์ Serial ไม่อยู่ในไฟล์นี้
+//     (คีย์ Serial: src/serial_control.cpp, ปุ่มบนบอร์ด: src/minir4_io.cpp)
+//   - รูปแบบแพ็กเก็ตจอย (การถอดรหัส/ตรวจความถูกต้อง) อยู่ใน src/link_failsafe.cpp
+//     และไม่ต้องแก้เมื่อเปลี่ยนปุ่ม
+// ============================================================================
+
+namespace Controls {
+
+enum class Btn : uint8_t {
+    Up,
+    Down,
+    Left,
+    Right,
+    L1,
+    R1,
+    L2,
+    R2,
+    L3,
+    R3,
+    Triangle,
+    Circle,
+    Cross,
+    Square,
+    Select,
+    Start
+};
+
+// --- Servos -------------------------------------------------------------------
+constexpr Btn kFrontArmsDown = Btn::L1;       // RC3+RC4 ลงไปที่ kRc3L1Deg / kRc4L1Deg
+constexpr Btn kFrontArmsUp   = Btn::R1;       // RC3+RC4 ยกไปที่ kRc3R1Deg / kRc4R1Deg
+constexpr Btn kPushGround    = Btn::Square;   // สลับท่าดันพื้น (กดครั้งที่ 2 คืนค่าเดิม)
+constexpr Btn kGripperOpen   = Btn::L2;       // RC1 -> kRc1L2Deg
+constexpr Btn kGripperClose  = Btn::R2;       // RC1 -> kRc1R2Deg
+constexpr Btn kPosePreset    = Btn::Circle;   // สลับท่า ถือ/วาง (RC1+RC2)
+constexpr Btn kArmUp         = Btn::Up;       // RC2 ขยับขึ้น (ทิศกลับด้วย kRc2InvertDir)
+constexpr Btn kArmDown       = Btn::Down;     // RC2 ขยับลง
+
+// --- Drive modes & trim ---------------------------------------------------------
+constexpr Btn kPrecisionToggle = Btn::Select; // โหมดช้า Precision เปิด/ปิด
+constexpr Btn kReverseToggle   = Btn::R3;     // สลับหน้า-หลังของหุ่น (Reverse-Front)
+constexpr Btn kSmoothToggle    = Btn::L3;     // เปิด/ปิดการกวาด RC2 แบบนุ่ม (บันทึก EEPROM)
+constexpr Btn kTrimModifier    = Btn::Start;  // กดค้างร่วมกับปุ่มด้านล่างเพื่อปรับสมดุลล้อ
+constexpr Btn kTrimLeft        = Btn::Left;   // Start + ปุ่มนี้ = trim -1%
+constexpr Btn kTrimRight       = Btn::Right;  // Start + ปุ่มนี้ = trim +1%
+// Start + kSmoothToggle = รีเซ็ต trim เป็น 0
+constexpr Btn kMicroTurnLeft   = Btn::Left;   // หมุนตัวละเอียดซ้าย (ไม่กด kTrimModifier)
+constexpr Btn kMicroTurnRight  = Btn::Right;  // หมุนตัวละเอียดขวา
+
+// --- Match control -------------------------------------------------------------
+constexpr Btn kAutoStart   = Btn::Triangle;   // เริ่มโหมด Auto (ขอบขาขึ้น, ต้องไม่กด kBrakeOrExit)
+constexpr Btn kBrakeOrExit = Btn::Cross;      // เบรกหยุดล้อค้างขณะกด + ออกจาก Auto ทันที
+
+/** True while button `b` is held in a decoded PS2 frame. */
+inline bool held(const Ps2Frame& f, Btn b) {
+    switch (b) {
+        case Btn::Up:       return f.up;
+        case Btn::Down:     return f.down;
+        case Btn::Left:     return f.left;
+        case Btn::Right:    return f.right;
+        case Btn::L1:       return f.l1;
+        case Btn::R1:       return f.r1;
+        case Btn::L2:       return f.l2;
+        case Btn::R2:       return f.r2;
+        case Btn::L3:       return f.l3;
+        case Btn::R3:       return f.r3;
+        case Btn::Triangle: return f.triangle;
+        case Btn::Circle:   return f.circle;
+        case Btn::Cross:    return f.cross;
+        case Btn::Square:   return f.square;
+        case Btn::Select:   return f.select;
+        case Btn::Start:    return f.start;
+    }
+    return false;
+}
+
+} // namespace Controls

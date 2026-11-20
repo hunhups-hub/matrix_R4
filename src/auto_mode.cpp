@@ -7,6 +7,7 @@
 #include <setjmp.h>
 
 #include "config.h"
+#include "controls.h"
 #include "oled_ui.h"
 
 namespace {
@@ -42,6 +43,9 @@ uint8_t                 s_driveEncIdxL           = Config::kMotorLeftId - 1U;
 uint8_t                 s_driveEncIdxR           = Config::kMotorRightId - 1U;
 bool                    s_driveTaskActive        = false;
 bool                    s_expectWheelMotion      = false;
+bool                    s_gyroActive             = false;
+int16_t                 s_headingTargetDeg       = 0;
+uint16_t                s_moveStep               = 0U;
 
 constexpr uint8_t       kSerialPassCap           = 32U;
 uint8_t                 s_serialBuf[kSerialPassCap]{};
@@ -285,7 +289,7 @@ void pollExitControls(uint32_t nowMs) {
     s_snap->ps2Rx        = s_lastFrame->rx;
     s_snap->commHealthy  = s_io->commHealthy();
 
-    if (RobotLogic::shouldAbortAutoMode(valid, s_lastFrame->cross)) {
+    if (RobotLogic::shouldAbortAutoMode(valid, Controls::held(*s_lastFrame, Controls::kBrakeOrExit))) {
         abortAuto(AutoExitReason::Ps2Cross);
     }
 
@@ -323,6 +327,13 @@ AutoExitReason execute(MiniR4IO& io,
     s_driveEncIdxR           = Config::kMotorRightId - 1U;
     clearSerialPassthrough();
     resetStallTracker(startMs);
+    // Gyro assist is opt-in; on any IMU reset failure it stays off so DriveDC keeps legacy behaviour.
+    s_gyroActive       = false;
+    s_headingTargetDeg = 0;
+    s_moveStep         = 0U;
+    if (Config::kAutoGyroMode != Config::kAutoGyroOff) {
+        s_gyroActive = (mmL.SetIMUToZero() == MMLower::RESULT::OK);
+    }
     s_entryTrianglePending   = true;
     s_exitAfterLoopIteration = false;
     s_sawUpReleased          = false;
@@ -355,6 +366,7 @@ AutoExitReason execute(MiniR4IO& io,
     s_expectWheelMotion      = false;
     s_entryTrianglePending   = false;
     s_exitAfterLoopIteration = false;
+    s_gyroActive             = false;
     s_oled                   = nullptr;
     WDT.refresh();
 
@@ -511,6 +523,65 @@ void endBlockingDriveTask() {
 
 void noteUserLoopActivity() {
     s_yieldCalled = true;
+}
+
+bool gyroAssistActive() {
+    return s_running && s_gyroActive;
+}
+
+int16_t headingTargetDeg() {
+    return s_headingTargetDeg;
+}
+
+void setHeadingTargetDeg(int16_t deg) {
+    s_headingTargetDeg = RobotLogic::wrapYawDeg(deg);
+}
+
+bool readYawDeg(int16_t& outDeg) {
+    return MiniR4IO::readImuYawDeg(outDeg);
+}
+
+bool latchHeadingFromImu() {
+    int16_t yaw = 0;
+    if (!readYawDeg(yaw)) {
+        return false;
+    }
+    s_headingTargetDeg = yaw;
+    return true;
+}
+
+void logMove(const char* kind, int16_t a, int16_t b, uint16_t degrees, uint8_t result) {
+    ++s_moveStep;
+    if (!Config::kAutoMoveTelemetry || !s_gyroActive) {
+        return;
+    }
+    int16_t    yaw = 0;
+    const bool ok  = readYawDeg(yaw);
+    Serial.print(F("[AUTO] #"));
+    Serial.print(s_moveStep);
+    Serial.print(' ');
+    Serial.print(kind != nullptr ? kind : "?");
+    Serial.print(F(" a="));
+    Serial.print(a);
+    Serial.print(F(" b="));
+    Serial.print(b);
+    Serial.print(F(" d="));
+    Serial.print(degrees);
+    Serial.print(F(" hdgT="));
+    Serial.print(s_headingTargetDeg);
+    if (ok) {
+        Serial.print(F(" yaw="));
+        Serial.print(yaw);
+        Serial.print(F(" err="));
+        Serial.print(RobotLogic::yawErrorDeg(s_headingTargetDeg, yaw));
+    } else {
+        Serial.print(F(" yaw=n/a"));
+    }
+    Serial.print(F(" res="));
+    Serial.print(result);
+    Serial.print(F(" t="));
+    Serial.print(static_cast<uint32_t>(millis() - s_autoStartMs));
+    Serial.println(F("ms"));
 }
 
 int serialAvailable() {

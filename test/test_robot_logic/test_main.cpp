@@ -1881,6 +1881,229 @@ void test_serial_estop_batch_help_and_telemetry_fields(void) {
 }
 
 // ============================================================================
+// 11. Auto Gyro Assist: heading math and move classification
+// ============================================================================
+
+void test_yaw_wrap_error_and_snap(void) {
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::wrapYawDeg(0));
+    TEST_ASSERT_EQUAL_INT16(180, RobotLogic::wrapYawDeg(180));
+    TEST_ASSERT_EQUAL_INT16(-180, RobotLogic::wrapYawDeg(-180));
+    TEST_ASSERT_EQUAL_INT16(-170, RobotLogic::wrapYawDeg(190));
+    TEST_ASSERT_EQUAL_INT16(170, RobotLogic::wrapYawDeg(-190));
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::wrapYawDeg(720));
+    TEST_ASSERT_EQUAL_INT16(-90, RobotLogic::wrapYawDeg(270));
+    // INT32_MIN stays in range (-2147483648 mod 360 = -128).
+    TEST_ASSERT_EQUAL_INT16(-128, RobotLogic::wrapYawDeg(-2147483647L - 1L));
+
+    // Shortest path across the +/-180 seam.
+    TEST_ASSERT_EQUAL_INT16(20, RobotLogic::yawErrorDeg(-170, 170));
+    TEST_ASSERT_EQUAL_INT16(-20, RobotLogic::yawErrorDeg(170, -170));
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::yawErrorDeg(45, 45));
+    TEST_ASSERT_EQUAL_INT16(-30, RobotLogic::yawErrorDeg(0, 30));
+
+    // Snap: nearest multiple, symmetric about zero, disabled when step <= 0.
+    TEST_ASSERT_EQUAL_INT16(90, RobotLogic::snapYawDeg(97, 45));
+    TEST_ASSERT_EQUAL_INT16(-90, RobotLogic::snapYawDeg(-97, 45));
+    TEST_ASSERT_EQUAL_INT16(180, RobotLogic::snapYawDeg(182, 45));
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::snapYawDeg(22, 45));
+    TEST_ASSERT_EQUAL_INT16(45, RobotLogic::snapYawDeg(23, 45));
+    TEST_ASSERT_EQUAL_INT16(97, RobotLogic::snapYawDeg(97, 0));
+    TEST_ASSERT_EQUAL_INT16(97, RobotLogic::snapYawDeg(97, -5));
+}
+
+void test_pivot_yaw_estimate_and_move_classification(void) {
+    // Mission values: 255 wheel deg ~ 90 deg, 515 ~ 180 deg, direction by right-wheel sign.
+    TEST_ASSERT_EQUAL_INT16(90 * Config::kAutoPivotYawSign,
+                            RobotLogic::estimatePivotYawDeg(-50, 50, 255U));
+    TEST_ASSERT_EQUAL_INT16(-90 * Config::kAutoPivotYawSign,
+                            RobotLogic::estimatePivotYawDeg(50, -50, 255U));
+    TEST_ASSERT_EQUAL_INT16(RobotLogic::wrapYawDeg(182 * Config::kAutoPivotYawSign),
+                            RobotLogic::estimatePivotYawDeg(-50, 50, 515U));
+
+    // Not a symmetric pivot, or no travel: no estimate.
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::estimatePivotYawDeg(50, 50, 300U));
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::estimatePivotYawDeg(-50, 30, 300U));
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::estimatePivotYawDeg(0, 0, 300U));
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::estimatePivotYawDeg(-50, 50, 0U));
+    // Extreme wheel degrees stay inside the wrapped range.
+    const int16_t big = RobotLogic::estimatePivotYawDeg(-100, 100, 65535U);
+    TEST_ASSERT_TRUE(big >= -180 && big <= 180);
+
+    using RobotLogic::AutoMoveKind;
+    TEST_ASSERT_TRUE(RobotLogic::classifyAutoMove(-50, -50, 415U) == AutoMoveKind::Straight);
+    TEST_ASSERT_TRUE(RobotLogic::classifyAutoMove(50, 50, 300U) == AutoMoveKind::Straight);
+    TEST_ASSERT_TRUE(RobotLogic::classifyAutoMove(-50, 50, 275U) == AutoMoveKind::Pivot);
+    TEST_ASSERT_TRUE(RobotLogic::classifyAutoMove(50, -50, 255U) == AutoMoveKind::Pivot);
+    TEST_ASSERT_TRUE(RobotLogic::classifyAutoMove(50, 20, 255U) == AutoMoveKind::Other);   // arc
+    TEST_ASSERT_TRUE(RobotLogic::classifyAutoMove(50, 0, 255U) == AutoMoveKind::Other);    // one wheel
+    TEST_ASSERT_TRUE(RobotLogic::classifyAutoMove(50, 50, 0U) == AutoMoveKind::Other);     // no travel
+    TEST_ASSERT_TRUE(RobotLogic::classifyAutoMove(0, 0, 100U) == AutoMoveKind::Other);
+}
+
+// ============================================================================
+// 12. Manual stall cut-off and teleop heading hold
+// ============================================================================
+
+void test_manual_stall_detector_trip_rearm_and_fail_open(void) {
+    RobotLogic::ManualStallDetector d;
+    d.reset();
+    const uint32_t step = Config::kManualStallPollMs;
+
+    // Full command, wheels never move: arms on first sample, trips after the timeout.
+    uint32_t t = 1000UL;
+    TEST_ASSERT_FALSE(d.update(80, 80, true, true, 0, 0, t));
+    bool tripped = false;
+    uint32_t tripAt = 0UL;
+    for (uint32_t i = 1U; i <= 20U && !tripped; ++i) {
+        t += step;
+        tripped = d.update(80, 80, true, true, 0, 0, t);
+        if (tripped) {
+            tripAt = t - 1000UL;
+        }
+    }
+    TEST_ASSERT_TRUE(tripped);
+    TEST_ASSERT_TRUE(tripAt >= Config::kManualStallTimeoutMs);
+    TEST_ASSERT_TRUE(tripAt < Config::kManualStallTimeoutMs + 2U * step);
+
+    // Stays latched while the stick is still pushed, even if the wheels start moving.
+    TEST_ASSERT_TRUE(d.update(80, 80, true, true, 500, 500, t + step));
+    // Mid command (between rearm and min) does not clear it either.
+    TEST_ASSERT_TRUE(d.update(30, 30, false, false, 0, 0, t + 2U * step));
+    // Back to neutral re-arms; pushing again does not trip immediately.
+    TEST_ASSERT_FALSE(d.update(0, 0, false, false, 0, 0, t + 3U * step));
+    TEST_ASSERT_FALSE(d.tripped());
+    TEST_ASSERT_FALSE(d.update(80, 80, true, true, 500, 500, t + 4U * step));
+}
+
+void test_manual_stall_detector_progress_low_cmd_and_invalid_sample(void) {
+    RobotLogic::ManualStallDetector d;
+    d.reset();
+    const uint32_t step = Config::kManualStallPollMs;
+
+    // Wheels keep turning: never trips over 5 s.
+    int32_t enc = 0;
+    uint32_t t  = 0UL;
+    for (uint32_t i = 0U; i < 25U; ++i) {
+        enc += 40;
+        TEST_ASSERT_FALSE(d.update(100, -100, true, true, enc, -enc, t));
+        t += step;
+    }
+
+    // Below kManualStallMinCmdPct a frozen encoder is not a stall.
+    d.reset();
+    t = 0UL;
+    for (uint32_t i = 0U; i < 25U; ++i) {
+        TEST_ASSERT_FALSE(d.update(Config::kManualStallMinCmdPct - 1,
+                                   Config::kManualStallMinCmdPct - 1, true, true, 0, 0, t));
+        t += step;
+    }
+
+    // Failed encoder reads fail open and restart the timeout.
+    d.reset();
+    t = 0UL;
+    for (uint32_t i = 0U; i < 25U; ++i) {
+        TEST_ASSERT_FALSE(d.update(90, 90, true, false, 0, 0, t));
+        t += step;
+    }
+    TEST_ASSERT_FALSE(d.tripped());
+}
+
+void test_heading_hold_correction_and_state_machine(void) {
+    // Deadband, proportional region, clamp, symmetry and seam wrap.
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::computeHeadingHoldCorrection(0, 0));
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::computeHeadingHoldCorrection(0, -Config::kTeleopHoldDeadbandDeg));
+    TEST_ASSERT_EQUAL_INT16(4, RobotLogic::computeHeadingHoldCorrection(3, 0));
+    TEST_ASSERT_EQUAL_INT16(-4, RobotLogic::computeHeadingHoldCorrection(0, 3));
+    TEST_ASSERT_EQUAL_INT16(Config::kTeleopHoldMaxCorrPct, RobotLogic::computeHeadingHoldCorrection(90, 0));
+    TEST_ASSERT_EQUAL_INT16(-Config::kTeleopHoldMaxCorrPct, RobotLogic::computeHeadingHoldCorrection(-90, 0));
+    // 179 -> -179 is a 2 deg step across the seam (inside deadband), not 358.
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::computeHeadingHoldCorrection(-179, 179));
+
+    RobotLogic::TeleopHeadingHold h;
+    h.reset();
+    const uint32_t poll = Config::kTeleopHoldPollMs;
+    uint32_t       t    = 5000UL;
+
+    // Before the latch delay there is never a correction.
+    TEST_ASSERT_EQUAL_INT16(0, h.update(true, true, true, 10, t));
+    TEST_ASSERT_FALSE(h.latched());
+    t += poll;
+    TEST_ASSERT_EQUAL_INT16(0, h.update(true, true, true, 10, t));
+    TEST_ASSERT_FALSE(h.latched());
+
+    // After the delay the current yaw is latched (no correction on the latch tick).
+    t += Config::kTeleopHoldLatchDelayMs;
+    TEST_ASSERT_EQUAL_INT16(0, h.update(true, true, true, 10, t));
+    TEST_ASSERT_TRUE(h.latched());
+
+    // Drift +8 deg -> push back (negative), drift -8 -> positive; held between samples.
+    t += poll;
+    const int16_t back = h.update(true, true, true, 18, t);
+    TEST_ASSERT_TRUE(back < 0);
+    TEST_ASSERT_EQUAL_INT16(back, h.update(true, false, false, 0, t + 5U));
+    t += poll;
+    TEST_ASSERT_TRUE(h.update(true, true, true, 2, t) > 0);
+
+    // A failed IMU read fails open and drops the latch.
+    t += poll;
+    TEST_ASSERT_EQUAL_INT16(0, h.update(true, true, false, 0, t));
+    TEST_ASSERT_FALSE(h.latched());
+
+    // Re-latch, then a turn command (or releasing throttle) fully resets.
+    t += Config::kTeleopHoldLatchDelayMs + poll;
+    (void)h.update(true, true, true, 0, t);
+    t += poll;
+    (void)h.update(true, true, true, 0, t);
+    TEST_ASSERT_TRUE(h.latched());
+    TEST_ASSERT_EQUAL_INT16(0, h.update(false, true, true, 50, t + poll));
+    TEST_ASSERT_FALSE(h.latched());
+}
+
+void test_turn_correction_envelope_and_difference(void) {
+    // Straight 60/60 + 10: raw 50/70, right overflows the bound (60) by 10, moved onto left.
+    // The wheel difference (the actual turn) stays 2*c = 20.
+    int16_t l = 60;
+    int16_t r = 60;
+    RobotLogic::applyTurnCorrection(l, r, 10);
+    TEST_ASSERT_EQUAL_INT16(40, l);
+    TEST_ASSERT_EQUAL_INT16(60, r);
+    TEST_ASSERT_EQUAL_INT16(20, static_cast<int16_t>(r - l));
+
+    // Full speed, negative correction: raw 115/85 -> 100/70, difference -30.
+    l = 100;
+    r = 100;
+    RobotLogic::applyTurnCorrection(l, r, -15);
+    TEST_ASSERT_EQUAL_INT16(100, l);
+    TEST_ASSERT_EQUAL_INT16(70, r);
+
+    // Reverse travel: raw -92/-68 -> left clipped to -80, overflow 12 moves right to -56; difference 24.
+    l = -80;
+    r = -80;
+    RobotLogic::applyTurnCorrection(l, r, 12);
+    TEST_ASSERT_EQUAL_INT16(-80, l);
+    TEST_ASSERT_EQUAL_INT16(-56, r);
+    TEST_ASSERT_EQUAL_INT16(24, static_cast<int16_t>(r - l));
+
+    // No-ops.
+    l = 0;
+    r = 0;
+    RobotLogic::applyTurnCorrection(l, r, 10);
+    TEST_ASSERT_EQUAL_INT16(0, l);
+    TEST_ASSERT_EQUAL_INT16(0, r);
+    l = 40;
+    r = 40;
+    RobotLogic::applyTurnCorrection(l, r, 0);
+    TEST_ASSERT_EQUAL_INT16(40, l);
+    TEST_ASSERT_EQUAL_INT16(40, r);
+
+    // Extremes stay inside motor limits.
+    l = 100;
+    r = -100;
+    RobotLogic::applyTurnCorrection(l, r, 100);
+    TEST_ASSERT_TRUE(l >= -100 && l <= 100 && r >= -100 && r <= 100);
+}
+
+// ============================================================================
 // Main Unity Test Runner
 // ============================================================================
 
@@ -1946,6 +2169,16 @@ int main(int argc, char** argv) {
     RUN_TEST(test_servo_direction_inversion);
     RUN_TEST(test_kinodynamic_envelope_and_overflow_safety);
     RUN_TEST(test_serial_estop_batch_help_and_telemetry_fields);
+
+    // 11. Auto Gyro Assist heading math
+    RUN_TEST(test_yaw_wrap_error_and_snap);
+    RUN_TEST(test_pivot_yaw_estimate_and_move_classification);
+
+    // 12. Manual stall cut-off & teleop heading hold
+    RUN_TEST(test_manual_stall_detector_trip_rearm_and_fail_open);
+    RUN_TEST(test_manual_stall_detector_progress_low_cmd_and_invalid_sample);
+    RUN_TEST(test_heading_hold_correction_and_state_machine);
+    RUN_TEST(test_turn_correction_envelope_and_difference);
 
     return UNITY_END();
 }

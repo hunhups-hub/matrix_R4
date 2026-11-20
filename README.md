@@ -21,7 +21,7 @@
    - การเปิดโปรเจกต์และการโหลด Toolchain อัตโนมัติ
    - การเรียกใช้งาน PlatformIO ผ่าน Terminal และ CLI
 5. [คู่มือการคอมไพล์ ทดสอบ และอัปโหลดโปรแกรม (Build, Test & Upload Step-by-Step)](#5-คู่มือการคอมไพล์-ทดสอบ-และอัปโหลดโปรแกรม-build-test--upload-step-by-step)
-   - 5.1 การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์ (`pio test -e native` — ครบ 38 รายการ 10 หมวดหมู่)
+   - 5.1 การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์ (`pio test -e native` — ครบ 44 รายการ 12 หมวดหมู่)
    - 5.2 การคอมไพล์โค้ดสำหรับฮาร์ดแวร์ (`pio run -e uno_r4_wifi`)
    - 5.3 การอัปโหลดเฟิร์มแวร์ลงบอร์ด (`pio run -e uno_r4_wifi --target upload`)
    - 5.4 ทางลัดเข้าสู่โหมดอัปโหลด Bootloader (Upload Bootloader Mode Shortcut)
@@ -327,16 +327,16 @@
 ```
 *(หรือพิมพ์ `pio test -e native` หากตั้งค่า Environment Path แล้ว)*
 
-**ผลลัพธ์ที่คาดหวัง**: ระบบจะรันชุดทดสอบ Unity Unit Tests ครบทั้ง **38 รายการ (10 หมวดหมู่)** โดยจะผ่านทั้งหมด (`[PASSED]`) 100% ภายในเวลาไม่กี่วินาที:
+**ผลลัพธ์ที่คาดหวัง**: ระบบจะรันชุดทดสอบ Unity Unit Tests ครบทั้ง **44 รายการ (12 หมวดหมู่)** โดยจะผ่านทั้งหมด (`[PASSED]`) 100% ภายในเวลาไม่กี่วินาที:
 ```text
 =================================== SUMMARY ===================================
 Environment    Test              Status    Duration
 -------------  ----------------  --------  ------------
 native         test_robot_logic  PASSED    00:00:02.729
-================= 38 test cases: 38 succeeded in 00:00:02.729 =================
+================= 44 test cases: 44 succeeded in 00:00:02.729 =================
 ```
 
-**คำอธิบายชุดทดสอบทั้ง 38 รายการ (10 หมวดหมู่หลัก)** ใน [test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp):
+**คำอธิบายชุดทดสอบทั้ง 44 รายการ (12 หมวดหมู่หลัก)** ใน [test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp):
 1. **การคำนวณจลนศาสตร์ล้อและการตัด Deadzone (Differential Drive Kinematics - 4 รายการ)**:
    - `test_axis_deadzone_and_extremes`: ตรวจสอบว่าช่วง Deadband ตรงกลางของจอยสติ๊ก (`109..146`) ตัดเป็น `0` อย่างสมบูรณ์ และเมื่อโยกสุดจะได้ `±100%` แน่นอน
    - `test_differential_drive_zero_speed_boundary`: ตรวจสอบว่าเมื่อขีดจำกัดความเร็วเป็น `0` หรือติดลบ มอเตอร์จะไม่ขยับหรือค่อยๆ ลดความเร็วสู่ `0`
@@ -386,6 +386,15 @@ native         test_robot_logic  PASSED    00:00:02.729
     - `test_kinodynamic_envelope_and_overflow_safety`: ตรวจสอบว่าไปป์ไลน์ 2-DOF Slew ไม่พุ่งเกินเพดาน Precision (`55%`) หรือ Battery Emergency (`35%`) เมื่อเปลี่ยนจากวิ่งตรงเป็นหมุนตัวทันที พร้อมตรวจป้องกัน `int16_t` overflow ใน `applyDriveTargetsWithSlew`, `applyAsymmetricSlewStep`, `slewServoAngle`, `applyMotorBalanceTrim` และความทนทานต่อ `nullptr` ใน `decodePs2Payload`
     - `test_serial_estop_batch_help_and_telemetry_fields`: ตรวจสอบว่า `!w` ในแบตช์เดียวกันยังหยุดมอเตอร์สนิท, ข้อความ Help แสดง `Aux RC1 180 / 0 deg` และ `v` ถูกต้อง, `printEvent(nullptr, nullptr)` ปลอดภัย และ Telemetry `[STAT]` แสดงฟิลด์ `rf=` และ `com=`
 
+11. **ตัวช่วยคำนวณมุมหันสำหรับ Auto Gyro Assist (Heading Math - 2 รายการ)**:
+    - `test_yaw_wrap_error_and_snap`: ตรวจสอบ `wrapYawDeg()` (ช่วง `-180..180`, ทนค่าสุดขอบ `INT32_MIN`), `yawErrorDeg()` ที่เลือกเส้นทางสั้นสุดข้ามรอยต่อ `±180`, และ `snapYawDeg()` ปัดมุมเข้าขั้น `45°`
+    - `test_pivot_yaw_estimate_and_move_classification`: ตรวจสอบ `estimatePivotYawDeg()` (ประมาณมุมหมุนจากองศาล้อ) และ `classifyAutoMove()` แยกคำสั่ง `MoveDegs` เป็น Straight / Pivot / Other
+12. **ตัดกำลังเมื่อล้อติดขัดโหมด Manual, Heading Hold ขณะขับ Teleop และการแก้ทิศ (Opt-in - 4 รายการ)**:
+    - `test_manual_stall_detector_trip_rearm_and_fail_open`: ตรวจสอบ `ManualStallDetector` ตัดกำลังหลัง `kManualStallTimeoutMs`, ค้างสถานะจนปล่อยก้านโยก (re-arm) และไม่ตัดซ้ำทันที
+    - `test_manual_stall_detector_progress_low_cmd_and_invalid_sample`: ตรวจสอบว่าล้อหมุนอยู่, คำสั่งต่ำกว่า `kManualStallMinCmdPct`, หรืออ่าน Encoder ไม่สำเร็จ จะไม่ตัดกำลัง (Fail-open)
+    - `test_heading_hold_correction_and_state_machine`: ตรวจสอบ `computeHeadingHoldCorrection()` (Deadband, สัดส่วน, Clamp, ข้ามรอยต่อ `±180`) และ `TeleopHeadingHold` (หน่วงก่อนล็อกมุม, ถือค่าระหว่างตัวอย่าง, ยกเลิกเมื่อเลี้ยว/IMU อ่านพลาด)
+    - `test_turn_correction_envelope_and_difference`: ตรวจสอบ `applyTurnCorrection()` ไม่ให้กำลังล้อเกินเพดานคำสั่งปัจจุบัน โดยยังรักษาผลต่างล้อซ้าย/ขวา
+
 ---
 
 ### 5.2 การคอมไพล์โค้ดสำหรับฮาร์ดแวร์ (`pio run -e uno_r4_wifi`)
@@ -401,6 +410,14 @@ RAM:   [====      ]  43.9% (used 14396 bytes from 32768 bytes)
 Flash: [====      ]  41.5% (used 108820 bytes from 262144 bytes)
 ========================= [SUCCESS] Took 14.86 seconds =========================
 ```
+
+---
+
+**บิลด์ทดสอบหน้างาน (`uno_r4_wifi_field`)**: เปิด Gyro Assist ใน Auto (โหมด 2), ตัดกำลังเมื่อล้อติดขัดใน Manual และ Heading Hold ตอนขับ Teleop โดยไม่ต้องแก้โค้ด (ส่ง `-DMATRIX_AUTO_GYRO_MODE=2 -DMATRIX_MANUAL_STALL_CUT=1 -DMATRIX_TELEOP_HEADING_HOLD=1`):
+```powershell
+& "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" run -e uno_r4_wifi_field --target upload
+```
+ขั้นตอนทดสอบ: ยกล้อลอยจากพื้น → รัน Auto แล้วดูบรรทัด `[AUTO] #n ... yaw= err=` ใน Serial Monitor → ตรวจว่าทิศของ `kAutoPivotYawSign` และโหมด `TurnGyro` ถูกต้อง → จูน `kAutoPivotWheelDegPerYawDegX100` → จึงค่อยขึ้นพื้นจริง ส่วนบิลด์แข่ง (`uno_r4_wifi`) ปิดฟีเจอร์เหล่านี้ทั้งหมดโดยค่าเริ่มต้น
 
 ---
 
@@ -862,8 +879,16 @@ matrix_R4/
 └── test/                                           # ส่วนการทดสอบซอฟต์แวร์อัตโนมัติ (Automated Unit Tests - 2 ไฟล์)
     ├── README                                      # [27] คำแนะนำมาตรฐานของ PlatformIO สำหรับ Test Runner และ Unit Testing
     └── test_robot_logic/
-        └── test_main.cpp                           # [28] ชุดแบบทดสอบอัตโนมัติ 38 รายการ (10 หมวดหมู่) บน Native Host ด้วย Unity
+        └── test_main.cpp                           # [28] ชุดแบบทดสอบอัตโนมัติ 44 รายการ (12 หมวดหมู่) บน Native Host ด้วย Unity
 ```
+
+> **อัปเดตโครงสร้าง**: `src/robot_logic.cpp` ถูกแยกเป็น 6 ไฟล์ลอจิกบริสุทธิ์ (Pure C++11, คอมไพล์ใน `env:native` ทั้งหมด) โดย `robot_logic.h` ยังเป็นอินเทอร์เฟซเดียวเหมือนเดิม:
+> - `robot_logic.cpp` — จลนพลศาสตร์การขับและ Slew
+> - `persistent_config.cpp` — CRC-16 และแพ็ก/ถอดรหัส EEPROM
+> - `auto_heading.cpp` — คณิตศาสตร์มุมหัน, `ManualStallDetector`, `TeleopHeadingHold`, `applyTurnCorrection`, ซิงก์ทิศมอเตอร์ Auto
+> - `servo_logic.cpp` — เป้าหมายเซอร์โว, พรีเซ็ต, ท่ากลับทิศ
+> - `link_failsafe.cpp` — ถอดรหัสแพ็กเก็ต PS2 และ `FailsafeStateMachine`
+> - `power_stability.cpp` — `BatteryStabilizer` และ `StabilityMonitor`
 
 ---
 
@@ -880,7 +905,7 @@ matrix_R4/
 2. **`[env:native]` (Target จำลองบนคอมพิวเตอร์โฮสต์)**:
    - `platform = native`, `platform_packages = platformio/toolchain-gccmingw32@^1.40900.0`
    - `build_flags = -std=c++11 -Wall -Wextra -Werror -Iinclude`
-   - `build_src_filter = +<robot_logic.cpp> +<serial_control.cpp>` และ `test_build_src = yes`: ดึงโมดูลลอจิกบริสุทธิ์และตัวแยกคำสั่ง Serial มาคอมไพล์รันชุดทดสอบทั้ง 38 ข้อบนคอมพิวเตอร์ได้โดยตรงโดยไม่ต้องต่อบอร์ดจริง
+   - `build_src_filter = +<robot_logic.cpp> +<serial_control.cpp>` และ `test_build_src = yes`: ดึงโมดูลลอจิกบริสุทธิ์และตัวแยกคำสั่ง Serial มาคอมไพล์รันชุดทดสอบทั้ง 44 ข้อบนคอมพิวเตอร์ได้โดยตรงโดยไม่ต้องต่อบอร์ดจริง
 
 ##### 7.2.2 [README.md](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/README.md) — คู่มือการใช้งานและเอกสารวิศวกรรมฉบับสมบูรณ์ภาษาไทย
 ไฟล์เอกสารคู่มือฉบับสมบูรณ์ที่คุณกำลังอ่านอยู่นี้ ครอบคลุมตั้งแต่สถาปัตยกรรมระบบ, ผังพิน, การติดตั้ง PlatformIO, คู่มือการบังคับด้วยจอยสติ๊กและคีย์บอร์ด, การวางโค้ดโหมดอัตโนมัติจาก MATRIXblock R4, แบบจำลองฟิสิกส์จลนพลศาสตร์ 5 ขั้นตอน, คำอธิบายโค้ดครบทั้ง 28 ไฟล์ ไปจนถึงการแก้ไขปัญหาหน้างาน
@@ -1046,8 +1071,8 @@ matrix_R4/
 ##### 7.2.27 [test/README](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/README) — คู่มือมาตรฐาน PlatformIO สำหรับระบบรันการทดสอบ Unit Testing
 เอกสารคำแนะนำมาตรฐานของ PlatformIO สำหรับการสร้างและรันชุดแบบทดสอบ Unit Testing
 
-##### 7.2.28 [test/test_robot_logic/test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp) — ตัวรันชุดแบบทดสอบ Unity Unit Tests ครบทั้ง 38 รายการ (10 หมวดหมู่) บน Native Host
-ไฟล์ชุดแบบทดสอบอัตโนมัติขนาดกว่า 1,900 บรรทัดที่ใช้เฟรมเวิร์ก Unity Test Framework ตรวจสอบความถูกต้องของอัลกอริทึมทุกส่วนในโปรเจกต์ครบทั้ง 38 รายการ (ดูรายละเอียดทั้ง 38 รายการได้ในหัวข้อ [5.1](#51-การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์-pio-test--e-native))
+##### 7.2.28 [test/test_robot_logic/test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp) — ตัวรันชุดแบบทดสอบ Unity Unit Tests ครบทั้ง 44 รายการ (12 หมวดหมู่) บน Native Host
+ไฟล์ชุดแบบทดสอบอัตโนมัติขนาดกว่า 1,900 บรรทัดที่ใช้เฟรมเวิร์ก Unity Test Framework ตรวจสอบความถูกต้องของอัลกอริทึมทุกส่วนในโปรเจกต์ครบทั้ง 44 รายการ (ดูรายละเอียดทั้ง 44 รายการได้ในหัวข้อ [5.1](#51-การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์-pio-test--e-native))
 
 ---
 
@@ -1140,6 +1165,30 @@ flowchart TD
 | `kAutoHoldBarDelayMs` | `250` | ms | เวลาหน่วงก่อนแสดงแถบกราฟิก `Hold UP->AUTO` บนจอ OLED |
 | `kAutoMaxDurationMs` | `60000` | ms | เวลาทำงานสูงสุดของโหมด Auto เพื่อความปลอดภัย (60 วินาที; ตั้ง `0` หากไม่จำกัด) |
 | `kAutoStallGraceMs` / `TimeoutMs`| `1250` / `1600` | ms | เวลาผ่อนผันเริ่มต้น (`1.25s`) และเวลาตรวจจับล้อติดขัดต่อเนื่อง (`1.6s`) ในโหมด Auto |
+| `kAutoGyroMode` | `0` (Off) | enum | โหมด Gyro Assist ใน Auto: `0`=Off (เหมือนเดิม), `1`=StraightHold (วิ่งตรงด้วย `MoveGyroDegs`), `2`=StraightHoldAndTurn (หมุนด้วย `TurnGyro`) — ต้องตรวจเครื่องหมาย/โหมดบนหุ่นจริงก่อนเปิด |
+| `kAutoPivotWheelDegPerYawDegX100` / `kAutoPivotYawSign` | `283` / `1` | x100 / sign | องศาล้อต่อ 1° yaw (x100) และทิศ yaw เมื่อล้อขวาเดินหน้า ใช้ประมาณมุมเลี้ยว |
+| `kAutoTurnSnapStepDeg` / `kAutoTurnGyroMode` | `45` / `1` | deg / mode | ขั้นปัดมุมเป้าหมาย (`<= 0` = ไม่ปัด) และโหมด `TurnGyro` (`0`=ล้อเดียว, `1`=สองล้อ) |
+| `kAutoMoveTelemetry` | `true` | bool | พิมพ์บรรทัด `[AUTO] #n ...` ทุกคำสั่งขับใน Auto (เมื่อ Gyro Assist ทำงาน) |
+| `kEnableManualStallCut` | `false` | bool | ตัดกำลังเมื่อล้อติดขัดขณะขับ Manual (ปิดไว้เพราะการแข่งดันต้องใช้แรงบิดเต็ม) |
+| `kManualStallMinCmdPct` / `RearmCmdPct` | `60` / `15` | % | กำลังสั่งขั้นต่ำเพื่อตรวจติดขัด / ระดับที่ปลดล็อกการตัด |
+| `kManualStallTimeoutMs` / `PollMs` | `1500` / `200` | ms | เวลาไม่มีความคืบหน้าของ Encoder ก่อนตัด / คาบอ่าน Encoder |
+| `kEnableTeleopHeadingHold` | `false` | bool | ล็อกทิศด้วย Gyro เมื่อดันคันเร่งโดยไม่เลี้ยว |
+| `kTeleopHoldLatchDelayMs` / `PollMs` | `250` / `100` | ms | เวลาขับตรงก่อนล็อกมุม / คาบอ่าน IMU |
+| `kTeleopHoldDeadbandDeg` / `KpX10` / `MaxCorrPct` | `2` / `15` / `15` | deg / x10 / % | Deadband, อัตราขยายแก้มุม (%/° x10) และเพดานแก้ต่อล้อ |
+
+---
+
+### 7.5 ที่ไหนแก้อะไร (Where to Edit — Quick Map)
+
+| ต้องการแก้ | ไฟล์ | ตัวอย่าง |
+| :--- | :--- | :--- |
+| ความเร็ว ความนุ่ม ทิศมอเตอร์ มุมเซอร์โว นโยบายแบตเตอรี่ เวลา Auto | [include/user_settings.h](include/user_settings.h) | `kPrecisionMaxPower`, `kRc1PresetDropDeg`, `kMotorRightReverseInit` |
+| ปุ่มจอย PS2 ทำหน้าที่อะไร | [include/controls.h](include/controls.h) | เปลี่ยน `kPrecisionToggle = Btn::Select;` เป็น `Btn::Triangle;` |
+| ภารกิจ Auto จาก MATRIXblock R4 | [src/auto_block_code.cpp](src/auto_block_code.cpp) | วางโค้ดใต้บรรทัด `PASTE ... BELOW` |
+| คีย์ที่พิมพ์ใน Serial Monitor | [src/serial_control.cpp](src/serial_control.cpp) | สวิตช์ `case 'w':` ฯลฯ |
+| พิน คาบเวลา ขีดจำกัดฮาร์ดแวร์ | [include/config.h](include/config.h) | `kControlPeriodMs`, `kPs2ClkPin` |
+
+หลังแก้ให้รัน `pio test -e native` แล้ว `pio run -e uno_r4_wifi` (หรือ `uno_r4_wifi_field` สำหรับบิลด์ทดสอบ Gyro) ตารางพารามิเตอร์ในหัวข้อ 7.4 ด้านบนยังใช้ชื่อค่าคงที่เดิมทุกตัว เพียงแต่ค่าที่ปรับบ่อยย้ายไปอยู่ใน `user_settings.h`
 
 ---
 
@@ -1221,7 +1270,7 @@ flowchart TD
 
 ## 9. สรุปการยกระดับความปลอดภัยและความเสถียรล่าสุด (Security & Stability Hardening Summary)
 
-รายการปรับปรุงสำคัญจากการตรวจสอบโค้ดและฮาร์ดแวร์ครบทั้ง 28 ไฟล์ (ผ่าน `pio run -e uno_r4_wifi`, `pio test -e native` 38/38 เคส, และ `pio check` `0 HIGH, 0 MEDIUM` ใน `src/`):
+รายการปรับปรุงสำคัญจากการตรวจสอบโค้ดและฮาร์ดแวร์ครบทั้ง 28 ไฟล์ (ผ่าน `pio run -e uno_r4_wifi`, `pio test -e native` 44/44 เคส, และ `pio check` `0 HIGH, 0 MEDIUM` ใน `src/`):
 
 | หมวดงาน | ไฟล์หลักที่ปรับปรุง | สิ่งที่แก้ไขและพัฒนา |
 | :--- | :--- | :--- |
@@ -1229,7 +1278,7 @@ flowchart TD
 | **ความเสถียรของลิงก์ PS2 และฟิสิกส์การขับเคลื่อน** | [src/robot_logic.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/robot_logic.cpp), [src/ps2_driver.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/ps2_driver.cpp) | • `FailsafeStateMachine` ดูดซับ RF Glitch 1–3 เฟรมขณะ `Operational` ได้โดยไม่หลุดเข้า `Stabilizing`<br>• เพิ่ม Power Envelope Cap หลัง 2-DOF Slew กันโอเวอร์ชูตเกินเพดาน `55%`/`35%` และใช้คณิตศาสตร์ 32-bit ป้องกัน `int16_t` overflow<br>• แยก `Ps2Driver::restorePins()`, เช็ก timeout ก่อน `delay()`, และตัดโพรบเร็วทั้งสายลอย `0xFF` และสายช็อต `0x00` |
 | **โหมด Auto, Stall Protection & Serial Abort** | [src/auto_mode.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/auto_mode.cpp), [src/auto_block_code.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/auto_block_code.cpp) | • `checkSerialAbort()` ดูดทุกไบต์และเก็บไบต์ทั่วไปลง Ring Buffer 32 ไบต์ (ส่งต่อให้ `AutoSerialProxy`) กัน `\r`/`\n` บล็อก `!`/`x`/`u`<br>• แยก baseline ระหว่าง Encoder กับ Drive Degrees, จดจำช่องมอเตอร์จริงของ `DriveDC.begin()`, และปัดเศษ/จำกัดช่วงเวลา `MoveTime` อย่างปลอดภัย |
 | **ความทนทานของ STM32 UART, OLED & Scheduler** | [src/minir4_io.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/minir4_io.cpp), [src/oled_ui.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/oled_ui.cpp), [src/main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/main.cpp) | • `noteCommFailure()` บันทึกเวลาหลัง timeout จริงพร้อม signed wrap-safe backoff<br>• `OledUI::flushBufferChecked()` สำรอง Framebuffer 512 ไบต์ก่อนกู้บัส I2C กันจอดำ และรีเซ็ต hash cache เมื่อส่งพลาด<br>• ล้างแฟลก `R_SYSTEM->RSTSR1_b.WDTRF` และรีเซ็ตนาฬิกาลูปหลังบูต/หลัง Auto เพื่อลด Jitter หลอก |
-| **การทดสอบอัตโนมัติ, Serial Telemetry & เครื่องมือพัฒนา** | [test/test_robot_logic/test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp), [.vscode/tasks.json](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/.vscode/tasks.json) | • เพิ่ม Unit Tests เป็น **38 เคส** ครอบคลุม 2-DOF Envelope, Overflow safety, Glitch absorption, `!w` E-Stop, Help `o/p` + `v`, และ Telemetry `rf=`/`com=`<br>• เพิ่ม VS Code Task `PIO: Test Native (matrix_R4)` |
+| **การทดสอบอัตโนมัติ, Serial Telemetry & เครื่องมือพัฒนา** | [test/test_robot_logic/test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp), [.vscode/tasks.json](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/.vscode/tasks.json) | • เพิ่ม Unit Tests เป็น **44 เคส** ครอบคลุม 2-DOF Envelope, Overflow safety, Glitch absorption, `!w` E-Stop, Help `o/p` + `v`, และ Telemetry `rf=`/`com=`<br>• เพิ่ม VS Code Task `PIO: Test Native (matrix_R4)` |
 
 ---
 

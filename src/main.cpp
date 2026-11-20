@@ -4,6 +4,7 @@
 
 #include "auto_mode.h"
 #include "config.h"
+#include "controls.h"
 #include "minir4_io.h"
 #include "oled_ui.h"
 #include "robot_logic.h"
@@ -18,12 +19,12 @@ namespace {
 
 /** Previous-tick state of PS2 buttons used for rising-edge (press) detection. */
 struct Ps2MenuEdges {
-    bool triangle  = false;
-    bool select    = false;
-    bool l3        = false;
-    bool r3        = false;
-    bool dpadLeft  = false;
-    bool dpadRight = false;
+    bool autoStart  = false; // Controls::kAutoStart
+    bool precision  = false; // Controls::kPrecisionToggle
+    bool smooth     = false; // Controls::kSmoothToggle
+    bool reverse    = false; // Controls::kReverseToggle
+    bool trimLeft   = false; // Controls::kTrimLeft
+    bool trimRight  = false; // Controls::kTrimRight
 };
 
 /** Latched drive request from the Serial command interface. */
@@ -39,6 +40,10 @@ OledUI                           g_oled;
 RobotLogic::FailsafeStateMachine g_linkSm;
 RobotLogic::BatteryStabilizer    g_battStab;
 RobotLogic::StabilityMonitor     g_stabMon;
+RobotLogic::ManualStallDetector  g_stallDet;
+RobotLogic::TeleopHeadingHold    g_headingHold;
+uint32_t                         g_lastStallPollMs = 0;
+uint32_t                         g_lastHoldPollMs  = 0;
 
 SystemSnapshot   g_snap{};
 Ps2Frame         g_lastPs2Frame{};
@@ -82,8 +87,70 @@ bool isDriving() {
     return g_snap.drive.left != 0 || g_snap.drive.right != 0;
 }
 
-void applyDriveToMotors(uint32_t nowMs) {
-    g_io.applyMotors(g_snap.drive.left, g_snap.drive.right, Config::kEnableSmartHoldBrake, nowMs);
+/**
+ * Opt-in (Config::kEnableManualStallCut): cuts both wheels when they are commanded hard but the
+ * encoders show no motion. Fails open on any encoder read failure. Latched until the stick is
+ * released near neutral (see RobotLogic::ManualStallDetector).
+ */
+void maybeCutStalledDrive(uint32_t nowMs) {
+    if (!Config::kEnableManualStallCut) {
+        return;
+    }
+    const int32_t absL = (g_snap.drive.left < 0) ? -static_cast<int32_t>(g_snap.drive.left)
+                                                 : g_snap.drive.left;
+    const int32_t absR = (g_snap.drive.right < 0) ? -static_cast<int32_t>(g_snap.drive.right)
+                                                  : g_snap.drive.right;
+    const bool demanding = ((absL > absR) ? absL : absR) >= Config::kManualStallMinCmdPct;
+
+    bool    fresh = false;
+    bool    valid = false;
+    int32_t encL  = 0;
+    int32_t encR  = 0;
+    if (demanding &&
+        static_cast<uint32_t>(nowMs - g_lastStallPollMs) >= Config::kManualStallPollMs) {
+        g_lastStallPollMs = nowMs;
+        fresh             = true;
+        valid             = g_io.readDriveEncoders(nowMs, encL, encR);
+    }
+
+    const bool wasTripped = g_stallDet.tripped();
+    if (g_stallDet.update(g_snap.drive.left, g_snap.drive.right, fresh, valid, encL, encR, nowMs)) {
+        g_snap.drive = {0, 0};
+        if (!wasTripped) {
+            g_oled.beepWarning();
+            g_serial.printEvent("STALL", "Wheels stalled -> motors cut (release stick to re-arm)");
+        }
+    }
+}
+
+/** Sends the current drive output; turnCorrPct (heading hold) is added on top without touching g_snap.drive. */
+void applyDriveToMotors(uint32_t nowMs, int16_t turnCorrPct = 0) {
+    maybeCutStalledDrive(nowMs);
+    int16_t left  = g_snap.drive.left;
+    int16_t right = g_snap.drive.right;
+    RobotLogic::applyTurnCorrection(
+        left, right, static_cast<int16_t>(turnCorrPct * Config::kAutoPivotYawSign));
+    g_io.applyMotors(left, right, Config::kEnableSmartHoldBrake, nowMs);
+}
+
+/**
+ * Opt-in (Config::kEnableTeleopHeadingHold): when the driver pushes throttle with no turn input,
+ * returns a gyro correction (percent turn) that keeps the latched heading. 0 when not holding.
+ */
+int16_t updateHeadingHold(uint32_t nowMs, const Ps2Frame& f, bool microLeft, bool microRight) {
+    const bool throttle = RobotLogic::computeAxisWithDeadzone(f.ly) != 0;
+    const bool turning  = RobotLogic::computeAxisWithDeadzone(f.rx) != 0 || microLeft || microRight;
+    const bool straight = throttle && !turning;
+
+    bool    fresh = false;
+    bool    valid = false;
+    int16_t yaw   = 0;
+    if (straight && static_cast<uint32_t>(nowMs - g_lastHoldPollMs) >= Config::kTeleopHoldPollMs) {
+        g_lastHoldPollMs = nowMs;
+        fresh            = true;
+        valid            = g_io.readYawDeg(nowMs, yaw);
+    }
+    return g_headingHold.update(straight, fresh, valid, yaw, nowMs);
 }
 
 /** Effective max drive power = min(mode cap [precision/normal], battery power cap). */
@@ -102,17 +169,18 @@ void cancelSerialDrive() {
 // --- PS2 edge latches ---------------------------------------------------------
 
 void latchMenuEdges(bool valid) {
-    g_prevPs2.triangle  = valid && g_lastPs2Frame.triangle;
-    g_prevPs2.select    = valid && g_lastPs2Frame.select;
-    g_prevPs2.l3        = valid && g_lastPs2Frame.l3;
-    g_prevPs2.r3        = valid && g_lastPs2Frame.r3;
-    g_prevPs2.dpadLeft  = valid && g_lastPs2Frame.left;
-    g_prevPs2.dpadRight = valid && g_lastPs2Frame.right;
+    using Controls::held;
+    g_prevPs2.autoStart = valid && held(g_lastPs2Frame, Controls::kAutoStart);
+    g_prevPs2.precision = valid && held(g_lastPs2Frame, Controls::kPrecisionToggle);
+    g_prevPs2.smooth    = valid && held(g_lastPs2Frame, Controls::kSmoothToggle);
+    g_prevPs2.reverse   = valid && held(g_lastPs2Frame, Controls::kReverseToggle);
+    g_prevPs2.trimLeft  = valid && held(g_lastPs2Frame, Controls::kTrimLeft);
+    g_prevPs2.trimRight = valid && held(g_lastPs2Frame, Controls::kTrimRight);
 }
 
 void latchServoEdges(bool valid) {
-    g_armPushState.prevSquare    = valid && g_lastPs2Frame.square;
-    g_posePresetState.prevCircle = valid && g_lastPs2Frame.circle;
+    g_armPushState.prevSquare    = valid && Controls::held(g_lastPs2Frame, Controls::kPushGround);
+    g_posePresetState.prevCircle = valid && Controls::held(g_lastPs2Frame, Controls::kPosePreset);
 }
 
 /** Seeds every edge latch from the current frame so held buttons don't fire on (re)entry. */
@@ -542,6 +610,8 @@ void runAutoSession(uint32_t nowMs) {
     }
 
     g_io.restoreAfterAuto(exitMs);
+    g_stallDet.reset();
+    g_headingHold.reset();
     g_snap.drive           = {0, 0};
     g_snap.holdBrakeActive = g_io.isBrakeEngaged();
     g_snap.comboHolding    = false;
@@ -631,28 +701,30 @@ bool updatePs2Link(uint32_t nowMs) {
  *   Start + D-Pad L/R -> Adjust straight-line Motor Balance Trim (-/+1%)
  */
 void handlePs2ConfigCombos() {
-    const Ps2Frame& f = g_lastPs2Frame;
+    using Controls::held;
+    const Ps2Frame& f        = g_lastPs2Frame;
+    const bool      modifier = held(f, Controls::kTrimModifier);
 
-    if (f.select && !g_prevPs2.select) {
-        togglePrecisionMode("PS2 Select: Precision 55% ON (session)",
-                            "PS2 Select: Precision OFF 100%");
+    if (held(f, Controls::kPrecisionToggle) && !g_prevPs2.precision) {
+        togglePrecisionMode("PS2: Precision 55% ON (session)",
+                            "PS2: Precision OFF 100%");
     }
-    if (f.r3 && !g_prevPs2.r3) {
-        toggleReverseDrive("PS2 R3: Reverse-Front ON", "PS2 R3: Reverse-Front OFF");
+    if (held(f, Controls::kReverseToggle) && !g_prevPs2.reverse) {
+        toggleReverseDrive("PS2: Reverse-Front ON", "PS2: Reverse-Front OFF");
     }
-    if (f.l3 && !g_prevPs2.l3) {
-        if (f.start) {
-            setMotorTrim(0, "PS2 Start+L3");
+    if (held(f, Controls::kSmoothToggle) && !g_prevPs2.smooth) {
+        if (modifier) {
+            setMotorTrim(0, "PS2 trim reset");
         } else {
-            toggleRc2Smooth("PS2 L3: RC2 Smooth Slew ON (saved)",
-                            "PS2 L3: RC2 Smooth Slew OFF (saved)");
+            toggleRc2Smooth("PS2: RC2 Smooth Slew ON (saved)",
+                            "PS2: RC2 Smooth Slew OFF (saved)");
         }
     }
-    if (f.start) {
-        if (f.left && !g_prevPs2.dpadLeft) {
-            setMotorTrim(RobotLogic::stepMotorTrim(g_snap.motorTrimPct, -1), "PS2 Start+Left");
-        } else if (f.right && !g_prevPs2.dpadRight) {
-            setMotorTrim(RobotLogic::stepMotorTrim(g_snap.motorTrimPct, 1), "PS2 Start+Right");
+    if (modifier) {
+        if (held(f, Controls::kTrimLeft) && !g_prevPs2.trimLeft) {
+            setMotorTrim(RobotLogic::stepMotorTrim(g_snap.motorTrimPct, -1), "PS2 trim -");
+        } else if (held(f, Controls::kTrimRight) && !g_prevPs2.trimRight) {
+            setMotorTrim(RobotLogic::stepMotorTrim(g_snap.motorTrimPct, 1), "PS2 trim +");
         }
     }
 }
@@ -720,6 +792,7 @@ bool driveFromPs2(uint32_t nowMs, LinkState prevLink, bool valid, const MotorPow
 
     if (!valid) {
         // Brief wireless glitch (<100ms): preserve last safe drive & servo state without overwrite.
+        g_headingHold.reset();
         applyDriveToMotors(nowMs);
         return false;
     }
@@ -736,8 +809,9 @@ bool driveFromPs2(uint32_t nowMs, LinkState prevLink, bool valid, const MotorPow
     g_snap.comScalePct = RobotLogic::computeCoMDynamicScale(g_snap.servos.rc2Deg);
 
     // D-Pad Left/Right without Start = micro-turn alignment (Start+D-Pad is trim).
-    const bool microLeft  = !f.start && f.left;
-    const bool microRight = !f.start && f.right;
+    const bool trimMod    = Controls::held(f, Controls::kTrimModifier);
+    const bool microLeft  = !trimMod && Controls::held(f, Controls::kMicroTurnLeft);
+    const bool microRight = !trimMod && Controls::held(f, Controls::kMicroTurnRight);
     g_snap.drive          = RobotLogic::computeKinodynamicDrive(f.ly,
                                                                 f.rx,
                                                                 g_snap.drive.left,
@@ -752,7 +826,9 @@ bool driveFromPs2(uint32_t nowMs, LinkState prevLink, bool valid, const MotorPow
                                                                 microRight,
                                                                 g_snap.motorTrimPct,
                                                                 g_snap.precisionMode);
-    applyDriveToMotors(nowMs);
+    const int16_t holdCorrPct =
+        Config::kEnableTeleopHeadingHold ? updateHeadingHold(nowMs, f, microLeft, microRight) : 0;
+    applyDriveToMotors(nowMs, holdCorrPct);
     return true;
 }
 
@@ -777,18 +853,23 @@ void driveCoastToStop(uint32_t nowMs, const MotorPowerProfile& pwr) {
  */
 bool arbitrateDrive(uint32_t nowMs, LinkState prevLink, bool valid, const MotorPowerProfile& pwr) {
     bool ps2ServosUpdated = false;
+    bool ps2Drive         = false;
     if (g_snap.sysState == SystemState::Estop) {
         driveEstop(nowMs);
     } else if (g_linkSm.isFailsafe()) {
         driveFailsafe(nowMs, prevLink != LinkState::Failsafe);
-    } else if (g_linkSm.isOperational() && valid && g_lastPs2Frame.cross) {
+    } else if (g_linkSm.isOperational() && valid && Controls::held(g_lastPs2Frame, Controls::kBrakeOrExit)) {
         driveCrossBrake(nowMs);
     } else if (g_serialDrive.latched) {
         driveFromSerial(nowMs, pwr);
     } else if (g_linkSm.isOperational()) {
+        ps2Drive         = true;
         ps2ServosUpdated = driveFromPs2(nowMs, prevLink, valid, pwr);
     } else {
         driveCoastToStop(nowMs, pwr);
+    }
+    if (!ps2Drive) {
+        g_headingHold.reset(); // Any non-PS2 source ends the hold; it re-latches on the next straight run.
     }
     g_snap.holdBrakeActive = g_io.isBrakeEngaged();
     return ps2ServosUpdated;
@@ -836,9 +917,9 @@ void runControlTick(uint32_t nowMs, uint32_t loopDtMs) {
     const bool ps2StartAuto = RobotLogic::shouldStartAutoMode(sysReady,
                                                               g_linkSm.isOperational(),
                                                               valid,
-                                                              g_lastPs2Frame.triangle,
-                                                              g_prevPs2.triangle,
-                                                              g_lastPs2Frame.cross);
+                                                              Controls::held(g_lastPs2Frame, Controls::kAutoStart),
+                                                              g_prevPs2.autoStart,
+                                                              Controls::held(g_lastPs2Frame, Controls::kBrakeOrExit));
     const bool startAuto = ps2StartAuto ||
                            (sysReady && (btn.autoStartRequested || g_serialAutoRequested));
     g_serialAutoRequested = false;

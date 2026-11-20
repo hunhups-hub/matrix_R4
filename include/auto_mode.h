@@ -87,6 +87,26 @@ void endBlockingDriveTask();
 /** Records that AutoBlockUser::loop() performed meaningful user activity beyond boilerplate polling. */
 void noteUserLoopActivity();
 
+/**
+ * True when Config::kAutoGyroMode != Off and the STM32 IMU was zeroed on Auto entry.
+ * False means every DriveDC call keeps its legacy open-loop behaviour (also the fallback
+ * when the IMU reset failed).
+ */
+bool gyroAssistActive();
+
+/** Virtual absolute heading (deg, -180..180, IMU zeroed at Auto entry) the robot should hold. */
+int16_t headingTargetDeg();
+void    setHeadingTargetDeg(int16_t deg);
+
+/** Reads IMU yaw (rounded, wrapped to -180..180). Returns false on any STM32/IMU read failure. */
+bool readYawDeg(int16_t& outDeg);
+
+/** Re-latches the virtual heading to the current IMU yaw. Returns false (heading unchanged) on read failure. */
+bool latchHeadingFromImu();
+
+/** Prints one `[AUTO] #n ...` telemetry line per DriveDC move (Config::kAutoMoveTelemetry). */
+void logMove(const char* kind, int16_t a, int16_t b, uint16_t degrees, uint8_t result);
+
 /** Abort-safe Serial pass-through for Auto code (emergency keys are always intercepted first). */
 int serialAvailable();
 int serialRead();
