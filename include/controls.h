@@ -6,7 +6,7 @@
 
 // ============================================================================
 //  controls.h  --  แผนผังปุ่มจอย PS2 (เปลี่ยนปุ่มแก้ที่ไฟล์นี้ที่เดียว)
-//  PS2 button map: every PS2 button -> function assignment lives in this file.
+//  การกำหนดหน้าที่ของทุกปุ่ม PS2 อยู่ในไฟล์นี้ทั้งหมด
 // ============================================================================
 //  วิธีเปลี่ยนปุ่ม: แก้ค่าทางขวาของ  constexpr Btn kXxx = Btn::...;
 //  ตัวอย่าง: ให้ปุ่ม Triangle เป็นตัวสลับ Precision แทน Select ->
@@ -68,7 +68,7 @@ constexpr Btn kMicroTurnRight  = Btn::Right;  // หมุนตัวละเ�
 constexpr Btn kAutoStart   = Btn::Triangle;   // เริ่มโหมด Auto (ขอบขาขึ้น, ต้องไม่กด kBrakeOrExit)
 constexpr Btn kBrakeOrExit = Btn::Cross;      // เบรกหยุดล้อค้างขณะกด + ออกจาก Auto ทันที
 
-/** True while button `b` is held in a decoded PS2 frame. */
+/** เป็นจริงขณะปุ่ม `b` ถูกกดค้างอยู่ในเฟรม PS2 ที่ถอดรหัสแล้ว */
 inline bool held(const Ps2Frame& f, Btn b) {
     switch (b) {
         case Btn::Up:       return f.up;

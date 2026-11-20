@@ -2,7 +2,8 @@
 
 - **โปรเจกต์**: `matrix_R4` (`Arduino UNO R4 WiFi` + `MATRIX Mini R4 Carrier Shield`)
 - **ฐานโค้ดที่ตรวจสอบ (Codebase State)**: Branch `main` พร้อมชุดปรับปรุงเสถียรภาพฮาร์ดแวร์และโหมดแข่งขันเต็มกำลัง 100% (`Post-Stability & Full-Power Hardening`) `[Verified: Build/Test Run]`
-- **คะแนนความพร้อมรวม (Overall Readiness Score)**: **`85.13 / 100`** *(เพิ่มขึ้นจาก `78.50 / 100` ก่อนปรับปรุงเสถียรภาพ)*
+- **ประเมินล่าสุด**: 2026-11-20 (หลังเพิ่ม Gyro-assisted Auto แบบ opt-in, Manual Stall Cut, Teleop Heading Hold, Drive stability category และการตรวจจับชุดแบตเตอรี่อัตโนมัติ)
+- **คะแนนความพร้อมรวม (Overall Readiness Score)**: **`85.88 / 100`** *(เดิม `85.13` → ก่อนปรับปรุงเสถียรภาพ `78.50`)*
 - **ระดับความพร้อม (Readiness Tier)**: **`Firmware-Ready (Track Calibration / Field Validation Required)`** — *เฟิร์มแวร์มีความเสถียรสูงและคงกำลังขับเต็ม 100% พร้อมลงสนาม เหลือเฉพาะการปรับจูนระยะทาง/มุมบนสนามแข่งจริง (HIL)*
 
 ---
@@ -10,15 +11,15 @@
 ## 1. บทสรุปผู้บริหาร (Executive Summary)
 
 ### 1.1 ภาพรวมผลคะแนนและระดับความพร้อม
-จากการตรวจสอบโค้ดรายบรรทัดทั้ง 8 โมดูลใน `src/`, 8 เฮดเดอร์ใน `include/`, ชุดทดสอบ `test/test_robot_logic/test_main.cpp`, ไฟล์ตั้งค่า `platformio.ini` และไลบรารี `MatrixMiniR4 @ 1.2.6` ร่วมกับการรันคอมไพล์จริงบนเป้าหมาย `uno_r4_wifi`, การรัน Unit Test บน `native` และการวิเคราะห์เชิงสถิต (`cppcheck`) หลังการปรับปรุงเสถียรภาพ พบว่าโปรเจกต์ `matrix_R4` ได้คะแนนความพร้อมรวม **`85.13 / 100`** อยู่ในระดับสูงสุดของเฟิร์มแวร์ก่อนทดสอบภาคสนาม **`Firmware-Ready (Track Calibration / Field Validation Required)`**
+จากการตรวจสอบโค้ดรายบรรทัดทั้ง 8 โมดูลใน `src/`, 8 เฮดเดอร์ใน `include/`, ชุดทดสอบ `test/test_robot_logic/test_main.cpp`, ไฟล์ตั้งค่า `platformio.ini` และไลบรารี `MatrixMiniR4 @ 1.2.6` ร่วมกับการรันคอมไพล์จริงบนเป้าหมาย `uno_r4_wifi`, การรัน Unit Test บน `native` และการวิเคราะห์เชิงสถิต (`cppcheck`) หลังการปรับปรุงเสถียรภาพ พบว่าโปรเจกต์ `matrix_R4` ได้คะแนนความพร้อมรวม **`85.88 / 100`** อยู่ในระดับสูงสุดของเฟิร์มแวร์ก่อนทดสอบภาคสนาม **`Firmware-Ready (Track Calibration / Field Validation Required)`**
 
 | องค์ประกอบหลัก | ผลลัพธ์ | ป้ายสถานะการตรวจสอบ |
 |---|---|---|
-| **คอมไพล์เฟิร์มแวร์จริง (`uno_r4_wifi`)** | ผ่าน (`SUCCESS`, 0 warnings/errors ภายใต้ `-Werror`), RAM `43.9%`, Flash `41.5%` | `[Verified: Build/Test Run]` |
-| **ชุดทดสอบอัตโนมัติ (`native` Unity)** | ผ่าน **`38 / 38`** เคส (0 Failures, 0 Ignored) ครอบคลุมครบทุกสาขาของ `robot_logic` และ `serial_control` | `[Verified: Build/Test Run]` |
+| **คอมไพล์เฟิร์มแวร์จริง (`uno_r4_wifi`)** | ผ่าน (`SUCCESS`, 0 warnings/errors ภายใต้ `-Werror`), RAM `44.1%`, Flash `41.8%`; `uno_r4_wifi_field` ก็ผ่าน | `[Verified: Build/Test Run]` |
+| **ชุดทดสอบอัตโนมัติ (`native` Unity)** | ผ่าน **`44 / 44`** เคส (0 Failures, 0 Ignored) ครอบคลุมครบทุกสาขาของ `robot_logic` และ `serial_control` | `[Verified: Build/Test Run]` |
 | **การวิเคราะห์โค้ดเชิงสถิต (`pio check`)** | ผ่านสะอาด (`src/`: **`0 HIGH, 0 MEDIUM`** ทั้งบน `uno_r4_wifi` และ `native`) | `[Verified: Build/Test Run]` |
 | **สถาปัตยกรรม Teleop, Failsafe & Auto Supervisor** | แข็งแรงระดับแข่งขัน (40 Hz scheduler, 5-stage kinodynamics 100% power, 1.4 ms SPI, 3s WDT, Rising-Edge E-Stop, Bounded STM32 Init/Guard) | `[Verified: Static Code Inspection]` |
-| **ตรรกะภารกิจ Autonomous ปัจจุบัน (`auto_block_code.cpp`)** | ใช้ `MoveDegs` แบบ Open-Loop + `delay()` รวม `15.5 s` ยังไม่ใช้ Gyro/Sensor ป้อนกลับ | `[Verified: Static Code Inspection]` |
+| **ตรรกะภารกิจ Autonomous ปัจจุบัน (`auto_block_code.cpp`)** | ภารกิจยังเขียนด้วย `MoveDegs` (14 ครั้ง) + `delay()` (27 ครั้ง) แบบ Open-Loop; มี Gyro proxy (`kAutoGyroMode`) แล้วแต่ปิดใน build แข่งจนกว่าจะยืนยันทิศ yaw บนฮาร์ดแวร์ | `[Verified: Static Code Inspection]` |
 | **พฤติกรรมบนฮาร์ดแวร์และสนามแข่งจริง (HIL)** | ยังไม่ได้เชื่อมต่อบอร์ด UNO R4 WiFi, STM32, มอเตอร์, เซอร์โว และจอย PS2/MJ2 จริง | `[Unverified: Requires Physical Hardware/Field Test]` |
 
 ### 1.2 จุดแข็งหลักและรายการเสถียรภาพที่ได้รับการยกระดับ (Key Strengths & Hardened Stability Features)
@@ -59,15 +60,15 @@ $$\text{Weighted Points} = \left(\frac{\text{Category Score}}{10}\right) \times 
 | **1** | **Build, Static Hygiene & Automated Tests** | `15%` | `8.50` | **`9.00`** | **`13.50`** | `(9.00 / 10) × 15 = 13.50` |
 | **2** | **Teleop Drive & Kinodynamic Precision** | `15%` | `9.00` | **`9.00`** | **`13.50`** | `(9.00 / 10) × 15 = 13.50` |
 | **3** | **Manipulator & Servo Actuation (`RC1..RC4`)** | `10%` | `8.00` | **`8.50`** | **`8.50`** | `(8.50 / 10) × 10 = 8.50` |
-| **4** | **Autonomous Mode & MARC Match Readiness** | `20%` | `6.00` | **`6.75`** | **`13.50`** | `(6.75 / 10) × 20 = 13.50` |
+| **4** | **Autonomous Mode & MARC Match Readiness** | `20%` | `6.75` | **`7.00`** | **`14.00`** | `(7.00 / 10) × 20 = 14.00` |
 | **5** | **Wireless Link, Coprocessor & Failsafe Reliability** | `15%` | `8.00` | **`9.25`** | **`13.88`** | `(9.25 / 10) × 15 = 13.875` |
-| **6** | **Power Management, Stall Safety & Persistence** | `10%` | `7.50` | **`8.00`** | **`8.00`** | `(8.00 / 10) × 10 = 8.00` |
+| **6** | **Power Management, Stall Safety & Persistence** | `10%` | `8.00` | **`8.25`** | **`8.25`** | `(8.25 / 10) × 10 = 8.25` |
 | **7** | **Competition Operations, Diagnostics & Maintainability** | `15%` | `8.50` | **`9.50`** | **`14.25`** | `(9.50 / 10) × 15 = 14.25` |
-| | **รวมทั้งหมด (Total)** | **`100%`** | `78.50` | — | **`85.13 / 100`** | `13.50 + 13.50 + 8.50 + 13.50 + 13.875 + 8.00 + 14.25 = 85.125` |
+| | **รวมทั้งหมด (Total)** | **`100%`** | `85.13` | — | **`85.88 / 100`** | `13.50 + 13.50 + 8.50 + 14.00 + 13.875 + 8.25 + 14.25 = 85.875` |
 
 ### 2.3 ระดับความพร้อม (Readiness Rating Tiers)
 - **`90 – 100`**: **Match-Ready (Field-Verified)** — พร้อมลงสนามแข่งเต็มรูปแบบ ผ่านการทดสอบทั้งโค้ดและสนามจริง (HIL)
-- **`75 – 89`**: **Firmware-Ready (Track Calibration / Field Validation Required)** — ซอฟต์แวร์แข็งแรงพร้อมใช้ แต่ต้องปรับจูนและทดสอบ HIL บนสนามจริง **(ระดับปัจจุบันของ `matrix_R4`: `85.13 / 100`)**
+- **`75 – 89`**: **Firmware-Ready (Track Calibration / Field Validation Required)** — ซอฟต์แวร์แข็งแรงพร้อมใช้ แต่ต้องปรับจูนและทดสอบ HIL บนสนามจริง **(ระดับปัจจุบันของ `matrix_R4`: `85.88 / 100`)**
 - **`60 – 74`**: **Conditional Readiness (Notable Autonomous/Reliability Gaps)** — พอใช้แข่งแบบมีเงื่อนไข มีจุดอ่อนสำคัญใน Auto หรือความเสถียรที่ควรแก้ก่อน
 - **`< 60`**: **Not Ready for Competition** — ยังไม่พร้อมลงแข่ง ต้องแก้ไขโครงสร้างหลักหรือบั๊กร้ายแรงก่อน
 
@@ -79,16 +80,17 @@ $$\text{Weighted Points} = \left(\frac{\text{Category Score}}{10}\right) \times 
 - **คำสั่ง**: `& "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" run -e uno_r4_wifi`
 - **สถานะ**: `SUCCESS` (Exit code `0`), **0 Warnings / 0 Errors** ภายใต้ `-Wall -Wextra -Werror` (`platformio.ini:22-25`)
 - **การใช้หน่วยความจำ**:
-  - **RAM**: **`43.9%`** (`used 14396 bytes from 32768 bytes`) — เหลือพื้นที่ Heap/Stack อีก `18,372 bytes`
-  - **Flash**: **`41.5%`** (`used 108820 bytes from 262144 bytes`) — เหลือพื้นที่โปรแกรมอีก `153,324 bytes`
+  - **RAM**: **`44.1%`** (`used 14436 bytes from 32768 bytes`) — เหลือพื้นที่ Heap/Stack อีก `18,332 bytes`
+  - **Flash**: **`41.8%`** (`used 109516 bytes from 262144 bytes`) — เหลือพื้นที่โปรแกรมอีก `152,628 bytes`
+- **`pio run -e uno_r4_wifi_field`** (Gyro Auto mode 2 + Stall Cut + Heading Hold): `SUCCESS`
 
 ### 3.2 การรันชุดทดสอบอัตโนมัติบนโฮสต์ (`pio test -e native -v`) `[Verified: Build/Test Run]`
 - **คำสั่ง**: `& "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" test -e native -v`
-- **สถานะ**: `PASSED` (Exit code `0`), ผ่านครบ **`38 Tests 0 Failures 0 Ignored`** ใน 10 หมวดหมู่ (`test/test_robot_logic/test_main.cpp:1887-1951`) รวมถึงการทดสอบ Glitch absorption โดยไม่หลุดจาก `Operational`, การคุมเพดานกำลัง 2-DOF Slew (`55%`/`35%`), ความปลอดภัยจาก `int16_t` overflow, การหยุด `!w` ในแบตช์เดียว, ข้อความ Help `o/p` + `v`, และฟิลด์ Telemetry `rf=`/`com=`
+- **สถานะ**: `PASSED` (Exit code `0`), ผ่านครบ **`44 Tests 0 Failures 0 Ignored`** ใน 12 หมวดหมู่ (`test/test_robot_logic/test_main.cpp:1887-1951`) รวมถึงการทดสอบ Glitch absorption โดยไม่หลุดจาก `Operational`, การคุมเพดานกำลัง 2-DOF Slew (`55%`/`35%`), ความปลอดภัยจาก `int16_t` overflow, การหยุด `!w` ในแบตช์เดียว, ข้อความ Help `o/p` + `v`, และฟิลด์ Telemetry `rf=`/`com=`
 
 ### 3.3 การวิเคราะห์โค้ดเชิงสถิตด้วย `cppcheck` (`pio check`) `[Verified: Build/Test Run]`
-1. **`pio check -e uno_r4_wifi --skip-packages`**: Exit code `0` (`PASSED`)
-   - โฟลเดอร์ `src/`: **`0 HIGH, 0 MEDIUM`** (ไม่มีคำเตือนระดับ HIGH หรือ MEDIUM ในโค้ดของโปรเจกต์)
+1. **`pio check -e uno_r4_wifi --skip-packages`**: Exit code `255` เพราะพบคำเตือนในไลบรารี `.pio/libdeps/.../MatrixMiniR4` (ไม่ใช่โค้ดโปรเจกต์)
+   - โฟลเดอร์ `src/` และ `include/`: **`0 HIGH, 0 MEDIUM`** (ไม่มีคำเตือนระดับ HIGH หรือ MEDIUM ในโค้ดของโปรเจกต์)
 2. **`pio check -e native --skip-packages`**: Exit code `0` (`PASSED`)
    - โฟลเดอร์ `src/`: **`0 HIGH, 0 MEDIUM`** (แก้ไข `compareBoolExpressionWithInt`, `constVariable`, `redundantInitialization` และ `variableScope` ครบทั้งหมดแล้ว)
 
@@ -100,7 +102,7 @@ $$\text{Weighted Points} = \left(\frac{\text{Category Score}}{10}\right) \times 
 - **หลักฐานยืนยัน**:
   - คอมไพล์ผ่านภายใต้ `-Wall -Wextra -Werror` ทั้งบน `uno_r4_wifi` และ `native`; ขอบเขต `#pragma GCC diagnostic` ใน `src/auto_block_code.cpp:616-699` ถูกจำกัดเฉพาะโซนโค้ดที่ผู้ใช้คัดลอกมาจาก MATRIXblock เท่านั้น ทำให้ชั้น Proxy ความปลอดภัยทั้งหมดอยู่ภายใต้ `-Werror` เต็มรูปแบบ `[Verified: Build/Test Run]`
   - `pio check` รายงาน `0 HIGH, 0 MEDIUM` ใน `src/` ทั้งสองสภาพแวดล้อม `[Verified: Build/Test Run]`
-  - `pio test -e native -v` ผ่าน `38 / 38` เคส พร้อมอัปเดตคอมเมนต์และเพิ่ม assertion ครอบคลุมครบทุกสาขาของ `robot_logic.cpp` และ `serial_control.cpp` `[Verified: Build/Test Run]`
+  - `pio test -e native -v` ผ่าน `44 / 44` เคส พร้อมอัปเดตคอมเมนต์และเพิ่ม assertion ครอบคลุมครบทุกสาขาของ `robot_logic.cpp` และ `serial_control.cpp` `[Verified: Build/Test Run]`
 - **เหตุผลการหักคะแนน (`-1.0`)**:
   - โมดูลฮาร์ดแวร์ (`main.cpp`, `minir4_io.cpp`, `ps2_driver.cpp`, `oled_ui.cpp`, `auto_mode.cpp`, `auto_block_code.cpp`) ยังไม่มีชุดทดสอบจำลองฮาร์ดแวร์หรือ HIL อัตโนมัติ (`-1.0`) `[Verified: Static Code Inspection]`
 
@@ -118,13 +120,14 @@ $$\text{Weighted Points} = \left(\frac{\text{Category Score}}{10}\right) \times 
   - `kRc3InitDeg`, `kRc3L1Deg`, `kRc3SquareDeg` (และ `RC4`) ตั้งไว้ที่ `30°` เท่ากัน (`include/config.h:115-123`) จึงเกิดการขยับสลับเฉพาะเมื่อกด `Square` หลังจากยกแขนด้วย `R1` (`140°`) (`-0.5`) `[Verified: Static Code Inspection]`
   - ขอบเขตกลไกจริงและช่วงพัลส์ `500–2500 us` บนเซอร์โวตัวจริงต้องตรวจบนหุ่นยนต์ (`-1.0`) `[Unverified: Requires Physical Hardware/Field Test]`
 
-### หมวดที่ 4: Autonomous Mode & MARC Match Readiness (`20%`) — คะแนน **`6.75 / 10`** (`13.50 / 20.00` คะแนน)
+### หมวดที่ 4: Autonomous Mode & MARC Match Readiness (`20%`) — คะแนน **`7.00 / 10`** (`14.00 / 20.00` คะแนน)
 - **หลักฐานยืนยัน**:
   - `AutoDriveDCProxy::begin` (`src/auto_block_code.cpp:169-197`) ซิงก์ทิศทางมอเตอร์ `f1`/`f2` จาก EEPROM อัตโนมัติผ่าน `RobotLogic::resolveAutoDrivePolarity` (`src/robot_logic.cpp:402-415`) `[Verified: Build/Test Run]` และสั่งเบรกตัดจบเข้า `AutoExitReason::DriveInitFail` ทันทีหากตั้งค่า `DriveDC` ไม่สำเร็จภายใน ~3 วินาที `[Verified: Static Code Inspection]`
   - `checkDriveStall` (`src/auto_mode.cpp:141-226`) ทำงานร่วมกับ `beginBlockingDriveTask()`/`endBlockingDriveTask()` สามารถตัดจบ `StallTimeout` ได้ทั้งเมื่อล้อติดกำแพงและเมื่อสาย UART ของ STM32 หลุดระหว่างรอคำสั่ง `DriveDC` `[Verified: Static Code Inspection]`
   - `AutoPs2Proxy::pollInternal` (`src/auto_block_code.cpp:487-513`) รักษาสัญญาณ `PSB_TRIANGLE` แม้มีการเรียก `read_gamepad()` ซ้ำก่อนตรวจ `Button(PSB_TRIANGLE)` `[Verified: Static Code Inspection]`
-- **เหตุผลการหักคะแนน (`-3.25`)**:
-  - ภารกิจ Auto ใน `src/auto_block_code.cpp:630-682` ยังเป็นการเดินแบบ Open-Loop `MoveDegs(±50, ±50)` 11 ครั้ง และ `delay()` รวม `15.5 s` โดยไม่ใช้ Gyro/Sync PID หรือเซนเซอร์สนาม (`-3.0`) `[Verified: Static Code Inspection]`
+  - `AutoDriveDCProxy::MoveDegs` รองรับ `kAutoGyroMode` 1/2: ส่งการเดินตรงไป `MoveGyroDegs` และเปลี่ยนการหมุนเป็น `TurnGyro` ตาม virtual heading (เปิดใน `env:uno_r4_wifi_field`, ปิดใน build แข่ง) `[Verified: Build/Test Run]`
+- **เหตุผลการหักคะแนน (`-3.00`)**:
+  - ภารกิจ Auto ใน `src/auto_block_code.cpp` ยังเขียนด้วย `MoveDegs(±50, ±50)` 14 ครั้ง และ `delay()` 27 ครั้ง; build แข่งยังวิ่ง Open-Loop เพราะทิศ `kAutoPivotYawSign`, เครื่องหมายกำลังของ `TurnGyro` และ `kAutoPivotWheelDegPerYawDegX100` ยังไม่ได้ยืนยันบนฮาร์ดแวร์ (`-2.75`) `[Unverified: Requires Physical Hardware/Field Test]`
   - การตัดจบด้วย `longjmp` มีข้อจำกัดห้ามประกาศตัวแปรที่มี C++ destructor ในโซนวางโค้ด Auto (`-0.25`) `[Verified: Static Code Inspection]`
 
 ### หมวดที่ 5: Wireless Link, Coprocessor & Failsafe Reliability (`15%`) — คะแนน **`9.25 / 10`** (`13.88 / 15.00` คะแนน)
@@ -137,12 +140,13 @@ $$\text{Weighted Points} = \left(\frac{\text{Category Score}}{10}\right) \times 
   - ไลบรารี `MMLower::WaitData` ยังเป็นการรอแบบบล็อกกิ้งสูงสุด `100 ms` ในคำสั่งแรกที่ STM32 ขาดการติดต่อ (`-0.25`) `[Verified: Static Code Inspection]`
   - ความทนทานต่อคลื่นรบกวน 2.4 GHz ในสนามแข่งขันจริงต้องทดสอบภาคสนาม (`-0.50`) `[Unverified: Requires Physical Hardware/Field Test]`
 
-### หมวดที่ 6: Power Management, Stall Safety & Persistence (`10%`) — คะแนน **`8.00 / 10`** (`8.00 / 10.00` คะแนน)
+### หมวดที่ 6: Power Management, Stall Safety & Persistence (`10%`) — คะแนน **`8.25 / 10`** (`8.25 / 10.00` คะแนน)
 - **หลักฐานยืนยัน**:
   - `BatteryStabilizer::motorProfile()` (`src/robot_logic.cpp:1035-1085`) คงกำลังขับสูงสุด `100%` (`kEnableBatterySagThrottle = false`) พร้อมชดเชยแรงบิดสูงสุด `115%` ในระดับ `Normal`/`Low`/`Critical` เพื่อให้หุ่นยนต์แรงเต็มพิกัด และตัดการบูสต์เกิน `100%` (`compPercent = 100U`) เฉพาะในระดับ `Emergency` (`<= 6.4V` หรือ `<= 69%` ของแรงดันฐาน) เพื่อลดความเสี่ยงไฟตกที่พื้นแรงดันต่ำสุด `[Verified: Build/Test Run]`
   - `MiniR4IO::applyLowerMcuConfig` (`src/minir4_io.cpp:151-182`) บังคับตั้ง `SetDCMotorSpeedRange(1/2, 0, 100)` ทุกครั้งที่กู้คืนการเชื่อมต่อ STM32 `[Verified: Static Code Inspection]`
-- **เหตุผลการหักคะแนน (`-2.0`)**:
-  - การเปิดโหมดกำลังขับ 100% เต็ม (`kEnableBatterySagThrottle = false`) ต้องอาศัยวินัยในการเปลี่ยนแบตเตอรี่เมื่อความจุต่ำกว่า `75%` และโหมด Manual ยังไม่มีการตัดกำลังอัตโนมัติเมื่อล้อติดขัด (`-1.0`) `[Verified: Static Code Inspection]`
+  - `ManualStallDetector` ตัดกำลังทั้งสองล้อเมื่อไม่มีความคืบหน้าของ encoder เกิน `kManualStallTimeoutMs` (opt-in, `MATRIX_MANUAL_STALL_CUT`) และหมวด Drive ใน stability score ประเมิน tip risk + stall; ตรวจจับชุดแบตเตอรี่อัตโนมัติ `[Verified: Build/Test Run]`
+- **เหตุผลการหักคะแนน (`-1.75`)**:
+  - การเปิดโหมดกำลังขับ 100% เต็ม (`kEnableBatterySagThrottle = false`) ต้องอาศัยวินัยในการเปลี่ยนแบตเตอรี่เมื่อความจุต่ำกว่า `75%` และ Manual Stall Cut ยังปิดใน build แข่ง (`-0.75`) `[Verified: Static Code Inspection]`
   - พฤติกรรมแรงดันตกภายใต้โหลดกระชากของมอเตอร์จริงต้องทดสอบกับแบตเตอรี่แข่งจริง (`-1.0`) `[Unverified: Requires Physical Hardware/Field Test]`
 
 ### หมวดที่ 7: Competition Operations, Diagnostics & Maintainability (`15%`) — คะแนน **`9.50 / 10`** (`14.25 / 15.00` คะแนน)

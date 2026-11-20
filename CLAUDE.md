@@ -93,5 +93,5 @@ Bootloader entry if upload cannot find the port: hold BTN_UP + BTN_DOWN for
   goes below the diagnostic pragmas, inside `namespace AutoBlockUser`. Proxy
   classes there wrap `MiniR4` and `Serial`. Do not remove the pragmas or proxies.
 - `src/` must build warning-free (`-Wall -Wextra -Werror`).
-- The README states the test count (38), the file count (28), and the
+- The README states the test count (44), the file count (28), and the
   `config.h` parameter table. Update the README when any of these change.

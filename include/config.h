@@ -5,98 +5,98 @@
 #include "user_settings.h" // ค่าที่ปรับบ่อยอยู่ในไฟล์นั้น; ไฟล์นี้เก็บพิน/คาบเวลา/ขีดจำกัดฮาร์ดแวร์
 
 // ============================================================================
-// MATRIX Mini R4 + Arduino UNO R4 WiFi Configuration
+// ค่าตั้งของ MATRIX Mini R4 + Arduino UNO R4 WiFi
 // ============================================================================
-// Hardware Mapping (fixed by MATRIX Mini R4 Carrier Shield):
-//   M1 / M2      : Drive DC Motors (STM32 co-processor via D8/D9 UART @ 57600)
-//   RC1..RC4     : Servos (RC1=Aux, RC2=Spare D-Pad, RC3=Front L, RC4=Front R)
-//   BTN_UP/DOWN  : Onboard top buttons above OLED (STM32)
-//   OLED (0x3D)  : Built-in 128x32 I2C OLED (Wire1)
-//   LED (D7)     : Built-in 2x WS2812B RGB LEDs
-//   Buzzer (D6)  : Built-in piezo buzzer
-//   PS2 / MJ2    : 4p wire -> DIGITAL 2 (D5/D4), 2p wire -> DIGITAL 3 (D12/D11)
+// การจับคู่ฮาร์ดแวร์ (ตายตัวตามบอร์ดแคริเออร์ MATRIX Mini R4):
+//   M1 / M2      : มอเตอร์ DC ขับเคลื่อน (STM32 โคโปรเซสเซอร์ ผ่าน UART D8/D9 @ 57600)
+//   RC1..RC4     : เซอร์โว (RC1=เสริม, RC2=แขนสำรอง D-Pad, RC3=หน้าซ้าย, RC4=หน้าขวา)
+//   BTN_UP/DOWN  : ปุ่มบนบอร์ดเหนือจอ OLED (STM32)
+//   OLED (0x3D)  : จอ OLED I2C 128x32 ในตัว (Wire1)
+//   LED (D7)     : RGB LED WS2812B ในตัว 2 ดวง
+//   Buzzer (D6)  : บัซเซอร์เพียโซในตัว
+//   PS2 / MJ2    : สาย 4p -> DIGITAL 2 (D5/D4), สาย 2p -> DIGITAL 3 (D12/D11)
 // ============================================================================
 
 namespace Config {
 
-// --- Control Cadence & Watchdog ---------------------------------------------
+// --- จังหวะควบคุมและ Watchdog -------------------------------------------------
 constexpr uint32_t kSerialBaud               = 115200UL;
-constexpr uint32_t kControlPeriodMs          = 25UL;    // 40 Hz control loop
-constexpr uint32_t kButtonPollPeriodMs       = 25UL;    // Alternating UP/DOWN poll
-constexpr uint32_t kButtonUnhealthyPollPeriodMs = 250UL; // Throttled button polling when comm is unhealthy
-constexpr uint32_t kLowerHealthIntervalMs    = 500UL;   // Idle STM32 health check period
-constexpr uint32_t kLowerFastHealthMs        = 100UL;   // Fast STM32 check while moving/healing
-constexpr uint32_t kLowerResyncConfigMs      = 2500UL;  // Periodic config defense vs silent brownout
-constexpr uint32_t kOledRefreshPeriodMs      = 180UL;   // Non-blocking UI cadence
-constexpr uint32_t kWireTimeoutUs            = 60000UL; // 60ms: >2.5x 255-byte SSD1306 transfer, << 3s WDT
-constexpr uint32_t kMotorKeepaliveMs         = 500UL;   // Periodic actuator re-sync
+constexpr uint32_t kControlPeriodMs          = 25UL;    // ลูปควบคุม 40 Hz
+constexpr uint32_t kButtonPollPeriodMs       = 25UL;    // อ่านปุ่ม UP/DOWN สลับกัน
+constexpr uint32_t kButtonUnhealthyPollPeriodMs = 250UL; // ลดความถี่อ่านปุ่มเมื่อการสื่อสารไม่ปกติ
+constexpr uint32_t kLowerHealthIntervalMs    = 500UL;   // คาบตรวจสุขภาพ STM32 ตอนว่าง
+constexpr uint32_t kLowerFastHealthMs        = 100UL;   // คาบตรวจ STM32 แบบเร็วตอนเคลื่อนที่/กำลังฟื้น
+constexpr uint32_t kLowerResyncConfigMs      = 2500UL;  // ส่งค่าตั้งซ้ำเป็นระยะ กันไฟตกเงียบ (brownout)
+constexpr uint32_t kOledRefreshPeriodMs      = 180UL;   // จังหวะรีเฟรช UI แบบไม่บล็อก
+constexpr uint32_t kWireTimeoutUs            = 60000UL; // 60ms: >2.5 เท่าของการส่ง SSD1306 255 ไบต์ และ << WDT 3 วินาที
+constexpr uint32_t kMotorKeepaliveMs         = 500UL;   // ส่งคำสั่งมอเตอร์ซ้ำเป็นระยะ
 constexpr uint32_t kServoKeepaliveMs         = 1000UL;
-constexpr uint32_t kFailsafeRefreshMs        = 250UL;   // Re-assert stop without flooding UART
-constexpr uint32_t kCommRetryIntervalMs      = 25UL;    // Min gap between STM32 write retries
-constexpr uint32_t kCommUnhealthyRetryIntervalMs = 100UL; // Throttled retry gap when comm is unhealthy
+constexpr uint32_t kFailsafeRefreshMs        = 250UL;   // ย้ำคำสั่งหยุดโดยไม่ท่วม UART
+constexpr uint32_t kCommRetryIntervalMs      = 25UL;    // ช่วงห่างต่ำสุดระหว่างการส่งซ้ำไป STM32
+constexpr uint32_t kCommUnhealthyRetryIntervalMs = 100UL; // ช่วงห่างการส่งซ้ำเมื่อการสื่อสารไม่ปกติ
 constexpr uint32_t kTelemetryHeartbeatMs     = 500UL;
-constexpr uint32_t kWdtTimeoutMs             = 3000UL;  // <= 5592 ms on RA4M1
+constexpr uint32_t kWdtTimeoutMs             = 3000UL;  // <= 5592 ms บน RA4M1
 
-// --- Drive Motors (M1 Left, M2 Right; matches matrix_R3) --------------------
+// --- มอเตอร์ขับเคลื่อน (M1 ซ้าย, M2 ขวา; ตรงกับ matrix_R3) -------------------
 constexpr uint8_t  kMotorLeftId            = 1U;
 constexpr uint8_t  kMotorRightId           = 2U;
 constexpr int16_t  kMotorMinPower          = -100;
 constexpr int16_t  kMotorMaxPower          = 100;
 
-// --- Physics Kinodynamic & Electromechanical Parameters --------------------
+// --- พารามิเตอร์ฟิสิกส์ Kinodynamic และไฟฟ้า-กล -----------------------------
 
-// --- Non-Volatile EEPROM Config Storage (avoids IMU cal at 50..73) ----------
-constexpr uint16_t kEepromConfigAddr       = 128U;    // Safe offset 0x80 in Renesas RA4M1 data flash
+// --- ที่เก็บค่าตั้งใน EEPROM แบบไม่ลบเมื่อดับไฟ (เลี่ยงช่วง IMU cal ที่ 50..73) ---
+constexpr uint16_t kEepromConfigAddr       = 128U;    // ออฟเซ็ตปลอดภัย 0x80 ใน data flash ของ Renesas RA4M1
 constexpr uint8_t  kEepromMagic0           = 'M';
 constexpr uint8_t  kEepromMagic1           = 'R';
 constexpr uint8_t  kEepromVersion          = 1U;
 
-// --- PS2 / MJ2 Wireless Controller (D2 + D3) --------------------------------
-constexpr uint8_t  kPs2ClkPin              = 11U;     // D3 Right
-constexpr uint8_t  kPs2CmdPin              = 4U;      // D2 Right
-constexpr uint8_t  kPs2AttPin              = 12U;     // D3 Left
-constexpr uint8_t  kPs2DatPin              = 5U;      // D2 Left
-constexpr uint8_t  kPs2ExpectedMode        = 0x73U;   // DualShock analog red-mode ID
-constexpr uint8_t  kPs2ExpectedSync        = 0x5AU;   // Controller sync byte
-constexpr uint8_t  kPs2StableFrames        = 3U;      // Valid frames to arm link
-constexpr uint8_t  kPs2FailsafeBadFrames   = 4U;      // ~100 ms glitch tolerance
-constexpr uint8_t  kPs2ModeResetFrames     = 3U;      // Consecutive 0x41 frames -> fast reconnect
-constexpr uint16_t kPs2PersistentLossFrames = 120U;   // 120 * 25 ms = 3000 ms -> Disconnected
+// --- จอยไร้สาย PS2 / MJ2 (D2 + D3) ------------------------------------------
+constexpr uint8_t  kPs2ClkPin              = 11U;     // D3 ขวา
+constexpr uint8_t  kPs2CmdPin              = 4U;      // D2 ขวา
+constexpr uint8_t  kPs2AttPin              = 12U;     // D3 ซ้าย
+constexpr uint8_t  kPs2DatPin              = 5U;      // D2 ซ้าย
+constexpr uint8_t  kPs2ExpectedMode        = 0x73U;   // ID โหมด DualShock analog (ไฟแดง)
+constexpr uint8_t  kPs2ExpectedSync        = 0x5AU;   // ไบต์ซิงก์ของจอย
+constexpr uint8_t  kPs2StableFrames        = 3U;      // จำนวนเฟรมที่ถูกต้องก่อนถือว่าลิงก์พร้อม
+constexpr uint8_t  kPs2FailsafeBadFrames   = 4U;      // ทนเฟรมเสียได้ ~100 ms
+constexpr uint8_t  kPs2ModeResetFrames     = 3U;      // เฟรม 0x41 ติดกันกี่เฟรม -> เชื่อมต่อใหม่เร็ว
+constexpr uint16_t kPs2PersistentLossFrames = 120U;   // 120 * 25 ms = 3000 ms -> ถือว่าหลุด
 constexpr uint32_t kPs2DisconnectMs        = 3000UL;
-constexpr uint32_t kPs2ReconnectPeriodMs   = 500UL;   // Non-blocking retry gap after finish
-constexpr uint32_t kPs2BootTimeoutMs       = 400UL;   // Bounded boot init budget
-constexpr uint8_t  kPs2InitBurstAttempts   = 3U;      // Multi-attempt burst count (available to Ps2Driver::tryConnect; runtime uses 1 non-blocking cycle)
-constexpr uint8_t  kPs2ClockHalfPeriodUs   = 8U;      // ~62 kHz bit-bang SPI clock
-constexpr uint8_t  kPs2ByteGapUs           = 20U;     // Inter-byte settle gap
-constexpr uint8_t  kPs2PacketGapUs         = 50U;     // CS high gap between transactions
-constexpr uint8_t  kPs2AttSettleUs         = 12U;     // CS low setup time before first clock
-constexpr uint32_t kPs2InitRetryGapMs      = 12U;     // Delay between init burst attempts
+constexpr uint32_t kPs2ReconnectPeriodMs   = 500UL;   // ช่วงห่างการลองต่อใหม่แบบไม่บล็อก หลังจบรอบ
+constexpr uint32_t kPs2BootTimeoutMs       = 400UL;   // งบเวลาเริ่มต้นจอยตอนบูตแบบมีขอบเขต
+constexpr uint8_t  kPs2InitBurstAttempts   = 3U;      // จำนวนครั้งลองต่อแบบ burst (ใช้ได้ใน Ps2Driver::tryConnect; ตอนรันใช้ 1 รอบแบบไม่บล็อก)
+constexpr uint8_t  kPs2ClockHalfPeriodUs   = 8U;      // สัญญาณนาฬิกา bit-bang SPI ~62 kHz
+constexpr uint8_t  kPs2ByteGapUs           = 20U;     // ช่วงพักระหว่างไบต์
+constexpr uint8_t  kPs2PacketGapUs         = 50U;     // ช่วง CS สูงระหว่างทรานแซกชัน
+constexpr uint8_t  kPs2AttSettleUs         = 12U;     // เวลาตั้ง CS ต่ำก่อนสัญญาณนาฬิกาแรก
+constexpr uint32_t kPs2InitRetryGapMs      = 12U;     // หน่วงระหว่างการลองเริ่มต้นแบบ burst
 
-// --- Servos (RC1..RC4; RC3+RC4 paired on L1=Down, R1=Up, Square=Push Ground) ---
+// --- เซอร์โว (RC1..RC4; RC3+RC4 จับคู่ที่ L1=ลง, R1=ขึ้น, Square=ดันพื้น) ---
 constexpr int16_t  kServoMinDeg            = 0;
 constexpr int16_t  kServoMaxDeg            = 180;
 constexpr int16_t  kRc2MinDeg              = 0;
 constexpr int16_t  kRc2MaxDeg              = 180;
 constexpr uint32_t kArmStepIntervalMs      = 50UL;
-constexpr uint32_t kServoBootStaggerMs     = 60UL;    // Reduce startup current spike
+constexpr uint32_t kServoBootStaggerMs     = 60UL;    // ลดกระแสพุ่งตอนเริ่มระบบ
 
-// --- Power / DC Adapter (Supports 9V-18V DC Adapter or 2S-4S Pack) ----------
-constexpr float    kPowerFullVolt          = 19.5f;   // <= 25.5V (uint8 tenths)
-constexpr float    kPowerCutoffVolt        = 6.0f;    // Below 6.4V Emergency floor so software sag throttling triggers first
+// --- กำลังไฟ / อะแดปเตอร์ DC (รองรับอะแดปเตอร์ 9V-18V หรือแบต 2S-4S) -------
+constexpr float    kPowerFullVolt          = 19.5f;   // <= 25.5V (uint8 หน่วยหนึ่งส่วนสิบ)
+constexpr float    kPowerCutoffVolt        = 6.0f;    // ต่ำกว่า 6.4V คือระดับฉุกเฉิน เพื่อให้ซอฟต์แวร์ลดกำลังตามแรงดันตกทำงานก่อน
 constexpr float    kPowerAlarmVolt         = 7.2f;
-constexpr uint16_t kLowVoltWarnMv          = 7200U;   // Floor Low threshold (2S / 9V safe)
-constexpr uint16_t kBattCritVoltMv         = 6800U;   // Floor Critical threshold
-constexpr uint16_t kBattEmergVoltMv        = 6400U;   // Floor Emergency threshold
-constexpr uint16_t kBattHysteresisMv       = 350U;    // Exit hysteresis above enter threshold
-constexpr uint16_t kExtPowerPresentMv      = 5500U;   // USB-only reads < 5.5V on VBAT
-constexpr uint8_t  kBattLowSagPct          = 83U;     // <= 83% of resting baseline -> Low
-constexpr uint8_t  kBattCritSagPct         = 76U;     // <= 76% of resting baseline -> Critical
-constexpr uint8_t  kBattEmergSagPct        = 69U;     // <= 69% of resting baseline -> Emergency
-constexpr uint8_t  kBattEmaDownAlphaPct    = 35U;     // Fast reaction to voltage sag
-constexpr uint8_t  kBattEmaUpAlphaPct      = 8U;      // Slow filter recovery
-constexpr uint8_t  kBattOffDebounceTicks   = 3U;      // Debounce USB-only / unplug
-constexpr uint8_t  kBattInvalidFallbackCnt = 6U;      // Missed ADC/UART reads before fallback
-constexpr uint32_t kBattRecoveryHoldMs     = 1500UL;  // Stable hold required to step up a tier
+constexpr uint16_t kLowVoltWarnMv          = 7200U;   // เกณฑ์ต่ำ (ปลอดภัยสำหรับ 2S / 9V)
+constexpr uint16_t kBattCritVoltMv         = 6800U;   // เกณฑ์วิกฤต
+constexpr uint16_t kBattEmergVoltMv        = 6400U;   // เกณฑ์ฉุกเฉิน
+constexpr uint16_t kBattHysteresisMv       = 350U;    // ฮิสเตอรีซิสตอนออกจากระดับ เหนือเกณฑ์ตอนเข้า
+constexpr uint16_t kExtPowerPresentMv      = 5500U;   // ไฟจาก USB อย่างเดียวอ่าน VBAT ได้ < 5.5V
+constexpr uint8_t  kBattLowSagPct          = 83U;     // <= 83% ของค่าฐานตอนพัก -> ระดับต่ำ
+constexpr uint8_t  kBattCritSagPct         = 76U;     // <= 76% ของค่าฐานตอนพัก -> ระดับวิกฤต
+constexpr uint8_t  kBattEmergSagPct        = 69U;     // <= 69% ของค่าฐานตอนพัก -> ระดับฉุกเฉิน
+constexpr uint8_t  kBattEmaDownAlphaPct    = 35U;     // ตอบสนองเร็วเมื่อแรงดันตก
+constexpr uint8_t  kBattEmaUpAlphaPct      = 8U;      // ตัวกรองฟื้นตัวช้า
+constexpr uint8_t  kBattOffDebounceTicks   = 3U;      // ดีบาวซ์การเสียบ/ถอด USB อย่างเดียว
+constexpr uint8_t  kBattInvalidFallbackCnt = 6U;      // จำนวนครั้งที่อ่าน ADC/UART พลาดก่อนถอยกลับค่าสำรอง
+constexpr uint32_t kBattRecoveryHoldMs     = 1500UL;  // เวลาที่ต้องนิ่งก่อนยกระดับขึ้นหนึ่งขั้น
 constexpr int16_t  kBattLowAccelSlew       = 15;
 constexpr int16_t  kBattCritAccelSlew      = 9;
 constexpr int16_t  kBattEmergAccelSlew     = 6;
@@ -104,26 +104,26 @@ constexpr int16_t  kBattLowDecelSlew       = 32;
 constexpr int16_t  kBattCritDecelSlew      = 22;
 constexpr int16_t  kBattEmergDecelSlew     = 18;
 
-// --- Serial Backup Manual Control -------------------------------------------
+// --- ควบคุมสำรองด้วยมือผ่าน Serial -------------------------------------------
 constexpr int16_t  kSerialMinSpeed         = 20;
 constexpr int16_t  kSerialSpeedStep        = 15;
-constexpr uint32_t kSerialKeyHoldMs        = 650UL;   // Bridges OS key-repeat gap
-constexpr uint32_t kSerialDirectHoldMs     = 2500UL;  // Safety window for `m L R`
-constexpr uint32_t kLineTimeoutMs          = 1500UL;  // Expiration window for line commands
+constexpr uint32_t kSerialKeyHoldMs        = 650UL;   // คร่อมช่องว่างของการกดคีย์ซ้ำของระบบปฏิบัติการ
+constexpr uint32_t kSerialDirectHoldMs     = 2500UL;  // หน้าต่างความปลอดภัยของคำสั่ง `m L R`
+constexpr uint32_t kLineTimeoutMs          = 1500UL;  // เวลาหมดอายุของคำสั่งแบบบรรทัด
 
-// --- Onboard Upload Combo (BTN_UP + BTN_DOWN) & Auto Start Hold ------------
+// --- คอมโบอัปโหลดบนบอร์ด (BTN_UP + BTN_DOWN) และการกดค้างเริ่ม Auto ---------
 constexpr uint32_t kButtonDebounceMs       = 30UL;
 constexpr uint32_t kUploadComboHoldMs      = 2500UL;
-constexpr uint32_t kAutoHoldBarDelayMs     = 250UL;   // Hold delay before showing BTN_UP->AUTO bar on OLED
-constexpr uint32_t kAutoOledRefreshMs      = 250UL;   // Live stopwatch OLED refresh during Auto
-constexpr uint32_t kAutoStallPollMs        = 200UL;   // Encoder progress poll period during blocking DriveDC
+constexpr uint32_t kAutoHoldBarDelayMs     = 250UL;   // หน่วงก่อนแสดงแถบ BTN_UP->AUTO บน OLED
+constexpr uint32_t kAutoOledRefreshMs      = 250UL;   // รีเฟรช OLED นาฬิกาจับเวลาสดระหว่าง Auto
+constexpr uint32_t kAutoStallPollMs        = 200UL;   // คาบอ่านความคืบหน้า encoder ระหว่าง DriveDC แบบบล็อก
 
-// --- Auto Gyro Assist mode names (value chosen in user_settings.h: kAutoGyroMode) ---
+// --- ชื่อโหมด Gyro ช่วย Auto (ค่าที่เลือกอยู่ใน user_settings.h: kAutoGyroMode) ---
 constexpr uint8_t  kAutoGyroOff                 = 0U;
 constexpr uint8_t  kAutoGyroStraightHold        = 1U;
 constexpr uint8_t  kAutoGyroStraightHoldAndTurn = 2U;
 
-// --- Live Stability Probability Index (0..100%) ----------------------------
+// --- ดัชนีความน่าจะเป็นความเสถียรสด (0..100%) -------------------------------
 constexpr uint8_t  kStabilityLinkMaxPen      = 35U;
 constexpr uint8_t  kStabilityLinkDropPen     = 25U;
 constexpr uint8_t  kStabilityIdleWaitPen     = 5U;

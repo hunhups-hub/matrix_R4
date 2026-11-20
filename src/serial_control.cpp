@@ -400,7 +400,7 @@ void SerialControl::poll(uint32_t nowMs, int16_t currentSpeedPct, SerialActions&
     outActions = SerialActions{};
     int16_t workingSpeedPct = currentSpeedPct;
 
-    // Cancel stale or abandoned line buffering
+    // ยกเลิกบัฟเฟอร์บรรทัดที่ค้างหรือถูกทิ้งไว้
     if (collectingLine_ &&
         static_cast<uint32_t>(nowMs - lineStartTimeMs_) >= Config::kLineTimeoutMs) {
         collectingLine_ = false;
@@ -410,14 +410,14 @@ void SerialControl::poll(uint32_t nowMs, int16_t currentSpeedPct, SerialActions&
     while (Serial.available() > 0) {
         const char ch = static_cast<char>(Serial.read());
 
-        // Cancel stale line buffering if timeout elapsed while receiving characters
+        // ยกเลิกบัฟเฟอร์บรรทัดที่ค้าง ถ้าหมดเวลาระหว่างกำลังรับตัวอักษร
         if (collectingLine_ &&
             static_cast<uint32_t>(nowMs - lineStartTimeMs_) >= Config::kLineTimeoutMs) {
             collectingLine_ = false;
             lineLen_        = 0U;
         }
 
-        // Emergency intercept: always immediate, even during line buffering!
+        // ดักคำสั่งฉุกเฉิน: ทำงานทันทีเสมอ แม้ระหว่างกำลังสะสมบรรทัด!
         if (ch == '!') {
             collectingLine_           = false;
             lineLen_                  = 0U;
@@ -439,7 +439,7 @@ void SerialControl::poll(uint32_t nowMs, int16_t currentSpeedPct, SerialActions&
                 parseLineCommand(nowMs, outActions);
                 lineLen_ = 0U;
             } else if (ch == ' ') {
-                // Space immediately stops active motion; cancel dangling "f " abort cleanly while allowing spaces inside m/c/trailing f1.
+                // เว้นวรรคหยุดการเคลื่อนที่ทันที; ยกเลิก "f " ที่ค้างอยู่อย่างเรียบร้อย แต่ยังอนุญาตเว้นวรรคภายในคำสั่ง m/c และ f1 ท้ายบรรทัด
                 activeMotion_ = MotionMode::Stop;
                 if (lineBuf_[0] == 'f' && lineLen_ == 1U) {
                     collectingLine_ = false;
@@ -447,21 +447,21 @@ void SerialControl::poll(uint32_t nowMs, int16_t currentSpeedPct, SerialActions&
                 } else if (lineLen_ + 1U < kLineBufSize) {
                     lineBuf_[lineLen_++] = ch;
                 } else {
-                    // Buffer overrun protection
+                    // กันบัฟเฟอร์ล้น
                     collectingLine_ = false;
                     lineLen_        = 0U;
                 }
             } else if (lineLen_ + 1U < kLineBufSize) {
                 lineBuf_[lineLen_++] = ch;
             } else {
-                // Buffer overrun protection: cancel line collection on overflow
+                // กันบัฟเฟอร์ล้น: ยกเลิกการสะสมบรรทัดเมื่อล้น
                 collectingLine_ = false;
                 lineLen_        = 0U;
             }
             continue;
         }
 
-        // Start line-buffered multi-argument commands cleanly on m/M, c/C, or f/F.
+        // เริ่มคำสั่งหลายอาร์กิวเมนต์แบบบัฟเฟอร์บรรทัดเมื่อพบ m/M, c/C หรือ f/F
         if (ch == 'm' || ch == 'M' || ch == 'c' || ch == 'C' || ch == 'f' || ch == 'F') {
             collectingLine_  = true;
             lineStartTimeMs_ = nowMs;

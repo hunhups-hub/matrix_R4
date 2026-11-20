@@ -4,8 +4,8 @@
 
 // ============================================================================
 //  user_settings.h  --  ค่าที่ผู้ใช้ปรับบ่อย (แก้ค่าที่หุ่นที่ไฟล์นี้ที่เดียว)
-//  Everything a driver/team normally tunes. Hardware pins, protocol timings and
-//  internal limits stay in config.h.
+//  ค่าทั้งหมดที่คนขับ/ทีมปรับตามปกติ ส่วนพิน คาบเวลาโปรโตคอล และขีดจำกัด
+//  ภายในอยู่ใน config.h
 // ============================================================================
 //  ที่ไหนแก้อะไร:
 //   - ค่าความเร็ว/มุมเซอร์โว/ทิศมอเตอร์/Auto ...   -> ไฟล์นี้ (user_settings.h)
@@ -19,7 +19,7 @@
 //  (platformio.ini ส่ง -DMATRIX_AUTO_GYRO_MODE=2 ฯลฯ ทับค่าด้านล่าง)
 // ============================================================================
 
-// Build-time overrides (platformio.ini -D flags). Defaults keep every gyro feature off.
+// ค่าที่ถูกทับตอน build (แฟลก -D ใน platformio.ini) ค่าเริ่มต้นปิดฟีเจอร์ Gyro ทั้งหมด
 #ifndef MATRIX_AUTO_GYRO_MODE
 #define MATRIX_AUTO_GYRO_MODE 0
 #endif
@@ -33,94 +33,94 @@
 namespace Config {
 
 // --- 1) ความรู้สึกการขับ (Drive feel)  ค่าความเร็ว/ความนุ่ม/การกลับทิศมอเตอร์ ---
-constexpr bool     kMotorLeftReverseInit   = false;   // Inverted from MATRIX default to match chassis front
+constexpr bool     kMotorLeftReverseInit   = false;   // กลับทิศจากค่าเริ่มต้นของ MATRIX ให้ตรงกับด้านหน้าของตัวถัง
 constexpr bool     kMotorRightReverseInit  = true;
-constexpr bool     kEnableSmartHoldBrake   = true;    // Lock M1/M2 with H-bridge brake when stationary (0,0)
-constexpr int16_t  kSerialDefaultSpeed     = 100;     // Full 100% speed by default (20..100%)
-constexpr uint8_t  kStickDeadzoneRaw       = 18U;     // ~14% center deadband (127/128)
-constexpr int16_t  kPrecisionMaxPower          = 55;   // Slow/precision mode full-stick speed limit (%)
-constexpr uint8_t  kPrecisionThrottleExpoPct   = 55U;  // Gentler cubic expo on throttle in precision mode
-constexpr uint8_t  kPrecisionTurnExpoPct       = 60U;  // Gentler cubic expo on steering in precision mode
-constexpr int16_t  kPrecisionMicroTurnPower    = 18;   // D-Pad Left/Right fine alignment pivot in precision mode (%)
-constexpr int16_t  kMicroTurnPower         = 26;      // D-Pad Left/Right fine alignment pivot power (%)
-constexpr uint8_t  kThrottleExpoPct        = 35U;     // 35% cubic jerk-reducing curve on throttle
-constexpr uint8_t  kTurnExpoPct            = 45U;     // 45% cubic curve on steering
-constexpr uint8_t  kTurnMaxRatioPct        = 80U;     // Max turn authority ratio at normal speed (%)
-constexpr int16_t  kMotorAccelSlewStep     = 25;      // 0 -> 100% in ~100 ms
-constexpr int16_t  kMotorDecelSlewStep     = 50;      // 100% -> 0 in ~50 ms
-constexpr int16_t  kAngularAccelSlewStep   = 35;      // Rotational 2-DOF slew step
-constexpr int16_t  kAngularDecelSlewStep   = 60;      // Rotational 2-DOF braking slew step
-constexpr int16_t  kMaxCentripetalLatAccel = 52;      // Traction circle limit |v * w| / 100 <= 52
-constexpr int16_t  kMotorStictionMinPower  = 12;      // Coulomb static friction threshold (%)
-constexpr uint8_t  kCoMHighMinScalePct     = 65U;     // Min accel/centripetal scale when arm raised (RC2->0)
-constexpr int16_t  kCoMLowArmDeg           = 140;     // RC2 angle >= this has low CoM (100% dynamic scale)
-constexpr int8_t   kMaxMotorTrimPct        = 15;      // Max straight-line L/R balance trim (+/-15%)
+constexpr bool     kEnableSmartHoldBrake   = true;    // ล็อก M1/M2 ด้วยเบรก H-bridge ตอนหยุดนิ่ง (0,0)
+constexpr int16_t  kSerialDefaultSpeed     = 100;     // ความเร็วเริ่มต้นผ่าน Serial เต็ม 100% (ช่วง 20..100%)
+constexpr uint8_t  kStickDeadzoneRaw       = 18U;     // เดดโซนกลางก้านจอย ~14% (127/128)
+constexpr int16_t  kPrecisionMaxPower          = 55;   // ความเร็วสูงสุดเมื่อโยกก้านสุดในโหมดช้า/แม่นยำ (%)
+constexpr uint8_t  kPrecisionThrottleExpoPct   = 55U;  // เส้นโค้ง expo ลูกบาศก์ของคันเร่งให้นุ่มขึ้นในโหมดแม่นยำ
+constexpr uint8_t  kPrecisionTurnExpoPct       = 60U;  // เส้นโค้ง expo ลูกบาศก์ของการเลี้ยวให้นุ่มขึ้นในโหมดแม่นยำ
+constexpr int16_t  kPrecisionMicroTurnPower    = 18;   // กำลังหมุนละเอียดเมื่อกด D-Pad ซ้าย/ขวา ในโหมดแม่นยำ (%)
+constexpr int16_t  kMicroTurnPower         = 26;      // กำลังหมุนละเอียดเมื่อกด D-Pad ซ้าย/ขวา เพื่อจัดแนว (%)
+constexpr uint8_t  kThrottleExpoPct        = 35U;     // เส้นโค้งลูกบาศก์ 35% ที่คันเร่ง ลดอาการกระชาก
+constexpr uint8_t  kTurnExpoPct            = 45U;     // เส้นโค้งลูกบาศก์ 45% ที่การเลี้ยว
+constexpr uint8_t  kTurnMaxRatioPct        = 80U;     // สัดส่วนกำลังเลี้ยวสูงสุดที่ความเร็วปกติ (%)
+constexpr int16_t  kMotorAccelSlewStep     = 25;      // 0 -> 100% ใช้เวลา ~100 ms
+constexpr int16_t  kMotorDecelSlewStep     = 50;      // 100% -> 0 ใช้เวลา ~50 ms
+constexpr int16_t  kAngularAccelSlewStep   = 35;      // ขั้น slew ของการหมุน (2-DOF) ตอนเร่ง
+constexpr int16_t  kAngularDecelSlewStep   = 60;      // ขั้น slew ของการหมุน (2-DOF) ตอนเบรก
+constexpr int16_t  kMaxCentripetalLatAccel = 52;      // ขีดจำกัดวงกลมการยึดเกาะ |v * w| / 100 <= 52
+constexpr int16_t  kMotorStictionMinPower  = 12;      // กำลังขั้นต่ำชนะแรงเสียดทานสถิต (%)
+constexpr uint8_t  kCoMHighMinScalePct     = 65U;     // สเกลเร่ง/แรงสู่ศูนย์กลางต่ำสุดเมื่อยกแขนสูง (RC2->0)
+constexpr int16_t  kCoMLowArmDeg           = 140;     // มุม RC2 >= ค่านี้ ถือว่าจุดศูนย์ถ่วงต่ำ (สเกลไดนามิก 100%)
+constexpr int8_t   kMaxMotorTrimPct        = 15;      // ค่าชดเชยซ้าย/ขวาสูงสุดเพื่อให้วิ่งตรง (+/-15%)
 
 // --- 2) เซอร์โว RC1..RC4  มุมต่างๆ / กลับทิศ / ช่วงพัลส์ (ปุ่มที่สั่ง ดู controls.h) ---
-constexpr int16_t  kRc1InitDeg             = 180;       // Aux servo default
+constexpr int16_t  kRc1InitDeg             = 180;       // มุมเริ่มต้นของเซอร์โวเสริม (กริปเปอร์)
 constexpr int16_t  kRc1L2Deg               = 180;
 constexpr int16_t  kRc1R2Deg               = 0;
-constexpr int16_t  kRc1PresetHoldDeg       = 75;      // Circle preset A: Gripper hold/carry (matches Auto)
-constexpr int16_t  kRc1PresetDropDeg       = 145;     // Circle preset B: Gripper open/release (matches Auto)
-constexpr int16_t  kRc2InitDeg             = 90;      // Spare/Arm RC2 (D-Pad UP/DOWN)
-constexpr int16_t  kRc2StepDeg             = 10;      // 10 deg / 50 ms (~200 deg/s)
-constexpr bool     kRc2InvertDir           = true;    // Invert RC2: UP/Fwd decreases deg, DOWN/Back increases deg
-constexpr int16_t  kRc2PresetHoldDeg       = 70;      // Circle preset A: Arm raised carry pose (matches Auto)
-constexpr int16_t  kRc2PresetDropDeg       = 140;     // Circle preset B: Arm lowered place pose (matches Auto)
-constexpr int16_t  kRc2SmoothStepDeg       = 6;       // RC2 slew step per 25ms tick (6 deg/25ms = 240 deg/s)
-constexpr bool     kRc2SmoothDefault       = true;    // Smooth trajectory enabled by default for RC2 only
-constexpr int16_t  kRc3InitDeg             = 30;      // Front L arm init (paired with RC4; clamped 0..180)
-constexpr int16_t  kRc3L1Deg               = 30;      // L1 Push down (30 deg; lower deg = deeper; min 0)
-constexpr int16_t  kRc3R1Deg               = 140;     // R1 Lift / mid stow up (140 deg)
-constexpr int16_t  kRc3SquareDeg           = 30;      // Square Push ground toggle (30 deg)
-constexpr bool     kRc3InvertDir           = false;   // Invert RC3 hardware output angle (deg -> 180 - deg)
-constexpr int16_t  kRc4InitDeg             = 30;      // Front R arm init (paired with RC3)
-constexpr int16_t  kRc4L1Deg               = 30;      // L1 Push down (30 deg; paired with RC3)
-constexpr int16_t  kRc4R1Deg               = 140;     // R1 Lift / mid stow up (140 deg)
-constexpr int16_t  kRc4SquareDeg           = 30;      // Square Push ground toggle (30 deg)
-constexpr bool     kRc4InvertDir           = true;    // Invert RC4 hardware output angle (deg -> 180 - deg)
-constexpr bool     kEnableRc34CustomPulse  = true;    // Apply SetServoPulseRange specifically to RC3 & RC4
-constexpr uint16_t kRc34PulseMinUs         = 500U;    // Wide standard min pulse (us) for RC3/RC4
-constexpr uint16_t kRc34PulseMaxUs         = 2500U;   // Wide standard max pulse (us) for RC3/RC4
+constexpr int16_t  kRc1PresetHoldDeg       = 75;      // พรีเซ็ตวงกลม A: กริปเปอร์จับ/ถือของ (ตรงกับ Auto)
+constexpr int16_t  kRc1PresetDropDeg       = 145;     // พรีเซ็ตวงกลม B: กริปเปอร์เปิด/ปล่อยของ (ตรงกับ Auto)
+constexpr int16_t  kRc2InitDeg             = 90;      // มุมเริ่มต้นแขน RC2 (D-Pad ขึ้น/ลง)
+constexpr int16_t  kRc2StepDeg             = 10;      // 10 องศา / 50 ms (~200 องศา/วินาที)
+constexpr bool     kRc2InvertDir           = true;    // กลับทิศ RC2: ขึ้น/หน้า ลดมุม, ลง/หลัง เพิ่มมุม
+constexpr int16_t  kRc2PresetHoldDeg       = 70;      // พรีเซ็ตวงกลม A: ท่ายกแขนถือของ (ตรงกับ Auto)
+constexpr int16_t  kRc2PresetDropDeg       = 140;     // พรีเซ็ตวงกลม B: ท่าลดแขนวางของ (ตรงกับ Auto)
+constexpr int16_t  kRc2SmoothStepDeg       = 6;       // ขั้น slew ของ RC2 ต่อ 25 ms (6 องศา/25 ms = 240 องศา/วินาที)
+constexpr bool     kRc2SmoothDefault       = true;    // เปิดการเคลื่อนที่นุ่มนวลเป็นค่าเริ่มต้น เฉพาะ RC2
+constexpr int16_t  kRc3InitDeg             = 30;      // มุมเริ่มต้นแขนหน้าซ้าย (คู่กับ RC4; จำกัด 0..180)
+constexpr int16_t  kRc3L1Deg               = 30;      // L1 กดลง (30 องศา; มุมน้อย = ลึกกว่า; ต่ำสุด 0)
+constexpr int16_t  kRc3R1Deg               = 140;     // R1 ยกขึ้น / เก็บกลาง (140 องศา)
+constexpr int16_t  kRc3SquareDeg           = 30;      // Square สลับกดพื้น (30 องศา)
+constexpr bool     kRc3InvertDir           = false;   // กลับมุมที่ส่งออกฮาร์ดแวร์ของ RC3 (องศา -> 180 - องศา)
+constexpr int16_t  kRc4InitDeg             = 30;      // มุมเริ่มต้นแขนหน้าขวา (คู่กับ RC3)
+constexpr int16_t  kRc4L1Deg               = 30;      // L1 กดลง (30 องศา; คู่กับ RC3)
+constexpr int16_t  kRc4R1Deg               = 140;     // R1 ยกขึ้น / เก็บกลาง (140 องศา)
+constexpr int16_t  kRc4SquareDeg           = 30;      // Square สลับกดพื้น (30 องศา)
+constexpr bool     kRc4InvertDir           = true;    // กลับมุมที่ส่งออกฮาร์ดแวร์ของ RC4 (องศา -> 180 - องศา)
+constexpr bool     kEnableRc34CustomPulse  = true;    // ใช้ SetServoPulseRange เฉพาะ RC3 และ RC4
+constexpr uint16_t kRc34PulseMinUs         = 500U;    // พัลส์ต่ำสุดแบบกว้าง (us) ของ RC3/RC4
+constexpr uint16_t kRc34PulseMaxUs         = 2500U;   // พัลส์สูงสุดแบบกว้าง (us) ของ RC3/RC4
 
 // --- 3) แบตเตอรี่  นโยบายกำลังขับเมื่อไฟตก ---
-constexpr bool     kEnableBatterySagThrottle = false; // Keep 100% motor power & slew even when battery is low
-constexpr int16_t  kBattLowMaxPower        = 72;      // Power caps & slew steps per tier (when sag throttle enabled)
+constexpr bool     kEnableBatterySagThrottle = false; // คงกำลังมอเตอร์และ slew 100% แม้แบตต่ำ
+constexpr int16_t  kBattLowMaxPower        = 72;      // เพดานกำลังและขั้น slew ของแต่ละระดับ (เมื่อเปิด sag throttle)
 constexpr int16_t  kBattCritMaxPower       = 50;
 constexpr int16_t  kBattEmergMaxPower      = 35;
-constexpr uint8_t  kBattCompMaxPct         = 115U;    // Bounded torque compensation cap
+constexpr uint8_t  kBattCompMaxPct         = 115U;    // เพดานการชดเชยแรงบิดแบบจำกัดขอบเขต
 
 // --- 4) โหมด Auto  เวลา / ตรวจล้อติด ---
-constexpr uint32_t kAutoStartBtnHoldMs     = 1200UL;  // Single BTN_UP hold to start Auto without PS2
-constexpr uint32_t kAutoMaxDurationMs      = 60000UL; // Max Auto safety duration (60s; 0 = unlimited)
-constexpr uint32_t kAutoStallGraceMs       = 1250UL;  // Initial grace window per Auto command before stall check
-constexpr uint32_t kAutoStallTimeoutMs     = 1600UL;  // Continuous stall window with < kAutoStallMinDeltaDeg
-constexpr int32_t  kAutoStallMinDeltaDeg   = 3L;      // Minimum encoder delta to reset stall timer
+constexpr uint32_t kAutoStartBtnHoldMs     = 1200UL;  // กด BTN_UP ค้างเท่านี้เพื่อเริ่ม Auto โดยไม่ใช้ PS2
+constexpr uint32_t kAutoMaxDurationMs      = 60000UL; // เวลา Auto สูงสุดเพื่อความปลอดภัย (60 วินาที; 0 = ไม่จำกัด)
+constexpr uint32_t kAutoStallGraceMs       = 1250UL;  // ช่วงผ่อนผันแรกของแต่ละคำสั่ง Auto ก่อนเริ่มตรวจล้อติด
+constexpr uint32_t kAutoStallTimeoutMs     = 1600UL;  // ช่วงที่ล้อติดต่อเนื่องโดยเปลี่ยนน้อยกว่า kAutoStallMinDeltaDeg
+constexpr int32_t  kAutoStallMinDeltaDeg   = 3L;      // ค่าเปลี่ยนแปลง encoder ขั้นต่ำที่รีเซ็ตตัวจับเวลาล้อติด
 
 // --- 5) Gyro ช่วย Auto (IMU บนบอร์ด)  ปิดเป็นค่าเริ่มต้น  เปิดด้วย env:uno_r4_wifi_field ---
 // 0 = ปิด (MoveDegs ทำงานเหมือนเดิมทุกอย่าง)
 // 1 = วิ่งตรงด้วย MoveGyroDegs + จำทิศจริงจาก IMU หลังหมุน
 // 2 = ข้อ 1 + หมุนด้วย TurnGyro ไปมุมที่ปัดเป็นขั้น
-constexpr uint8_t  kAutoGyroMode           = MATRIX_AUTO_GYRO_MODE;  // Default Off; env:uno_r4_wifi_field sets 2 (see CLAUDE.md)
-constexpr int16_t  kAutoPivotWheelDegPerYawDegX100 = 283;   // wheel deg per 1 deg yaw, x100 (mission: 255 wheel deg ~ 90 deg)
-constexpr int16_t  kAutoPivotYawSign       = 1;       // +1/-1: yaw sign when right wheel goes forward and left backward
-constexpr int16_t  kAutoTurnSnapStepDeg    = 45;      // Snap pivot estimate to this step (<= 0 disables snapping)
-constexpr uint8_t  kAutoTurnGyroMode       = 1U;      // TurnGyro mode: 0 = single motor, 1 = two motor (pivot)
-constexpr bool     kAutoMoveTelemetry      = true;    // Print one [AUTO] line per DriveDC move on Serial
+constexpr uint8_t  kAutoGyroMode           = MATRIX_AUTO_GYRO_MODE;  // เริ่มต้นปิด; env:uno_r4_wifi_field ตั้งเป็น 2 (ดู CLAUDE.md)
+constexpr int16_t  kAutoPivotWheelDegPerYawDegX100 = 283;   // องศาล้อต่อ yaw 1 องศา x100 (ภารกิจ: ล้อ 255 องศา ~ หมุน 90 องศา)
+constexpr int16_t  kAutoPivotYawSign       = 1;       // +1/-1: เครื่องหมาย yaw เมื่อล้อขวาไปหน้า ล้อซ้ายถอยหลัง
+constexpr int16_t  kAutoTurnSnapStepDeg    = 45;      // ปัดค่าประมาณการหมุนเป็นขั้นนี้ (<= 0 = ปิดการปัด)
+constexpr uint8_t  kAutoTurnGyroMode       = 1U;      // โหมด TurnGyro: 0 = มอเตอร์เดียว, 1 = สองมอเตอร์ (pivot)
+constexpr bool     kAutoMoveTelemetry      = true;    // พิมพ์บรรทัด [AUTO] หนึ่งบรรทัดต่อการสั่ง DriveDC หนึ่งครั้งทาง Serial
 
 // --- 6) ตัดกำลังเมื่อล้อติดขัดตอนขับ Manual  (ปิดเป็นค่าเริ่มต้น) ---
 constexpr bool     kEnableManualStallCut   = (MATRIX_MANUAL_STALL_CUT != 0);
-constexpr int16_t  kManualStallMinCmdPct   = 60;      // Only judge stalls while |wheel cmd| >= this
-constexpr int16_t  kManualStallRearmCmdPct = 15;      // Cut stays latched until |cmd| <= this (stick near neutral)
-constexpr uint32_t kManualStallTimeoutMs   = 1500UL;  // No encoder progress for this long -> cut
-constexpr uint32_t kManualStallPollMs      = 200UL;   // Encoder sample period (5 Hz) while demanding
+constexpr int16_t  kManualStallMinCmdPct   = 60;      // ตัดสินล้อติดเฉพาะเมื่อ |คำสั่งล้อ| >= ค่านี้
+constexpr int16_t  kManualStallRearmCmdPct = 15;      // คงสถานะตัดกำลังไว้จนกว่า |คำสั่ง| <= ค่านี้ (ก้านใกล้กลาง)
+constexpr uint32_t kManualStallTimeoutMs   = 1500UL;  // encoder ไม่ขยับนานเท่านี้ -> ตัดกำลัง
+constexpr uint32_t kManualStallPollMs      = 200UL;   // คาบอ่าน encoder (5 Hz) ขณะสั่งกำลังอยู่
 
 // --- 7) ล็อกทิศด้วย Gyro ตอนขับ Teleop  (ปิดเป็นค่าเริ่มต้น) ---
 constexpr bool     kEnableTeleopHeadingHold = (MATRIX_TELEOP_HEADING_HOLD != 0);
-constexpr uint32_t kTeleopHoldLatchDelayMs  = 250UL;  // Straight input this long before heading is latched
-constexpr uint32_t kTeleopHoldPollMs        = 100UL;  // IMU sample period (10 Hz) while holding
-constexpr int16_t  kTeleopHoldDeadbandDeg   = 2;      // No correction inside +/- this yaw error
-constexpr int16_t  kTeleopHoldKpX10         = 15;     // Turn correction % per deg yaw error, x10
-constexpr int16_t  kTeleopHoldMaxCorrPct    = 15;     // Max correction added/removed per wheel
+constexpr uint32_t kTeleopHoldLatchDelayMs  = 250UL;  // ต้องโยกตรงนานเท่านี้ก่อนล็อกทิศ
+constexpr uint32_t kTeleopHoldPollMs        = 100UL;  // คาบอ่าน IMU (10 Hz) ขณะล็อกทิศ
+constexpr int16_t  kTeleopHoldDeadbandDeg   = 2;      // ไม่แก้ไขเมื่อ yaw คลาดเคลื่อนภายใน +/- ค่านี้
+constexpr int16_t  kTeleopHoldKpX10         = 15;     // % แก้การเลี้ยวต่อ yaw คลาดเคลื่อน 1 องศา x10
+constexpr int16_t  kTeleopHoldMaxCorrPct    = 15;     // ค่าแก้สูงสุดที่บวก/ลบต่อล้อ
 
 } // namespace Config

@@ -21,7 +21,7 @@
 //    - การออกกลางคัน (กด X / E-Stop / Timeout) ใช้ longjmp จึงห้ามประกาศตัวแปรที่มี destructor
 //      (เช่น String, std::string) ในโค้ดที่วาง — ใช้ char[] หรือชนิดพื้นฐานแทน
 //    - มีฟังก์ชันช่วยเขียนภารกิจด้วย C++ เอง (driveStraight, turnTo, turnBy, servoTo, headingNow)
-//      อยู่เหนือโซนวางโค้ด และเปิด Gyro Assist ได้ที่ Config::kAutoGyroMode ใน include/config.h
+//      อยู่เหนือโซนวางโค้ด และเปิด Gyro Assist ได้ที่ Config::kAutoGyroMode ใน include/user_settings.h
 // ============================================================================
 
 #ifndef ENABLE_DRIVEDC_BRAKE_DELAY
