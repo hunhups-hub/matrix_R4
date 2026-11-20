@@ -235,9 +235,9 @@ MotorPowerProfile BatteryStabilizer::motorProfile() const {
         profile.maxPowerCap   = Config::kMotorMaxPower;
         profile.accelSlewStep = Config::kMotorAccelSlewStep;
         profile.decelSlewStep = Config::kMotorDecelSlewStep;
-        profile.compPercent   = (tier_ == BatteryTier::Emergency)
-                                    ? 100U
-                                    : computeComp(Config::kBattCompMaxPct);
+        // Keep torque compensation active in every tier, Emergency included: the weaker the
+        // battery, the more the competition robot needs it to hold full wheel strength.
+        profile.compPercent   = computeComp(Config::kBattCompMaxPct);
         profile.slewLimited   = false;
         return profile;
     }

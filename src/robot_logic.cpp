@@ -271,6 +271,29 @@ int16_t applyCoulombStiction(int16_t cmdPower, int16_t stictionMin, int16_t maxP
     return (cmdPower < 0) ? static_cast<int16_t>(-mag) : mag;
 }
 
+void applyCoulombStictionPair(int16_t& left, int16_t& right, int16_t stictionMin, int16_t maxPower) {
+    const int32_t absL = abs16To32(left);
+    const int32_t absR = abs16To32(right);
+    const int32_t peak = (absL > absR) ? absL : absR;
+    if (peak == 0L) {
+        return;
+    }
+    const int16_t limit = clamp16(maxPower, 0, Config::kMotorMaxPower);
+    const int16_t lifted = applyCoulombStiction(static_cast<int16_t>(clampLong(peak, 0L, 32767L)),
+                                                stictionMin,
+                                                limit);
+    if (lifted == 0) {
+        left  = 0;
+        right = 0;
+        return;
+    }
+    // Scale both wheels by lifted/peak (rounded to nearest) so L/R ratio is preserved.
+    const int32_t liftedL = (absL * lifted + (peak / 2L)) / peak;
+    const int32_t liftedR = (absR * lifted + (peak / 2L)) / peak;
+    left  = static_cast<int16_t>((left < 0) ? -liftedL : liftedL);
+    right = static_cast<int16_t>((right < 0) ? -liftedR : liftedR);
+}
+
 int8_t stepMotorTrim(int8_t currentTrim, int8_t delta) {
     const int16_t sum     = static_cast<int16_t>(currentTrim) + static_cast<int16_t>(delta);
     const int16_t clamped = clamp16(sum,
@@ -341,6 +364,14 @@ DriveOutput computeKinodynamicDrive(uint8_t lyRaw,
     if (accelSlewStep > 0 && linAccel < 1) linAccel = 1;
     if (decelSlewStep > 0 && linDecel < 1) linDecel = 1;
 
+    // Rotational slew is CoM-scaled too, so a pivot with the arm raised is not harsher than a straight run.
+    int16_t angAccel =
+        static_cast<int16_t>((static_cast<int32_t>(Config::kAngularAccelSlewStep) * comScale + 50L) / 100L);
+    int16_t angDecel =
+        static_cast<int16_t>((static_cast<int32_t>(Config::kAngularDecelSlewStep) * comScale + 50L) / 100L);
+    if (Config::kAngularAccelSlewStep > 0 && angAccel < 1) angAccel = 1;
+    if (Config::kAngularDecelSlewStep > 0 && angDecel < 1) angDecel = 1;
+
     if (limit == 0) {
         return apply2DofKinodynamicSlew(0,
                                         0,
@@ -348,8 +379,8 @@ DriveOutput computeKinodynamicDrive(uint8_t lyRaw,
                                         currentRight,
                                         linAccel,
                                         linDecel,
-                                        Config::kAngularAccelSlewStep,
-                                        Config::kAngularDecelSlewStep);
+                                        angAccel,
+                                        angDecel);
     }
 
     // 1. Deadzone & reverse-front orientation + cubic jerk-reducing input shaping
@@ -395,8 +426,7 @@ DriveOutput computeKinodynamicDrive(uint8_t lyRaw,
 
     // 4. Coulomb static friction feedforward on proportional stick commands (exact power for Micro-Turn)
     if (!isMicroTurn) {
-        scaledL = applyCoulombStiction(scaledL, Config::kMotorStictionMinPower, limit);
-        scaledR = applyCoulombStiction(scaledR, Config::kMotorStictionMinPower, limit);
+        applyCoulombStictionPair(scaledL, scaledR, Config::kMotorStictionMinPower, limit);
     }
 
     // 5. Coupled 2-DOF translational (v) & rotational (w) slew limiting
@@ -406,8 +436,8 @@ DriveOutput computeKinodynamicDrive(uint8_t lyRaw,
                                                currentRight,
                                                linAccel,
                                                linDecel,
-                                               Config::kAngularAccelSlewStep,
-                                               Config::kAngularDecelSlewStep);
+                                               angAccel,
+                                               angDecel);
 
     // Enforce power envelope so rapid forward-to-pivot 2-DOF slew transitions never
     // overshoot Precision/Battery caps while still allowing smooth ramp-down if already above limit.

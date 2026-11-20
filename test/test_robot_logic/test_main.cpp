@@ -734,7 +734,8 @@ void test_battery_stabilizer_progressive_sag_tiers(void) {
     TEST_ASSERT_EQUAL_INT16(Config::kEnableBatterySagThrottle ? Config::kBattEmergMaxPower : Config::kMotorMaxPower, prof.maxPowerCap);
     TEST_ASSERT_EQUAL_INT16(Config::kEnableBatterySagThrottle ? Config::kBattEmergAccelSlew : Config::kMotorAccelSlewStep, prof.accelSlewStep);
     TEST_ASSERT_EQUAL_INT16(Config::kEnableBatterySagThrottle ? Config::kBattEmergDecelSlew : Config::kMotorDecelSlewStep, prof.decelSlewStep);
-    TEST_ASSERT_EQUAL_UINT8(100U, prof.compPercent);
+    // Emergency tier keeps torque compensation when sag throttle is off (full strength on weak battery)
+    TEST_ASSERT_EQUAL_UINT8(Config::kEnableBatterySagThrottle ? 100U : Config::kBattCompMaxPct, prof.compPercent);
     TEST_ASSERT_EQUAL(Config::kEnableBatterySagThrottle, prof.slewLimited);
 }
 
@@ -1474,6 +1475,45 @@ void test_2dof_kinodynamic_slew_and_coulomb_stiction(void) {
     TEST_ASSERT_EQUAL_INT16(100, RobotLogic::applyCoulombStiction(100, 12, 100));
     TEST_ASSERT_EQUAL_INT16(-100, RobotLogic::applyCoulombStiction(-100, 12, 100));
     TEST_ASSERT_EQUAL_INT16(55, RobotLogic::applyCoulombStiction(55, 12, 55));
+
+    // Stiction pair keeps the L/R ratio: old per-wheel lift turned (13, 2) into (23, 13) = 1.8:1
+    int16_t pl = 13;
+    int16_t pr = 2;
+    RobotLogic::applyCoulombStictionPair(pl, pr, 12, 100);
+    TEST_ASSERT_EQUAL_INT16(23, pl);
+    TEST_ASSERT_EQUAL_INT16(4, pr);
+    pl = -13;
+    pr = 2;
+    RobotLogic::applyCoulombStictionPair(pl, pr, 12, 100);
+    TEST_ASSERT_EQUAL_INT16(-23, pl);
+    TEST_ASSERT_EQUAL_INT16(4, pr);
+    // Equal-magnitude pivot matches the single-wheel mapping; a wheel at 0 stays 0; (0,0) stays (0,0)
+    pl = 30;
+    pr = -30;
+    RobotLogic::applyCoulombStictionPair(pl, pr, 12, 100);
+    TEST_ASSERT_EQUAL_INT16(RobotLogic::applyCoulombStiction(30, 12, 100), pl);
+    TEST_ASSERT_EQUAL_INT16(static_cast<int16_t>(-RobotLogic::applyCoulombStiction(30, 12, 100)), pr);
+    pl = 20;
+    pr = 0;
+    RobotLogic::applyCoulombStictionPair(pl, pr, 12, 100);
+    TEST_ASSERT_EQUAL_INT16(RobotLogic::applyCoulombStiction(20, 12, 100), pl);
+    TEST_ASSERT_EQUAL_INT16(0, pr);
+    pl = 0;
+    pr = 0;
+    RobotLogic::applyCoulombStictionPair(pl, pr, 12, 100);
+    TEST_ASSERT_EQUAL_INT16(0, pl);
+    TEST_ASSERT_EQUAL_INT16(0, pr);
+
+    // Arm raised (RC2=0): pivot angular slew is scaled by CoM scale, same as linear slew
+    const DriveOutput pivotLow  = RobotLogic::computeKinodynamicDrive(
+        128U, 255U, 0, 0, 100, 100, 100, 100U, 140, false, false, false);
+    const DriveOutput pivotHigh = RobotLogic::computeKinodynamicDrive(
+        128U, 255U, 0, 0, 100, 100, 100, 100U, 0, false, false, false);
+    const int16_t expectHigh = static_cast<int16_t>(
+        (static_cast<int32_t>(Config::kAngularAccelSlewStep) * Config::kCoMHighMinScalePct + 50L) / 100L);
+    TEST_ASSERT_EQUAL_INT16(Config::kAngularAccelSlewStep, pivotLow.left);
+    TEST_ASSERT_EQUAL_INT16(expectHigh, pivotHigh.left);
+    TEST_ASSERT_EQUAL_INT16(static_cast<int16_t>(-expectHigh), pivotHigh.right);
 
     // 2-DOF Slew: pure straight acceleration (linAccel=25, angAccel=35) steps both wheels by 25
     const DriveOutput fwdStep = RobotLogic::apply2DofKinodynamicSlew(100, 100, 0, 0, 25, 50, 35, 60);

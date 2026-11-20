@@ -81,6 +81,16 @@ int16_t applyCoulombStiction(int16_t cmdPower,
                              int16_t maxPower = Config::kMotorMaxPower);
 
 /**
+ * Stiction feedforward for a wheel pair that keeps the left/right ratio (path curvature):
+ * the larger wheel is lifted through applyCoulombStiction() and the smaller wheel is scaled by
+ * the same factor. A wheel commanded to 0 stays 0 (pivot about one wheel).
+ */
+void applyCoulombStictionPair(int16_t& left,
+                              int16_t& right,
+                              int16_t stictionMin = Config::kMotorStictionMinPower,
+                              int16_t maxPower = Config::kMotorMaxPower);
+
+/**
  * Full physics-based kinodynamic differential drive pipeline combining all 5 models,
  * plus reverse-front orientation toggle (R3), D-Pad Left/Right micro-turn alignment,
  * straight-line left/right motor balance trim, and full-stick Precision Mode scaling.
