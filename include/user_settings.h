@@ -72,7 +72,7 @@ constexpr int16_t  kRc4SquareDeg           = 30;      // Square สลับก�
 constexpr bool     kRc4InvertDir           = true;    // กลับมุมที่ส่งออกฮาร์ดแวร์ของ RC4 (องศา -> 180 - องศา)
 
 // --- 3) แบตเตอรี่  นโยบายกำลังขับเมื่อไฟตก ---
-constexpr bool     kEnableBatterySagThrottle = false; // คงกำลังมอเตอร์และ slew 100% แม้แบตต่ำ
+constexpr bool     kEnableBatterySagThrottle = false; // คงกำลังมอเตอร์และ slew 100% แม้แบตต่ำ , มีโอกาศให้เปิด
 constexpr int16_t  kBattLowMaxPower        = 72;      // เพดานกำลังและขั้น slew ของแต่ละระดับ (เมื่อเปิด sag throttle)
 constexpr int16_t  kBattCritMaxPower       = 50;
 constexpr int16_t  kBattEmergMaxPower      = 35;
