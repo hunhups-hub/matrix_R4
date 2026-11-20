@@ -420,6 +420,10 @@ void updateStabilityMetrics(bool frameValid, uint8_t compPercent, uint32_t loopD
     in.batTier      = g_snap.batTier;
     in.compPct      = compPercent;
     in.loopDtMs     = loopDtMs;
+    in.comScalePct  = g_snap.comScalePct;
+    in.driveLeft    = g_snap.drive.left;
+    in.driveRight   = g_snap.drive.right;
+    in.wheelStall   = Config::kEnableManualStallCut && g_stallDet.tripped();
 
     g_snap.stabilityPct   = g_stabMon.update(in);
     g_snap.loopJitterMs   = g_stabMon.jitterMs();
@@ -427,6 +431,7 @@ void updateStabilityMetrics(bool frameValid, uint8_t compPercent, uint32_t loopD
     g_snap.powerStabState = classifyStabPenalty(g_stabMon.powerPenalty());
     g_snap.commStabState  = classifyStabPenalty(g_stabMon.commPenalty());
     g_snap.loopStabState  = classifyStabPenalty(g_stabMon.loopPenalty());
+    g_snap.driveStabState = classifyStabPenalty(g_stabMon.drivePenalty());
 }
 
 // ============================================================================

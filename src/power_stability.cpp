@@ -178,29 +178,9 @@ uint8_t BatteryStabilizer::batteryPercent() const {
         return 0U;
     }
 
-    uint16_t emptyMv;
-    uint16_t fullMv;
-    if (baselineMv_ <= 8700U) {
-        // 2S LiPo (6.6V..8.4V)
-        emptyMv = 6600U;
-        fullMv  = 8400U;
-    } else if (baselineMv_ <= 10400U) {
-        // 9V adapter / NiMH pack
-        emptyMv = 7000U;
-        fullMv  = baselineMv_;
-    } else if (baselineMv_ <= 13200U) {
-        // 3S LiPo / 12V pack (9.8V..12.6V)
-        emptyMv = 9800U;
-        fullMv  = 12600U;
-    } else if (baselineMv_ <= 17200U) {
-        // 4S LiPo (13.2V..16.8V)
-        emptyMv = 13200U;
-        fullMv  = 16800U;
-    } else {
-        // 18V adapter / high-voltage supply
-        emptyMv = static_cast<uint16_t>((static_cast<uint32_t>(baselineMv_) * 78U) / 100U);
-        fullMv  = baselineMv_;
-    }
+    uint16_t emptyMv = 0U;
+    uint16_t fullMv  = 0U;
+    classifyBatteryPack(baselineMv_, emptyMv, fullMv);
 
     if (fullMv <= emptyMv) {
         return 100U;
@@ -321,6 +301,52 @@ uint8_t computePowerStabilityPenalty(bool extPower,
 
 } // namespace
 
+void classifyBatteryPack(uint16_t baselineMv, uint16_t& emptyMv, uint16_t& fullMv) {
+    if (baselineMv <= 8700U) {
+        // 2S Li-ion/LiPo (6.6V..8.4V)
+        emptyMv = 6600U;
+        fullMv  = 8400U;
+    } else if (baselineMv < 9600U) {
+        // 9V adapter / NiMH pack (a 3S this low is below 3.2 V/cell, already dead)
+        emptyMv = 7000U;
+        fullMv  = baselineMv;
+    } else if (baselineMv <= 12900U) {
+        // 3S LiPo (9.8V..12.6V). Starts at 9.6 V so a drained 3S reads ~0%, not adapter 100%.
+        emptyMv = 9800U;
+        fullMv  = 12600U;
+    } else if (baselineMv <= 17200U) {
+        // 4S LiPo (13.2V..16.8V). Starts above 12.9 V so a drained 4S is not read as a full 3S.
+        emptyMv = 13200U;
+        fullMv  = 16800U;
+    } else {
+        // 18V adapter / high-voltage supply
+        emptyMv = static_cast<uint16_t>((static_cast<uint32_t>(baselineMv) * 78U) / 100U);
+        fullMv  = baselineMv;
+    }
+}
+
+uint8_t computeDriveStabilityPenalty(uint8_t comScalePct,
+                                     int16_t driveLeft,
+                                     int16_t driveRight,
+                                     bool    wheelStall) {
+    // Arm-raise factor 0..100: 0 at CoM scale 100 (arm low), 100 at the minimum CoM scale (arm high).
+    const int32_t minScale = static_cast<int32_t>(Config::kCoMHighMinScalePct);
+    int32_t armFactor = 0L;
+    if (minScale < 100L) {
+        const int32_t scale = clampLong(static_cast<int32_t>(comScalePct), minScale, 100L);
+        armFactor = ((100L - scale) * 100L + ((100L - minScale) / 2L)) / (100L - minScale);
+    }
+
+    // Motion intensity 0..100: peak commanded wheel power.
+    const int32_t absL   = (driveLeft < 0) ? -static_cast<int32_t>(driveLeft) : static_cast<int32_t>(driveLeft);
+    const int32_t absR   = (driveRight < 0) ? -static_cast<int32_t>(driveRight) : static_cast<int32_t>(driveRight);
+    const int32_t motion = clampLong((absL > absR) ? absL : absR, 0L, 100L);
+
+    const int32_t tipPen   = (armFactor * motion * static_cast<int32_t>(Config::kStabilityTipMaxPen) + 5000L) / 10000L;
+    const int32_t stallPen = wheelStall ? static_cast<int32_t>(Config::kStabilityStallPen) : 0L;
+    return static_cast<uint8_t>(clampLong(tipPen + stallPen, 0L, static_cast<int32_t>(Config::kStabilityDriveMaxPen)));
+}
+
 void StabilityMonitor::reset() {
     everConnected_ = false;
     scorePct_      = 100U;
@@ -330,6 +356,7 @@ void StabilityMonitor::reset() {
     commPen_       = 0U;
     powerPen_      = 0U;
     loopPen_       = 0U;
+    drivePen_      = 0U;
 }
 
 uint8_t StabilityMonitor::update(const StabilityInput& in) {
@@ -415,7 +442,11 @@ uint8_t StabilityMonitor::update(const StabilityInput& in) {
                    ? Config::kStabilityLoopMaxPen
                    : static_cast<uint8_t>(rawLoopPen);
 
-    const uint16_t totalPen = static_cast<uint16_t>(linkPen_) + commPen_ + powerPen_ + loopPen_;
+    // 5. Drive risk: arm raised while driving hard (tip) + wheel stall
+    drivePen_ = computeDriveStabilityPenalty(in.comScalePct, in.driveLeft, in.driveRight, in.wheelStall);
+
+    const uint16_t totalPen =
+        static_cast<uint16_t>(linkPen_) + commPen_ + powerPen_ + loopPen_ + drivePen_;
     const uint8_t  rawScore = (totalPen >= 100U) ? 0U : static_cast<uint8_t>(100U - totalPen);
 
     if (rawScore <= scorePct_) {

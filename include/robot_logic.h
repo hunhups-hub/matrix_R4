@@ -353,11 +353,16 @@ struct StabilityInput {
     BatteryTier   batTier      = BatteryTier::Normal;
     uint8_t       compPct      = 100U;
     uint32_t      loopDtMs     = Config::kControlPeriodMs;
+    uint8_t       comScalePct  = 100U;  // CoM scale from RC2 angle (100 = arm low)
+    int16_t       driveLeft    = 0;     // Commanded wheel power this tick (%)
+    int16_t       driveRight   = 0;
+    bool          wheelStall   = false; // ManualStallDetector tripped (wheels commanded, no motion)
 };
 
 /**
- * Computes real-time robot stability probability (0..100%) from PS2/serial link
- * quality, battery % + voltage sag risk, STM32 bus/config health, and loop jitter.
+ * Heuristic stability / health score (0..100%, not a probability). Starts at 100 and subtracts
+ * penalties: PS2/serial link quality, STM32 bus health, battery % + sag tier, loop jitter, and
+ * drive risk (arm raised while driving hard = tip risk, wheel stall). Weights are hand-set.
  */
 class StabilityMonitor {
 public:
@@ -370,6 +375,7 @@ public:
     uint8_t  powerPenalty() const { return powerPen_; }
     uint8_t  commPenalty() const { return commPen_; }
     uint8_t  loopPenalty() const { return loopPen_; }
+    uint8_t  drivePenalty() const { return drivePen_; }
 
 private:
     bool     everConnected_ = false;
@@ -380,6 +386,23 @@ private:
     uint8_t  commPen_       = 0U;
     uint8_t  powerPen_      = 0U;
     uint8_t  loopPen_       = 0U;
+    uint8_t  drivePen_      = 0U;
 };
+
+/**
+ * Drive-risk penalty: tip risk grows with how high RC2 lifts the arm (CoM scale below 100)
+ * times how hard the wheels are commanded, plus a fixed penalty while wheels are stalled.
+ */
+uint8_t computeDriveStabilityPenalty(uint8_t comScalePct,
+                                     int16_t driveLeft,
+                                     int16_t driveRight,
+                                     bool    wheelStall);
+
+/**
+ * Battery pack range from the rested baseline voltage (mV), auto-detected per cell count:
+ * 2S (<= 8.7 V), 9 V adapter/NiMH (8.7..9.6 V), 3S (9.6..12.9 V), 4S (12.9..17.2 V), HV adapter.
+ * A drained 3S/4S lands in its own range (low %), never in a range that reads 100%.
+ */
+void classifyBatteryPack(uint16_t baselineMv, uint16_t& emptyMv, uint16_t& fullMv);
 
 } // namespace RobotLogic

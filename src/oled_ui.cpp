@@ -341,12 +341,13 @@ void OledUI::render(const SystemSnapshot& snap, uint32_t nowMs, bool force) {
                  vTenths % 10);
     }
 
-    snprintf(line2, sizeof(line2), "STB:%3u%% L%c P%c C%c T%c",
+    snprintf(line2, sizeof(line2), "STB%3u%% L%cP%cC%cT%cD%c",
              static_cast<unsigned>(snap.stabilityPct),
              stabFlagChar(snap.linkStabState),
              stabFlagChar(snap.powerStabState),
              stabFlagChar(snap.commStabState),
-             stabFlagChar(snap.loopStabState));
+             stabFlagChar(snap.loopStabState),
+             stabFlagChar(snap.driveStabState));
 
     const char idleBrakeChar =
         (snap.drive.left == 0 && snap.drive.right == 0 && snap.holdBrakeActive) ? 'H' : ' ';

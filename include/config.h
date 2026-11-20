@@ -142,5 +142,8 @@ constexpr uint8_t  kStabilityPowerEmergPen   = 30U;
 constexpr uint8_t  kStabilityLoopMaxPen      = 20U;
 constexpr uint16_t kStabilityJitterSlackMs   = 5U;
 constexpr uint8_t  kStabilityRecoverStep     = 2U;
+constexpr uint8_t  kStabilityTipMaxPen       = 15U;     // แขน RC2 สูงสุด + ล้อเต็มกำลัง
+constexpr uint8_t  kStabilityStallPen        = 15U;     // ล้อติด (stall detector ทำงาน)
+constexpr uint8_t  kStabilityDriveMaxPen     = 25U;
 
 } // namespace Config

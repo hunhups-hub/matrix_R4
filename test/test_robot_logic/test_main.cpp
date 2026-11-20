@@ -685,6 +685,21 @@ void test_battery_stabilizer_multiprofile_baselines(void) {
     }
     TEST_ASSERT_EQUAL_UINT16(14040U, batt.filteredMv());
     TEST_ASSERT_EQUAL_UINT8(0U, batt.batteryPercent());
+
+    // 7. Auto pack detection never reads a drained pack as full:
+    //    3S booted at 10.0 V -> 3S range (7%), not 9V-adapter 100%;
+    //    4S booted at 13.0 V -> 4S range (0%), not full 3S 100%.
+    batt.reset();
+    batt.update(10000U, true, 0UL);
+    TEST_ASSERT_EQUAL_UINT8(7U, batt.batteryPercent());
+    batt.reset();
+    batt.update(13000U, true, 0UL);
+    TEST_ASSERT_EQUAL_UINT8(0U, batt.batteryPercent());
+    uint16_t emptyMv = 0U;
+    uint16_t fullMv  = 0U;
+    RobotLogic::classifyBatteryPack(9300U, emptyMv, fullMv); // 9V adapter / NiMH band unchanged
+    TEST_ASSERT_EQUAL_UINT16(7000U, emptyMv);
+    TEST_ASSERT_EQUAL_UINT16(9300U, fullMv);
 }
 
 void test_battery_stabilizer_progressive_sag_tiers(void) {
@@ -1015,6 +1030,29 @@ void test_stability_monitor_individual_penalties(void) {
     in.loopDtMs = 125UL; // Overshoot = 100 ms -> loopPen = 100 / 5 = 20% (capped at 20%)
     stb.update(in);
     TEST_ASSERT_EQUAL_UINT8(Config::kStabilityLoopMaxPen, stb.loopPenalty()); // 20%
+
+    // 5. Drive risk penalty (D): arm low or stopped = 0; arm high + full power = tip max;
+    //    half way scales; stall adds a fixed penalty; total capped.
+    TEST_ASSERT_EQUAL_UINT8(0U, RobotLogic::computeDriveStabilityPenalty(100U, 100, 100, false));
+    TEST_ASSERT_EQUAL_UINT8(0U, RobotLogic::computeDriveStabilityPenalty(Config::kCoMHighMinScalePct, 0, 0, false));
+    TEST_ASSERT_EQUAL_UINT8(Config::kStabilityTipMaxPen,
+                            RobotLogic::computeDriveStabilityPenalty(Config::kCoMHighMinScalePct, 100, -100, false));
+    const uint8_t halfTip = RobotLogic::computeDriveStabilityPenalty(Config::kCoMHighMinScalePct, 50, 50, false);
+    TEST_ASSERT_TRUE(halfTip > 0U && halfTip < Config::kStabilityTipMaxPen);
+    TEST_ASSERT_EQUAL_UINT8(Config::kStabilityStallPen, RobotLogic::computeDriveStabilityPenalty(100U, 80, 80, true));
+    TEST_ASSERT_EQUAL_UINT8(Config::kStabilityDriveMaxPen,
+                            RobotLogic::computeDriveStabilityPenalty(Config::kCoMHighMinScalePct, 100, 100, true));
+
+    stb.reset();
+    in.loopDtMs    = Config::kControlPeriodMs;
+    in.comScalePct = Config::kCoMHighMinScalePct;
+    in.driveLeft   = 100;
+    in.driveRight  = 100;
+    stb.update(in);
+    TEST_ASSERT_EQUAL_UINT8(Config::kStabilityTipMaxPen, stb.drivePenalty());
+    in.comScalePct = 100U;
+    stb.update(in);
+    TEST_ASSERT_EQUAL_UINT8(0U, stb.drivePenalty());
 }
 
 void test_stability_monitor_saturation_and_deterministic_recovery(void) {

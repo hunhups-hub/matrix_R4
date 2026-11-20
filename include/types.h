@@ -151,6 +151,7 @@ struct SystemSnapshot {
     uint8_t       powerStabState = 0U;
     uint8_t       commStabState  = 0U;
     uint8_t       loopStabState  = 0U;
+    uint8_t       driveStabState = 0U; // D: arm-raised tip risk + wheel stall
     bool          wdtResetBoot   = false;
     bool          oledOk         = false;
     uint8_t       oledAddr       = 0x3D;
