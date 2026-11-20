@@ -36,7 +36,7 @@
    - 6.6 ระบบบันทึกการตั้งค่าถาวรลงหน่วยความจำ EEPROM (CRC-16-CCITT Persistent Config)
 7. [สถาปัตยกรรมโค้ด แบบจำลองฟิสิกส์ และการทำงานภายใน (Code Architecture & Engineering Details)](#7-สถาปัตยกรรมโค้ด-แบบจำลองฟิสิกส์-และการทำงานภายใน-code-architecture--engineering-details)
    - 7.1 [แผนผังรอบการทำงานลูปควบคุมหลัก 40 Hz (25 ms Cycle Diagram)](#71-แผนผังรอบการทำงานลูปควบคุมหลัก-40-hz-25-ms-cycle-diagram)
-   - 7.2 [คำอธิบายโครงสร้างและหน้าที่ของทุกไฟล์ในโปรเจกต์อย่างละเอียด (Exhaustive File-by-File Breakdown - 28 ไฟล์)](#72-คำอธิบายโครงสร้างและหน้าที่ของทุกไฟล์ในโปรเจกต์อย่างละเอียด-exhaustive-file-by-file-breakdown---28-ไฟล์)
+   - 7.2 [คำอธิบายโครงสร้างและหน้าที่ของทุกไฟล์ในโปรเจกต์อย่างละเอียด (Exhaustive File-by-File Breakdown - 36 ไฟล์)](#72-คำอธิบายโครงสร้างและหน้าที่ของทุกไฟล์ในโปรเจกต์อย่างละเอียด-exhaustive-file-by-file-breakdown---36-ไฟล์)
      - [กลุ่มที่ 1: ไฟล์ระดับรากของโปรเจกต์ (Project Root Files - 4 ไฟล์)](#กลุ่มที่-1-ไฟล์ระดับรากของโปรเจกต์-project-root-files---4-ไฟล์)
      - [กลุ่มที่ 2: โฟลเดอร์การตั้งค่า Visual Studio Code (.vscode/ - 4 ไฟล์)](#กลุ่มที่-2-โฟลเดอร์การตั้งค่า-visual-studio-code-vscode---4-ไฟล์)
      - [กลุ่มที่ 3: ไฟล์ส่วนหัวและการประกาศฟังก์ชัน (include/ - 9 ไฟล์)](#กลุ่มที่-3-ไฟล์ส่วนหัวและการประกาศฟังก์ชัน-include---9-ไฟล์)
@@ -842,46 +842,54 @@ Flash: [====      ]  41.5% (used 108820 bytes from 262144 bytes)
 
 ---
 
-### 7.2 คำอธิบายโครงสร้างและหน้าที่ของทุกไฟล์ในโปรเจกต์อย่างละเอียด (Exhaustive File-by-File Breakdown - 28 ไฟล์)
+### 7.2 คำอธิบายโครงสร้างและหน้าที่ของทุกไฟล์ในโปรเจกต์อย่างละเอียด (Exhaustive File-by-File Breakdown - 36 ไฟล์)
 
-เพื่อให้ผู้เริ่มต้นและนักพัฒนาเข้าใจการทำงานของระบบอย่างถ่องแท้ แผนภาพด้านล่างแสดงโครงสร้างโฟลเดอร์และไฟล์ทั้งหมดในโปรเจกต์ (**ครบถ้วนทั้ง 28 ไฟล์** ไม่รวมโฟลเดอร์ชั่วคราว `.pio` และ `.git`):
+เพื่อให้ผู้เริ่มต้นและนักพัฒนาเข้าใจการทำงานของระบบอย่างถ่องแท้ แผนภาพด้านล่างแสดงโครงสร้างโฟลเดอร์และไฟล์ทั้งหมดในโปรเจกต์ (**ครบถ้วนทั้ง 36 ไฟล์** ไม่รวมโฟลเดอร์ชั่วคราว `.pio` และ `.git`):
 
 ```text
 matrix_R4/
-├── .gitignore                                      # [1] กฎการคัดออกไฟล์ชั่วคราวและ Build Artifacts จาก Git
-├── platformio.ini                                  # [2] ไฟล์กำหนดค่าหลักของโปรเจกต์ PlatformIO (uno_r4_wifi และ native)
-├── README.md                                       # [3] คู่มือการใช้งานและเอกสารวิศวกรรมฉบับสมบูรณ์ภาษาไทย
-├── MATRIX_MARC_READINESS.md                        # [4] รายงานประเมินความพร้อมเฟิร์มแวร์สำหรับการแข่งขัน Matrix MARC
-├── .vscode/                                        # โฟลเดอร์การตั้งค่าสภาพแวดล้อม Visual Studio Code (4 ไฟล์)
-│   ├── c_cpp_properties.json                       # [5] กำหนด Include Paths, Defines และ Compiler Path สำหรับ IntelliSense
-│   ├── extensions.json                             # [6] แนะนำ Extension ที่จำเป็นสำหรับโปรเจกต์ (PlatformIO IDE)
-│   ├── launch.json                                 # [7] การกำหนดค่า Debugger สำหรับ Hardware Probes (CMSIS-DAP, SVD)
-│   └── tasks.json                                  # [8] คำสั่งอัตโนมัติของ VS Code สำหรับ Build, Upload, Monitor และ Test
-├── include/                                        # ส่วนหัวโปรแกรม (Header Files) ประกาศ Interface และโครงสร้างข้อมูล (9 ไฟล์)
-│   ├── README                                      # [9] คำอธิบายมาตรฐานของ PlatformIO สำหรับการใช้งาน Header Files
-│   ├── config.h                                    # [10] ค่าคงที่ คาบเวลา พารามิเตอร์ฟิสิกส์ พิน และ EEPROM ของระบบทั้งหมด
-│   ├── types.h                                     # [11] นิยามโครงสร้างข้อมูล (Enums, Structs) และสถานะระบบที่ใช้ร่วมกัน
-│   ├── robot_logic.h                               # [12] ประกาศฟังก์ชันอัลกอริทึมฟิสิกส์ 5 ขั้นตอน, CRC-16 และ State Machine (Pure C++11)
-│   ├── serial_control.h                            # [13] ประกาศคลาสประมวลผลคำสั่ง Serial CLI และจัดรูปแบบ Telemetry
-│   ├── minir4_io.h                                 # [14] ประกาศคลาส Hardware Abstraction สำหรับ MATRIX Mini R4, STM32 และ EEPROM
-│   ├── ps2_driver.h                                # [15] ประกาศคลาสไดรเวอร์ Bit-bang SPI และการเข้าถึงรีจิสเตอร์พอร์ต RA4M1
-│   ├── oled_ui.h                                   # [16] ประกาศคลาสควบคุมจอแสดงผล OLED SSD1306, ไฟ RGB LED และ Piezo Buzzer
-│   └── auto_mode.h                                 # [17] ประกาศอินเทอร์เฟซโหมดอัตโนมัติ (AutoMode), AutoExitReason และฟังก์ชันช่วย
-├── src/                                            # ซอร์สโค้ดการทำงานหลัก (Implementation Files - 8 ไฟล์)
-│   ├── main.cpp                                    # [18] จุดเริ่มต้นโปรแกรม (setup/loop), 40 Hz Scheduler, EEPROM, Auto และ Bootloader
-│   ├── robot_logic.cpp                             # [19] อิมพลีเมนต์ฟิสิกส์จลนพลศาสตร์ 5 ขั้นตอน, Slew, Sag, Failsafe และ CRC-16
-│   ├── serial_control.cpp                          # [20] อิมพลีเมนต์การแยกคำสั่ง CLI, คีย์ลัดแข่งขัน, Timeout 1500 ms และ FakeSerialPort
-│   ├── minir4_io.cpp                               # [21] อิมพลีเมนต์การติดต่อ STM32 UART, Smart Hold-Brake, RC2 Smooth Slew และ EEPROM
-│   ├── ps2_driver.cpp                              # [22] อิมพลีเมนต์โพรโทคอล Bit-bang SPI ความเร็วสูงผ่านรีจิสเตอร์ POSR/PORR/PIDR
-│   ├── oled_ui.cpp                                 # [23] อิมพลีเมนต์การเรนเดอร์ UI 4 บรรทัด, กู้คืนบัส I2C, แอนิเมชัน RGB และเสียงเตือน
-│   ├── auto_mode.cpp                               # [24] อิมพลีเมนต์เอนจินรันโหมด Auto, ดักจับ yield()/ปุ่ม X และตรวจจับล้อติดขัด (Stall)
-│   └── auto_block_code.cpp                         # [25] พื้นที่วางโค้ด Auto จาก MATRIXblock R4 พร้อมชั้น Proxy ความปลอดภัยครบวงจร
-├── lib/                                            # โฟลเดอร์สำหรับ Private Project Libraries (1 ไฟล์)
-│   └── README                                      # [26] คำแนะนำมาตรฐานของ PlatformIO ในการสร้างและติดตั้งไลบรารีส่วนตัว
-└── test/                                           # ส่วนการทดสอบซอฟต์แวร์อัตโนมัติ (Automated Unit Tests - 2 ไฟล์)
-    ├── README                                      # [27] คำแนะนำมาตรฐานของ PlatformIO สำหรับ Test Runner และ Unit Testing
+├── .gitignore                                  # [1] กฎการคัดออกไฟล์ชั่วคราวและ Build Artifacts จาก Git
+├── platformio.ini                              # [2] ไฟล์กำหนดค่าหลักของโปรเจกต์ PlatformIO (uno_r4_wifi, uno_r4_wifi_field และ native)
+├── README.md                                   # [3] คู่มือการใช้งานและเอกสารวิศวกรรมฉบับสมบูรณ์ภาษาไทย
+├── CLAUDE.md                                   # [4] คำแนะนำสถาปัตยกรรมและกฎการแก้โค้ดสำหรับ Claude Code
+├── MATRIX_MARC_READINESS.md                    # [5] รายงานประเมินความพร้อมเฟิร์มแวร์สำหรับการแข่งขัน Matrix MARC
+├── .vscode/                                    # โฟลเดอร์การตั้งค่าสภาพแวดล้อม Visual Studio Code (4 ไฟล์)
+│   ├── c_cpp_properties.json                   # [6] กำหนด Include Paths, Defines และ Compiler Path สำหรับ IntelliSense
+│   ├── extensions.json                         # [7] แนะนำ Extension ที่จำเป็นสำหรับโปรเจกต์ (PlatformIO IDE)
+│   ├── launch.json                             # [8] การกำหนดค่า Debugger สำหรับ Hardware Probes (CMSIS-DAP, SVD)
+│   └── tasks.json                              # [9] คำสั่งอัตโนมัติของ VS Code สำหรับ Build, Upload, Monitor และ Test
+├── include/                                    # ส่วนหัวโปรแกรม ประกาศ Interface, โครงสร้างข้อมูล และค่าที่ปรับได้ (11 ไฟล์)
+│   ├── README                                  # [10] คำอธิบายมาตรฐานของ PlatformIO สำหรับการใช้งาน Header Files
+│   ├── config.h                                # [11] พิน คาบเวลา และขีดจำกัดฮาร์ดแวร์ (แก้ไม่บ่อย)
+│   ├── user_settings.h                         # [12] ค่าที่ผู้ขับปรับได้: ความเร็ว expo slew มุมเซอร์โว นโยบายแบต เวลา Auto และสวิตช์ฟีเจอร์ gyro/stall
+│   ├── controls.h                              # [13] แผนที่ปุ่ม PS2 -> ฟังก์ชัน (Controls::kXxx) และ Controls::held()
+│   ├── types.h                                 # [14] นิยามโครงสร้างข้อมูล (Enums, Structs) และสถานะระบบที่ใช้ร่วมกัน
+│   ├── robot_logic.h                           # [15] ประกาศฟังก์ชันอัลกอริทึมทั้งหมดของ RobotLogic (Pure C++11) อิมพลีเมนต์แยกใน 6 ไฟล์
+│   ├── serial_control.h                        # [16] ประกาศคลาสประมวลผลคำสั่ง Serial CLI และจัดรูปแบบ Telemetry
+│   ├── minir4_io.h                             # [17] ประกาศคลาส Hardware Abstraction สำหรับ MATRIX Mini R4, STM32 และ EEPROM
+│   ├── ps2_driver.h                            # [18] ประกาศคลาสไดรเวอร์ Bit-bang SPI และการเข้าถึงรีจิสเตอร์พอร์ต RA4M1
+│   ├── oled_ui.h                               # [19] ประกาศคลาสควบคุมจอแสดงผล OLED SSD1306, ไฟ RGB LED และ Piezo Buzzer
+│   └── auto_mode.h                             # [20] ประกาศอินเทอร์เฟซโหมดอัตโนมัติ (AutoMode), AutoExitReason และฟังก์ชันช่วย
+├── src/                                        # ซอร์สโค้ดการทำงานหลัก (Implementation Files - 13 ไฟล์)
+│   ├── main.cpp                                # [21] จุดเริ่มต้นโปรแกรม (setup/loop), 40 Hz Scheduler, Auto และ Bootloader
+│   ├── robot_logic.cpp                         # [22] [Pure] จลนพลศาสตร์การขับ, Slew, Sag และการคำนวณมอเตอร์
+│   ├── persistent_config.cpp                   # [23] [Pure] CRC-16 และแพ็ก/ถอดรหัส EEPROM
+│   ├── auto_heading.cpp                        # [24] [Pure] คณิตศาสตร์มุมหัน, ManualStallDetector, TeleopHeadingHold, applyTurnCorrection
+│   ├── servo_logic.cpp                         # [25] [Pure] เป้าหมายเซอร์โว, พรีเซ็ต, ท่ากลับทิศ
+│   ├── link_failsafe.cpp                       # [26] [Pure] ถอดรหัสแพ็กเก็ต PS2 และ FailsafeStateMachine
+│   ├── power_stability.cpp                     # [27] [Pure] BatteryStabilizer และ StabilityMonitor
+│   ├── serial_control.cpp                      # [28] [Pure] การแยกคำสั่ง CLI, คีย์ลัดแข่งขัน, Timeout 1500 ms และ FakeSerialPort
+│   ├── minir4_io.cpp                           # [29] การติดต่อ STM32 UART, Smart Hold-Brake, RC2 Smooth Slew และ EEPROM
+│   ├── ps2_driver.cpp                          # [30] โพรโทคอล Bit-bang SPI ความเร็วสูงผ่านรีจิสเตอร์ POSR/PORR/PIDR
+│   ├── oled_ui.cpp                             # [31] การเรนเดอร์ UI 4 บรรทัด, กู้คืนบัส I2C, แอนิเมชัน RGB และเสียงเตือน
+│   ├── auto_mode.cpp                           # [32] เอนจินรันโหมด Auto, ดักจับ yield()/ปุ่ม X และตรวจจับล้อติดขัด (Stall)
+│   └── auto_block_code.cpp                     # [33] พื้นที่วางโค้ด Auto จาก MATRIXblock R4 พร้อมชั้น Proxy ความปลอดภัยครบวงจร
+├── lib/                                        # โฟลเดอร์สำหรับ Private Project Libraries (1 ไฟล์)
+│   └── README                                  # [34] คำแนะนำมาตรฐานของ PlatformIO ในการสร้างและติดตั้งไลบรารีส่วนตัว
+└── test/                                       # ส่วนการทดสอบซอฟต์แวร์อัตโนมัติ (Automated Unit Tests - 2 ไฟล์)
+    ├── README                                  # [35] คำแนะนำมาตรฐานของ PlatformIO สำหรับ Test Runner และ Unit Testing
     └── test_robot_logic/
-        └── test_main.cpp                           # [28] ชุดแบบทดสอบอัตโนมัติ 44 รายการ (12 หมวดหมู่) บน Native Host ด้วย Unity
+        └── test_main.cpp                       # [36] ชุดแบบทดสอบอัตโนมัติ 44 รายการ บน Native Host ด้วย Unity
 ```
 
 > **อัปเดตโครงสร้าง**: `src/robot_logic.cpp` ถูกแยกเป็น 6 ไฟล์ลอจิกบริสุทธิ์ (Pure C++11, คอมไพล์ใน `env:native` ทั้งหมด) โดย `robot_logic.h` ยังเป็นอินเทอร์เฟซเดียวเหมือนเดิม:
@@ -907,10 +915,10 @@ matrix_R4/
 2. **`[env:native]` (Target จำลองบนคอมพิวเตอร์โฮสต์)**:
    - `platform = native`, `platform_packages = platformio/toolchain-gccmingw32@^1.40900.0`
    - `build_flags = -std=c++11 -Wall -Wextra -Werror -Iinclude`
-   - `build_src_filter = +<robot_logic.cpp> +<serial_control.cpp>` และ `test_build_src = yes`: ดึงโมดูลลอจิกบริสุทธิ์และตัวแยกคำสั่ง Serial มาคอมไพล์รันชุดทดสอบทั้ง 44 ข้อบนคอมพิวเตอร์ได้โดยตรงโดยไม่ต้องต่อบอร์ดจริง
+   - `build_src_filter` รวม 7 ไฟล์ (`robot_logic`, `persistent_config`, `auto_heading`, `servo_logic`, `link_failsafe`, `power_stability`, `serial_control`) และ `test_build_src = yes`: ดึงโมดูลลอจิกบริสุทธิ์และตัวแยกคำสั่ง Serial มาคอมไพล์รันชุดทดสอบทั้ง 44 ข้อบนคอมพิวเตอร์ได้โดยตรงโดยไม่ต้องต่อบอร์ดจริง
 
 ##### 7.2.2 [README.md](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/README.md) — คู่มือการใช้งานและเอกสารวิศวกรรมฉบับสมบูรณ์ภาษาไทย
-ไฟล์เอกสารคู่มือฉบับสมบูรณ์ที่คุณกำลังอ่านอยู่นี้ ครอบคลุมตั้งแต่สถาปัตยกรรมระบบ, ผังพิน, การติดตั้ง PlatformIO, คู่มือการบังคับด้วยจอยสติ๊กและคีย์บอร์ด, การวางโค้ดโหมดอัตโนมัติจาก MATRIXblock R4, แบบจำลองฟิสิกส์จลนพลศาสตร์ 5 ขั้นตอน, คำอธิบายโค้ดครบทั้ง 28 ไฟล์ ไปจนถึงการแก้ไขปัญหาหน้างาน
+ไฟล์เอกสารคู่มือฉบับสมบูรณ์ที่คุณกำลังอ่านอยู่นี้ ครอบคลุมตั้งแต่สถาปัตยกรรมระบบ, ผังพิน, การติดตั้ง PlatformIO, คู่มือการบังคับด้วยจอยสติ๊กและคีย์บอร์ด, การวางโค้ดโหมดอัตโนมัติจาก MATRIXblock R4, แบบจำลองฟิสิกส์จลนพลศาสตร์ 5 ขั้นตอน, คำอธิบายโค้ดครบทั้ง 36 ไฟล์ ไปจนถึงการแก้ไขปัญหาหน้างาน
 
 ##### 7.2.3 [.gitignore](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/.gitignore) — กฎการคัดออกไฟล์ชั่วคราวและ Build Artifacts จาก Git
 กำหนดกฎสำหรับ Git เพื่อไม่ให้ติดตามไฟล์ชั่วคราวและไฟล์ที่สร้างขึ้นเฉพาะเครื่อง ได้แก่ `.pio`, `.vscode/.browse.c_cpp.db*`, `.vscode/c_cpp_properties.json`, `.vscode/launch.json`, และ `.vscode/ipch`
@@ -1272,7 +1280,7 @@ flowchart TD
 
 ## 9. สรุปการยกระดับความปลอดภัยและความเสถียรล่าสุด (Security & Stability Hardening Summary)
 
-รายการปรับปรุงสำคัญจากการตรวจสอบโค้ดและฮาร์ดแวร์ครบทั้ง 28 ไฟล์ (ผ่าน `pio run -e uno_r4_wifi`, `pio test -e native` 44/44 เคส, และ `pio check` `0 HIGH, 0 MEDIUM` ใน `src/`):
+รายการปรับปรุงสำคัญจากการตรวจสอบโค้ดและฮาร์ดแวร์ครบทั้ง 36 ไฟล์ (ผ่าน `pio run -e uno_r4_wifi`, `pio test -e native` 44/44 เคส, และ `pio check` `0 HIGH, 0 MEDIUM` ใน `src/`):
 
 | หมวดงาน | ไฟล์หลักที่ปรับปรุง | สิ่งที่แก้ไขและพัฒนา |
 | :--- | :--- | :--- |

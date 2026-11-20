@@ -257,17 +257,23 @@ void setGripServo(int16_t& targetDeg, int16_t deg) {
 }
 
 void togglePosePreset() {
+    char msg[48];
     if (!g_posePresetState.dropActive) {
         g_snap.servos.rc1Deg         = Config::kRc1PresetDropDeg;
         g_snap.servos.rc2Deg         = Config::kRc2PresetDropDeg;
         g_posePresetState.dropActive = true;
-        g_serial.printEvent("POSE", "Drop/Place preset (RC1=145, RC2=140)");
+        snprintf(msg, sizeof(msg), "Drop/Place preset (RC1=%d, RC2=%d)",
+                 static_cast<int>(Config::kRc1PresetDropDeg),
+                 static_cast<int>(Config::kRc2PresetDropDeg));
     } else {
         g_snap.servos.rc1Deg         = Config::kRc1PresetHoldDeg;
         g_snap.servos.rc2Deg         = Config::kRc2PresetHoldDeg;
         g_posePresetState.dropActive = false;
-        g_serial.printEvent("POSE", "Hold/Carry preset (RC1=75, RC2=70)");
+        snprintf(msg, sizeof(msg), "Hold/Carry preset (RC1=%d, RC2=%d)",
+                 static_cast<int>(Config::kRc1PresetHoldDeg),
+                 static_cast<int>(Config::kRc2PresetHoldDeg));
     }
+    g_serial.printEvent("POSE", msg);
     g_oled.beepConfirm();
 }
 
@@ -345,19 +351,25 @@ void logLinkTransition(LinkState prev, LinkState next) {
 // Power & health telemetry
 // ============================================================================
 
+/** Formats into a static buffer; the result is valid until the next call. */
 const char* batteryTierEventMsg(BatteryTier tier) {
+    static char buf[48];
+    const char* name = "LOW";
+    int         cap  = Config::kBattLowMaxPower;
+    if (tier == BatteryTier::Emergency) {
+        name = "EMERGENCY";
+        cap  = Config::kBattEmergMaxPower;
+    } else if (tier == BatteryTier::Critical) {
+        name = "CRITICAL";
+        cap  = Config::kBattCritMaxPower;
+    }
     if (Config::kEnableBatterySagThrottle) {
-        switch (tier) {
-            case BatteryTier::Emergency: return "EMERGENCY sag cap (35%)";
-            case BatteryTier::Critical:  return "CRITICAL sag cap (50%)";
-            default:                     return "LOW sag cap (72%)";
-        }
+        snprintf(buf, sizeof(buf), "%s sag cap (%d%%)", name, cap);
+    } else {
+        snprintf(buf, sizeof(buf), "%s low batt (%d%% full power)", name,
+                 static_cast<int>(Config::kMotorMaxPower));
     }
-    switch (tier) {
-        case BatteryTier::Emergency: return "EMERGENCY low batt (100% full power)";
-        case BatteryTier::Critical:  return "CRITICAL low batt (100% full power)";
-        default:                     return "LOW batt warning (100% full power)";
-    }
+    return buf;
 }
 
 void applyBatteryTelemetry(bool voltValid, uint16_t battMv, uint32_t nowMs) {
