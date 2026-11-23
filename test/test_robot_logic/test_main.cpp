@@ -434,7 +434,7 @@ void test_servo_bounds_and_ps2_presets(void) {
     bad.rc4Deg = 300;
     const ServoTargets clamped = RobotLogic::clampServoTargets(bad);
     TEST_ASSERT_EQUAL_INT16(0, clamped.rc1Deg);
-    TEST_ASSERT_EQUAL_INT16(180, clamped.rc2Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc2MaxDeg, clamped.rc2Deg);
     TEST_ASSERT_EQUAL_INT16(0, clamped.rc3Deg);
     TEST_ASSERT_EQUAL_INT16(180, clamped.rc4Deg);
 
@@ -473,8 +473,8 @@ void test_servo_bounds_and_ps2_presets(void) {
 }
 
 void test_square_push_ground_toggle_and_l1_r1_override(void) {
-    TEST_ASSERT_EQUAL_INT16(30, Config::kRc3SquareDeg);
-    TEST_ASSERT_EQUAL_INT16(30, Config::kRc4SquareDeg);
+    TEST_ASSERT_EQUAL_INT16(180, Config::kRc3SquareDeg);
+    TEST_ASSERT_EQUAL_INT16(180, Config::kRc4SquareDeg);
     TEST_ASSERT_GREATER_OR_EQUAL_INT16(Config::kServoMinDeg, Config::kRc3SquareDeg);
     TEST_ASSERT_LESS_OR_EQUAL_INT16(Config::kServoMaxDeg, Config::kRc3SquareDeg);
     TEST_ASSERT_GREATER_OR_EQUAL_INT16(Config::kServoMinDeg, Config::kRc4SquareDeg);
@@ -1656,6 +1656,24 @@ void test_precision_mode_full_stick_scaling_and_micro_turn(void) {
     TEST_ASSERT_NOT_NULL(strstr(NativeSerial::output(), "prec=1"));
 }
 
+void test_triangle_sets_rc2_140_and_rc1_100(void) {
+    ServoTargets       servos{};
+    FrontArmPushState  pushState{};
+    ArmPosePresetState poseState{};
+
+    Ps2Frame fTri = makeValidFrame();
+    fTri.triangle = true;
+    RobotLogic::updateServoTargetsFromPs2(fTri, servos, false, &pushState, &poseState);
+    TEST_ASSERT_EQUAL_INT16(100, servos.rc1Deg);
+    TEST_ASSERT_EQUAL_INT16(140, servos.rc2Deg);
+
+    // Holding Triangle does not override a later R2 gripper command
+    Ps2Frame fR2 = fTri;
+    fR2.r2 = true;
+    RobotLogic::updateServoTargetsFromPs2(fR2, servos, false, &pushState, &poseState);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc1R2Deg, servos.rc1Deg);
+}
+
 void test_circle_pose_preset_and_serial_competition_shortcuts(void) {
     ServoTargets      servos{};
     FrontArmPushState pushState{};
@@ -1708,7 +1726,7 @@ void test_rc2_smooth_servo_slew(void) {
     TEST_ASSERT_EQUAL_INT16(134, cur);
 
     // Clamping to [0, 180] and instant jump when maxStepDeg <= 0
-    TEST_ASSERT_EQUAL_INT16(180, RobotLogic::slewServoAngle(178, 220, 6));
+    TEST_ASSERT_EQUAL_INT16(Config::kRc2MaxDeg, RobotLogic::slewServoAngle(Config::kRc2MaxDeg - 2, 220, 6));
     TEST_ASSERT_EQUAL_INT16(0, RobotLogic::slewServoAngle(3, -20, 6));
     TEST_ASSERT_EQUAL_INT16(140, RobotLogic::slewServoAngle(70, 140, 0));
 }
@@ -1908,7 +1926,7 @@ void test_kinodynamic_envelope_and_overflow_safety(void) {
     TEST_ASSERT_EQUAL_INT16(-32768, RobotLogic::applyAsymmetricSlewStep(-32700, -32768, 100, 100));
     TEST_ASSERT_EQUAL_INT16(-1, RobotLogic::applyAsymmetricSlewStep(-32768, 100, 100, 32767));
     TEST_ASSERT_EQUAL_INT16(0, RobotLogic::applyAsymmetricSlewStep(-32767, 100, 100, 32767));
-    TEST_ASSERT_EQUAL_INT16(180, RobotLogic::slewServoAngle(90, 180, 32767));
+    TEST_ASSERT_EQUAL_INT16(Config::kRc2MaxDeg, RobotLogic::slewServoAngle(90, 180, 32767));
     TEST_ASSERT_EQUAL_INT16(0, RobotLogic::slewServoAngle(90, 0, 32767));
 
     int16_t trimL = -32768;
@@ -2080,6 +2098,7 @@ int main(int argc, char** argv) {
     RUN_TEST(test_2dof_kinodynamic_slew_and_coulomb_stiction);
     RUN_TEST(test_kinodynamic_drive_reverse_front_and_dpad_micro_turn);
     RUN_TEST(test_precision_mode_full_stick_scaling_and_micro_turn);
+    RUN_TEST(test_triangle_sets_rc2_140_and_rc1_100);
     RUN_TEST(test_circle_pose_preset_and_serial_competition_shortcuts);
 
     // 10. Phase 2: RC2 Smooth Trajectory, Motor Trim, EEPROM CRC-16, Auto Stall Detection

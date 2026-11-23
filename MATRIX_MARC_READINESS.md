@@ -16,7 +16,7 @@
 | องค์ประกอบหลัก | ผลลัพธ์ | ป้ายสถานะการตรวจสอบ |
 |---|---|---|
 | **คอมไพล์เฟิร์มแวร์จริง (`uno_r4_wifi`)** | ผ่าน (`SUCCESS`, 0 warnings/errors ภายใต้ `-Werror`), RAM `44.1%`, Flash `41.5%` | `[Verified: Build/Test Run]` |
-| **ชุดทดสอบอัตโนมัติ (`native` Unity)** | ผ่าน **`40 / 40`** เคส (0 Failures, 0 Ignored) ครอบคลุมครบทุกสาขาของ `robot_logic` และ `serial_control` | `[Verified: Build/Test Run]` |
+| **ชุดทดสอบอัตโนมัติ (`native` Unity)** | ผ่าน **`41 / 41`** เคส (0 Failures, 0 Ignored) ครอบคลุมครบทุกสาขาของ `robot_logic` และ `serial_control` | `[Verified: Build/Test Run]` |
 | **การวิเคราะห์โค้ดเชิงสถิต (`pio check`)** | ผ่านสะอาด (`src/`: **`0 HIGH, 0 MEDIUM`** ทั้งบน `uno_r4_wifi` และ `native`) | `[Verified: Build/Test Run]` |
 | **สถาปัตยกรรม Teleop, Failsafe & Auto Supervisor** | แข็งแรงระดับแข่งขัน (40 Hz scheduler, 5-stage kinodynamics 100% power, 1.4 ms SPI, 3s WDT, Rising-Edge E-Stop, Bounded STM32 Init/Guard) | `[Verified: Static Code Inspection]` |
 | **ตรรกะภารกิจ Autonomous ปัจจุบัน (`auto_block_code.cpp`)** | ภารกิจยังเขียนด้วย `MoveDegs` (14 ครั้ง) + `delay()` (27 ครั้ง) แบบ Open-Loop; ไม่มี Gyro assist (นำออกแล้ว) | `[Verified: Static Code Inspection]` |
@@ -85,7 +85,7 @@ $$\text{Weighted Points} = \left(\frac{\text{Category Score}}{10}\right) \times 
 
 ### 3.2 การรันชุดทดสอบอัตโนมัติบนโฮสต์ (`pio test -e native -v`) `[Verified: Build/Test Run]`
 - **คำสั่ง**: `& "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" test -e native -v`
-- **สถานะ**: `PASSED` (Exit code `0`), ผ่านครบ **`40 Tests 0 Failures 0 Ignored`** ใน 11 หมวดหมู่ (`test/test_robot_logic/test_main.cpp:1887-1951`) รวมถึงการทดสอบ Glitch absorption โดยไม่หลุดจาก `Operational`, การคุมเพดานกำลัง 2-DOF Slew (`55%`/`35%`), ความปลอดภัยจาก `int16_t` overflow, การหยุด `!w` ในแบตช์เดียว, ข้อความ Help `o/p` + `v`, และฟิลด์ Telemetry `rf=`/`com=`
+- **สถานะ**: `PASSED` (Exit code `0`), ผ่านครบ **`41 Tests 0 Failures 0 Ignored`** ใน 11 หมวดหมู่ (`test/test_robot_logic/test_main.cpp:1887-1951`) รวมถึงการทดสอบ Glitch absorption โดยไม่หลุดจาก `Operational`, การคุมเพดานกำลัง 2-DOF Slew (`55%`/`35%`), ความปลอดภัยจาก `int16_t` overflow, การหยุด `!w` ในแบตช์เดียว, ข้อความ Help `o/p` + `v`, และฟิลด์ Telemetry `rf=`/`com=`
 
 ### 3.3 การวิเคราะห์โค้ดเชิงสถิตด้วย `cppcheck` (`pio check`) `[Verified: Build/Test Run]`
 1. **`pio check -e uno_r4_wifi --skip-packages`**: Exit code `255` เพราะพบคำเตือนในไลบรารี `.pio/libdeps/.../MatrixMiniR4` (ไม่ใช่โค้ดโปรเจกต์)
@@ -101,7 +101,7 @@ $$\text{Weighted Points} = \left(\frac{\text{Category Score}}{10}\right) \times 
 - **หลักฐานยืนยัน**:
   - คอมไพล์ผ่านภายใต้ `-Wall -Wextra -Werror` ทั้งบน `uno_r4_wifi` และ `native`; ขอบเขต `#pragma GCC diagnostic` ใน `src/auto_block_code.cpp:616-699` ถูกจำกัดเฉพาะโซนโค้ดที่ผู้ใช้คัดลอกมาจาก MATRIXblock เท่านั้น ทำให้ชั้น Proxy ความปลอดภัยทั้งหมดอยู่ภายใต้ `-Werror` เต็มรูปแบบ `[Verified: Build/Test Run]`
   - `pio check` รายงาน `0 HIGH, 0 MEDIUM` ใน `src/` ทั้งสองสภาพแวดล้อม `[Verified: Build/Test Run]`
-  - `pio test -e native -v` ผ่าน `40 / 40` เคส พร้อมอัปเดตคอมเมนต์และเพิ่ม assertion ครอบคลุมครบทุกสาขาของ `robot_logic.cpp` และ `serial_control.cpp` `[Verified: Build/Test Run]`
+  - `pio test -e native -v` ผ่าน `41 / 41` เคส พร้อมอัปเดตคอมเมนต์และเพิ่ม assertion ครอบคลุมครบทุกสาขาของ `robot_logic.cpp` และ `serial_control.cpp` `[Verified: Build/Test Run]`
 - **เหตุผลการหักคะแนน (`-1.0`)**:
   - โมดูลฮาร์ดแวร์ (`main.cpp`, `minir4_io.cpp`, `ps2_driver.cpp`, `oled_ui.cpp`, `auto_mode.cpp`, `auto_block_code.cpp`) ยังไม่มีชุดทดสอบจำลองฮาร์ดแวร์หรือ HIL อัตโนมัติ (`-1.0`) `[Verified: Static Code Inspection]`
 
@@ -177,9 +177,9 @@ $$\text{Weighted Points} = \left(\frac{\text{Category Score}}{10}\right) \times 
 2. **การขับ Teleop เต็มกำลัง 100% & ระบบเบรก**:
    - ทดสอบเดินหน้า/ถอยหลัง/เลี้ยวโค้งความเร็วสูงด้วย `LY`/`RX`, ทดสอบ `Select` (Precision 55%), `R3` (Reverse-Front), `D-Pad L/R` (Micro-Turn), และ `Start + D-Pad L/R` (Motor Trim พร้อมรีบูตเช็ก EEPROM)
 3. **แขนกล & เซอร์โว `RC1..RC4`**:
-   - ทดสอบ `RC1` (`L2=180° / R2=0°`), `RC2` (`D-Pad U/D`), `RC3+RC4` (`L1=30° / R1=140° / Square`), และ `Circle` (Drop/Hold preset)
+   - ทดสอบ `RC1` (`L2=100° / R2=180°`), `RC2` (`D-Pad U/D`), `RC3+RC4` (`L1=30° / R1=140° / Square`), และ `Circle` (Drop/Hold preset), `Triangle` (RC2=140° / RC1=100°)
 4. **Failsafe & ปุ่มหยุดฉุกเฉินทันที (`BTN_DOWN`)**:
    - ปิดจอยขณะล้อหมุน: หุ่นต้องหยุดและล็อกเบรกภายใน `~100 ms` (`FAILSAFE`) และกลับมาเป็น `PS2 OK` อัตโนมัติเมื่อเปิดจอยใหม่
    - ทดสอบกด **`BTN_DOWN` ค้างไว้**: หุ่นต้องเข้า `ESTOP!` ทันทีที่นิ้วกดลงโดยไม่ต้องรอปล่อยนิ้ว และกด `BTN_UP` เพื่อปลดล็อก
 5. **โหมด Autonomous & ความปลอดภัย**:
-   - ทดสอบเริ่ม Auto ทั้งจาก `Triangle` และกด `BTN_UP` ค้าง `1.2 s` (ตรวจว่าขณะรัน Auto ค่าความเสถียรแสดง `L+` ไม่หักคะแนนแม้ไม่เปิดจอย), ทดสอบกด `Cross` ยกเลิกกลางคัน และปรับจูนระยะ `MoveDegs` ใน `src/auto_block_code.cpp` ให้ตรงกับพื้นสนามแข่งจริง
+   - ทดสอบเริ่ม Auto ทั้งจาก `Start` และกด `BTN_UP` ค้าง `1.2 s` (ตรวจว่าขณะรัน Auto ค่าความเสถียรแสดง `L+` ไม่หักคะแนนแม้ไม่เปิดจอย), ทดสอบกด `Cross` ยกเลิกกลางคัน และปรับจูนระยะ `MoveDegs` ใน `src/auto_block_code.cpp` ให้ตรงกับพื้นสนามแข่งจริง

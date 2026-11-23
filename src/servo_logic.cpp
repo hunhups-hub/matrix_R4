@@ -127,6 +127,17 @@ void updateServoTargetsFromPs2(const Ps2Frame& frame,
         poseState->prevCircle = posePreset;
     }
 
+    const bool triangleHeld   = held(frame, Controls::kTrianglePose);
+    const bool triangleRising = (poseState != nullptr) && triangleHeld && !poseState->prevTriangle;
+    if (triangleRising) {
+        targets.rc1Deg = Config::kRcTrianglePoseRc1Deg;
+        targets.rc2Deg = Config::kRcTrianglePoseRc2Deg;
+        poseState->dropActive = false;
+    }
+    if (poseState != nullptr) {
+        poseState->prevTriangle = triangleHeld;
+    }
+
     targets = clampServoTargets(targets);
 }
 

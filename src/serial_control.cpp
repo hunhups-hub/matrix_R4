@@ -229,7 +229,7 @@ void SerialControl::printBanner() {
     Serial.println(F("\n================================================"));
     Serial.println(F("  MATRIX Mini R4 Robot Firmware Ready"));
     Serial.println(F("  Drive: M1(L) + M2(R) | Servos: RC1..RC4"));
-    Serial.println(F("  PS2/MJ2: D2(4p) + D3(2p) | Auto: Triangle=Start, X=Exit"));
+    Serial.println(F("  PS2/MJ2: D2(4p) + D3(2p) | Auto: START btn=Run, X=Exit"));
     Serial.println(F("  Upload: BTN UP+DOWN 2.5s or 'u'"));
     Serial.println(F("================================================"));
     printHelp();

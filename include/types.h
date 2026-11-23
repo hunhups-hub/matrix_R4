@@ -88,6 +88,7 @@ struct FrontArmPushState {
 struct ArmPosePresetState {
     bool dropActive = false;
     bool prevCircle = false;
+    bool prevTriangle = false;
 };
 
 struct PersistentConfig {

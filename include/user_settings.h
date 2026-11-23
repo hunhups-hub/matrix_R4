@@ -37,7 +37,7 @@ constexpr int16_t  kNormalMaxPower         = 100;     // ช่วง 1..100 | �
 constexpr int16_t  kPrecisionMaxPower          = 55;   // ความเร็วสูงสุดเมื่อโยกก้านสุดในโหมดช้า/แม่นยำ (%)
                                                        // ช่วง 1..kNormalMaxPower | ปุ่ม kPrecisionToggle
 constexpr int16_t  kMicroTurnPower         = 26;      // กำลังหมุนละเอียดเมื่อกด D-Pad ซ้าย/ขวา เพื่อจัดแนว (%)
-                                                       // ช่วง 0..100 | ปุ่ม kMicroTurnLeft / kMicroTurnRight
+                                                       // ช่วง 0..100 | ตอนนี้ไม่มีปุ่มจอยผูกกับหมุนละเอียด (D-Pad ซ้าย/ขวาว่าง)
 constexpr int16_t  kPrecisionMicroTurnPower    = 18;   // กำลังหมุนละเอียดเมื่อกด D-Pad ซ้าย/ขวา ในโหมดแม่นยำ (%)
                                                        // ช่วง 0..100
 constexpr uint8_t  kTurnMaxRatioPct        = 80U;     // สัดส่วนกำลังเลี้ยวสูงสุดที่ความเร็วปกติ (%)
@@ -56,17 +56,25 @@ constexpr int16_t  kRc1R2Deg               = 180;       // ปุ่ม kGripper
 constexpr int16_t  kRc1PresetHoldDeg       = 75;      // พรีเซ็ตวงกลม A: กริปเปอร์จับ/ถือของ (ตรงกับ Auto)
 constexpr int16_t  kRc1PresetDropDeg       = 145;     // พรีเซ็ตวงกลม B: กริปเปอร์เปิด/ปล่อยของ (ตรงกับ Auto)
 
+// --- 2.1b) ท่าปุ่ม Triangle (kTrianglePose): กดครั้งเดียวตั้งมุมแล้วค้างไว้ ---
+constexpr int16_t  kRcTrianglePoseRc1Deg   = 100;     // RC1 (แขน R1) 0..180
+constexpr int16_t  kRcTrianglePoseRc2Deg   = 140;     // RC2 (แขน R2) ช่วง kRc2MinDeg..kRc2MaxDeg
+
 // --- 2.2) RC2 แขนยก  (ปุ่ม kArmUp / kArmDown / kPosePreset / kSmoothToggle) ---
 //  ความเร็วแขนเมื่อกดค้าง = kRc2StepDeg / kArmStepIntervalMs
 //  (ค่าปัจจุบัน 10 องศา / 50 ms = 200 องศา/วินาที)
 constexpr int16_t  kRc2InitDeg             = 90;      // มุมเริ่มต้นแขน RC2 (D-Pad ขึ้น/ลง)
+constexpr int16_t  kRc2MinDeg              = 0;       // มุมสิ้นสุดต่ำสุดของแขน RC2 (ช่วง 0..180, ต้อง < kRc2MaxDeg)
+constexpr int16_t  kRc2MaxDeg              = 175;     // มุมสิ้นสุดสูงสุดของแขน RC2 (ช่วง 0..180) | แขนไม่เกินมุมนี้
 constexpr int16_t  kRc2StepDeg             = 10;      // 10 องศา / 50 ms (~200 องศา/วินาที)
                                                        // ช่วง 1..90 | เพิ่ม = แขนขยับเร็วขึ้น/หยาบขึ้น
 constexpr uint32_t kArmStepIntervalMs      = 50UL;    // คาบขยับแขน RC2 หนึ่งขั้นเมื่อกดค้าง (ms)
                                                        // ช่วง >= 25 (คาบลูป) | เพิ่ม = แขนขยับช้าลง
 constexpr bool     kRc2InvertDir           = true;    // กลับทิศ RC2: ขึ้น/หน้า ลดมุม, ลง/หลัง เพิ่มมุม
-constexpr int16_t  kRc2PresetHoldDeg       = 70;      // พรีเซ็ตวงกลม A: ท่ายกแขนถือของ (ตรงกับ Auto)
-constexpr int16_t  kRc2PresetDropDeg       = 140;     // พรีเซ็ตวงกลม B: ท่าลดแขนวางของ (ตรงกับ Auto)
+constexpr int16_t  kRc2PresetHoldDeg       = 0
+
+;      // พรีเซ็ตวงกลม A: ท่ายกแขนถือของ (ตรงกับ Auto)
+constexpr int16_t  kRc2PresetDropDeg       = 165;     // พรีเซ็ตวงกลม B: ท่าลดแขนวางของ (ตรงกับ Auto)
 constexpr int16_t  kRc2SmoothStepDeg       = 6;       // ขั้น slew ของ RC2 ต่อ 25 ms (6 องศา/25 ms = 240 องศา/วินาที)
                                                        // ช่วง 1..90 | เพิ่ม = แขนกวาดเร็วขึ้นในโหมดนุ่ม
 constexpr bool     kRc2SmoothDefault       = true;    // เปิดการเคลื่อนที่นุ่มนวลเป็นค่าเริ่มต้น เฉพาะ RC2
@@ -75,12 +83,12 @@ constexpr bool     kRc2SmoothDefault       = true;    // เปิดการ�
 constexpr int16_t  kRc3InitDeg             = 30;      // มุมเริ่มต้นแขนหน้าซ้าย (คู่กับ RC4; จำกัด 0..180)
 constexpr int16_t  kRc3L1Deg               = 30;      // L1 กดลง (30 องศา; มุมน้อย = ลึกกว่า; ต่ำสุด 0)
 constexpr int16_t  kRc3R1Deg               = 140;     // R1 ยกขึ้น / เก็บกลาง (140 องศา)
-constexpr int16_t  kRc3SquareDeg           = 180;      // Square สลับกดพื้น (30 องศา)
+constexpr int16_t  kRc3SquareDeg           = 180;      // Square สลับกดพื้น (180 องศา)
 constexpr bool     kRc3InvertDir           = false;   // กลับมุมที่ส่งออกฮาร์ดแวร์ของ RC3 (องศา -> 180 - องศา)
 constexpr int16_t  kRc4InitDeg             = 30;      // มุมเริ่มต้นแขนหน้าขวา (คู่กับ RC3)
 constexpr int16_t  kRc4L1Deg               = 30;      // L1 กดลง (30 องศา; คู่กับ RC3)
 constexpr int16_t  kRc4R1Deg               = 140;     // R1 ยกขึ้น / เก็บกลาง (140 องศา)
-constexpr int16_t  kRc4SquareDeg           = 180;      // Square สลับกดพื้น (30 องศา)
+constexpr int16_t  kRc4SquareDeg           = 180;      // Square สลับกดพื้น (180 องศา)
 constexpr bool     kRc4InvertDir           = true;    // กลับมุมที่ส่งออกฮาร์ดแวร์ของ RC4 (องศา -> 180 - องศา)
 
 // ============================================================================

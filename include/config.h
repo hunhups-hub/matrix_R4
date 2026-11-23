@@ -75,8 +75,7 @@ constexpr uint32_t kPs2InitRetryGapMs      = 12U;     // หน่วงระ�
 // --- เซอร์โว (RC1..RC4; RC3+RC4 จับคู่ที่ L1=ลง, R1=ขึ้น, Square=ดันพื้น) ---
 constexpr int16_t  kServoMinDeg            = 0;
 constexpr int16_t  kServoMaxDeg            = 180;
-constexpr int16_t  kRc2MinDeg              = 0;
-constexpr int16_t  kRc2MaxDeg              = 180;
+// kRc2MinDeg / kRc2MaxDeg (มุมสิ้นสุดแขน RC2) ย้ายไปอยู่ใน user_settings.h
 // kArmStepIntervalMs (คาบขยับแขน RC2) ย้ายไปอยู่ใน user_settings.h หมวด 2.2
 constexpr uint32_t kServoBootStaggerMs    = 60UL;    // ลดกระแสพุ่งตอนเริ่มระบบ
 
@@ -180,8 +179,12 @@ static_assert(inRange(kSerialDefaultSpeed, kSerialMinSpeed, kMotorMaxPower),
 static_assert(servoDegOk(kRc1InitDeg) && servoDegOk(kRc1L2Deg) && servoDegOk(kRc1R2Deg) &&
                   servoDegOk(kRc1PresetHoldDeg) && servoDegOk(kRc1PresetDropDeg),
               "user_settings.h: มุม RC1 (kRc1...Deg) ต้องอยู่ในช่วง 0..180");
+static_assert(servoDegOk(kRcTrianglePoseRc1Deg) && rc2DegOk(kRcTrianglePoseRc2Deg),
+              "user_settings.h: มุมท่า Triangle RC1 ต้องอยู่ในช่วง 0..180 และ RC2 ต้องอยู่ในช่วง kRc2MinDeg..kRc2MaxDeg");
+static_assert(servoDegOk(kRc2MinDeg) && servoDegOk(kRc2MaxDeg) && kRc2MinDeg < kRc2MaxDeg,
+              "user_settings.h: kRc2MinDeg/kRc2MaxDeg ต้องอยู่ในช่วง 0..180 และ Min < Max");
 static_assert(rc2DegOk(kRc2InitDeg) && rc2DegOk(kRc2PresetHoldDeg) && rc2DegOk(kRc2PresetDropDeg),
-              "user_settings.h: มุม RC2 (kRc2...Deg) ต้องอยู่ในช่วง 0..180");
+              "user_settings.h: มุม RC2 (kRc2...Deg) ต้องอยู่ในช่วง kRc2MinDeg..kRc2MaxDeg");
 static_assert(rc2DegOk(kCoMLowArmDeg),
               "user_settings.h: kCoMLowArmDeg ต้องอยู่ในช่วง 0..180");
 static_assert(servoDegOk(kRc3InitDeg) && servoDegOk(kRc3L1Deg) && servoDegOk(kRc3R1Deg) &&

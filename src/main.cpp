@@ -23,8 +23,6 @@ struct Ps2MenuEdges {
     bool precision  = false; // Controls::kPrecisionToggle
     bool smooth     = false; // Controls::kSmoothToggle
     bool reverse    = false; // Controls::kReverseToggle
-    bool trimLeft   = false; // Controls::kTrimLeft
-    bool trimRight  = false; // Controls::kTrimRight
 };
 
 /** Latched drive request from the Serial command interface. */
@@ -148,13 +146,12 @@ void latchMenuEdges(bool valid) {
     g_prevPs2.precision = valid && held(g_lastPs2Frame, Controls::kPrecisionToggle);
     g_prevPs2.smooth    = valid && held(g_lastPs2Frame, Controls::kSmoothToggle);
     g_prevPs2.reverse   = valid && held(g_lastPs2Frame, Controls::kReverseToggle);
-    g_prevPs2.trimLeft  = valid && held(g_lastPs2Frame, Controls::kTrimLeft);
-    g_prevPs2.trimRight = valid && held(g_lastPs2Frame, Controls::kTrimRight);
 }
 
 void latchServoEdges(bool valid) {
     g_armPushState.prevSquare    = valid && Controls::held(g_lastPs2Frame, Controls::kPushGround);
     g_posePresetState.prevCircle = valid && Controls::held(g_lastPs2Frame, Controls::kPosePreset);
+    g_posePresetState.prevTriangle = valid && Controls::held(g_lastPs2Frame, Controls::kTrianglePose);
 }
 
 /** Seeds every edge latch from the current frame so held buttons don't fire on (re)entry. */
@@ -696,13 +693,10 @@ bool updatePs2Link(uint32_t nowMs) {
  *   Select            -> Precision Mode toggle
  *   R3                -> Reverse-Front orientation toggle
  *   L3                -> RC2 Smooth Trajectory toggle
- *   Start + L3        -> Reset Motor Trim
- *   Start + D-Pad L/R -> Adjust straight-line Motor Balance Trim (-/+1%)
  */
 void handlePs2ConfigCombos() {
     using Controls::held;
     const Ps2Frame& f        = g_lastPs2Frame;
-    const bool      modifier = held(f, Controls::kTrimModifier);
 
     if (held(f, Controls::kPrecisionToggle) && !g_prevPs2.precision) {
         togglePrecisionMode("PS2: ");
@@ -711,19 +705,8 @@ void handlePs2ConfigCombos() {
         toggleReverseDrive("PS2: Reverse-Front ON", "PS2: Reverse-Front OFF");
     }
     if (held(f, Controls::kSmoothToggle) && !g_prevPs2.smooth) {
-        if (modifier) {
-            setMotorTrim(0, "PS2 trim reset");
-        } else {
-            toggleRc2Smooth("PS2: RC2 Smooth Slew ON (saved)",
-                            "PS2: RC2 Smooth Slew OFF (saved)");
-        }
-    }
-    if (modifier) {
-        if (held(f, Controls::kTrimLeft) && !g_prevPs2.trimLeft) {
-            setMotorTrim(RobotLogic::stepMotorTrim(g_snap.motorTrimPct, -1), "PS2 trim -");
-        } else if (held(f, Controls::kTrimRight) && !g_prevPs2.trimRight) {
-            setMotorTrim(RobotLogic::stepMotorTrim(g_snap.motorTrimPct, 1), "PS2 trim +");
-        }
+        toggleRc2Smooth("PS2: RC2 Smooth Slew ON (saved)",
+                        "PS2: RC2 Smooth Slew OFF (saved)");
     }
 }
 
@@ -805,10 +788,6 @@ bool driveFromPs2(uint32_t nowMs, LinkState prevLink, bool valid, const MotorPow
     }
     g_snap.comScalePct = RobotLogic::computeCoMDynamicScale(g_snap.servos.rc2Deg);
 
-    // D-Pad Left/Right without Start = micro-turn alignment (Start+D-Pad is trim).
-    const bool trimMod    = Controls::held(f, Controls::kTrimModifier);
-    const bool microLeft  = !trimMod && Controls::held(f, Controls::kMicroTurnLeft);
-    const bool microRight = !trimMod && Controls::held(f, Controls::kMicroTurnRight);
     g_snap.drive          = RobotLogic::computeKinodynamicDrive(f.ly,
                                                                 f.rx,
                                                                 g_snap.drive.left,
@@ -819,8 +798,8 @@ bool driveFromPs2(uint32_t nowMs, LinkState prevLink, bool valid, const MotorPow
                                                                 pwr.compPercent,
                                                                 g_snap.servos.rc2Deg,
                                                                 g_snap.reverseDrive,
-                                                                microLeft,
-                                                                microRight,
+                                                                false,
+                                                                false,
                                                                 g_snap.motorTrimPct,
                                                                 g_snap.precisionMode);
     applyDriveToMotors(nowMs);

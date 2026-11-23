@@ -207,7 +207,7 @@ bool isPs2UnconfiguredMode(const Ps2Frame& frame);
 /** Validates PS2 frame mode/sync bytes and rejects impossible button/bus-short patterns. */
 bool isPs2FrameValid(const Ps2Frame& frame);
 
-/** Returns true on a rising Triangle press while Ready, PS2 Operational, and X not held. */
+/** Returns true on a rising Start press (Controls::kAutoStart) while Ready, PS2 Operational, and X not held. */
 bool shouldStartAutoMode(bool sysReady,
                          bool ps2Operational,
                          bool frameValid,
