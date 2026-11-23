@@ -242,6 +242,7 @@ void togglePosePreset() {
         g_snap.servos.rc1Deg         = Config::kRc1PresetDropDeg;
         g_snap.servos.rc2Deg         = Config::kRc2PresetDropDeg;
         g_posePresetState.dropActive = true;
+        g_posePresetState.releasePending = false;
         snprintf(msg, sizeof(msg), "Drop/Place preset (RC1=%d, RC2=%d)",
                  static_cast<int>(Config::kRc1PresetDropDeg),
                  static_cast<int>(Config::kRc2PresetDropDeg));
@@ -249,6 +250,7 @@ void togglePosePreset() {
         g_snap.servos.rc1Deg         = Config::kRc1PresetHoldDeg;
         g_snap.servos.rc2Deg         = Config::kRc2PresetHoldDeg;
         g_posePresetState.dropActive = false;
+        g_posePresetState.releasePending = false;
         snprintf(msg, sizeof(msg), "Hold/Carry preset (RC1=%d, RC2=%d)",
                  static_cast<int>(Config::kRc1PresetHoldDeg),
                  static_cast<int>(Config::kRc2PresetHoldDeg));
@@ -600,7 +602,8 @@ void runAutoSession(uint32_t nowMs) {
 
     // Auto moved servos directly: drop manual pose/push states that no longer match.
     if (g_snap.servos.rc1Deg != preAuto.rc1Deg || g_snap.servos.rc2Deg != preAuto.rc2Deg) {
-        g_posePresetState.dropActive = false;
+        g_posePresetState.dropActive     = false;
+        g_posePresetState.releasePending = false;
     }
     if (g_snap.servos.rc3Deg != preAuto.rc3Deg || g_snap.servos.rc4Deg != preAuto.rc4Deg) {
         g_armPushState.active = false;
@@ -782,7 +785,7 @@ bool driveFromPs2(uint32_t nowMs, LinkState prevLink, bool valid, const MotorPow
         static_cast<uint32_t>(nowMs - g_lastArmStepMs) >= Config::kArmStepIntervalMs;
     const int16_t prevRc2 = g_snap.servos.rc2Deg;
     RobotLogic::updateServoTargetsFromPs2(
-        f, g_snap.servos, allowArm, &g_armPushState, &g_posePresetState);
+        f, g_snap.servos, allowArm, &g_armPushState, &g_posePresetState, nowMs);
     if (allowArm && g_snap.servos.rc2Deg != prevRc2) {
         g_lastArmStepMs = nowMs;
     }

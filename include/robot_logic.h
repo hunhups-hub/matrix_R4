@@ -196,7 +196,8 @@ void updateServoTargetsFromPs2(const Ps2Frame& frame,
                                ServoTargets& targets,
                                bool allowArmStep,
                                FrontArmPushState* pushState = nullptr,
-                               ArmPosePresetState* poseState = nullptr);
+                               ArmPosePresetState* poseState = nullptr,
+                               uint32_t nowMs = 0);
 
 /** Decodes a raw 9-byte Sony PS2 SPI response packet into a Ps2Frame. */
 void decodePs2Payload(const uint8_t raw[9], Ps2Frame& outFrame);

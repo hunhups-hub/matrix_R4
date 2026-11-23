@@ -86,9 +86,11 @@ struct FrontArmPushState {
 };
 
 struct ArmPosePresetState {
-    bool dropActive = false;
-    bool prevCircle = false;
-    bool prevTriangle = false;
+    bool     dropActive = false;
+    bool     prevCircle = false;
+    bool     prevTriangle = false;
+    bool     releasePending = false;  // Circle: RC2 already moved, RC1 release waiting
+    uint32_t releaseAtMs = 0;         // time (ms) when RC1 should be released
 };
 
 struct PersistentConfig {

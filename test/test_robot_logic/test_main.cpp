@@ -1679,27 +1679,46 @@ void test_circle_pose_preset_and_serial_competition_shortcuts(void) {
     FrontArmPushState pushState{};
     ArmPosePresetState poseState{};
 
-    // First Circle rising edge -> Drop/Place preset (RC1=145, RC2=140)
+    // First Circle rising edge -> RC2 moves now, RC1 release is delayed
+    servos.rc1Deg    = 0;
     Ps2Frame fCircle = makeValidFrame();
     fCircle.circle   = true;
-    RobotLogic::updateServoTargetsFromPs2(fCircle, servos, false, &pushState, &poseState);
+    RobotLogic::updateServoTargetsFromPs2(fCircle, servos, false, &pushState, &poseState, 1000UL);
+    TEST_ASSERT_TRUE(poseState.dropActive);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc2PresetDropDeg, servos.rc2Deg);
+    TEST_ASSERT_EQUAL_INT16(0, servos.rc1Deg);
+
+    // Holding Circle: still waiting, then RC1 released after the delay
+    RobotLogic::updateServoTargetsFromPs2(fCircle, servos, false, &pushState, &poseState,
+                                          1000UL + Config::kPoseDropReleaseDelayMs - 1UL);
+    TEST_ASSERT_EQUAL_INT16(0, servos.rc1Deg);
+    RobotLogic::updateServoTargetsFromPs2(fCircle, servos, false, &pushState, &poseState,
+                                          1000UL + Config::kPoseDropReleaseDelayMs);
     TEST_ASSERT_TRUE(poseState.dropActive);
     TEST_ASSERT_EQUAL_INT16(Config::kRc1PresetDropDeg, servos.rc1Deg);
-    TEST_ASSERT_EQUAL_INT16(Config::kRc2PresetDropDeg, servos.rc2Deg);
 
-    // Holding Circle does not re-toggle
-    RobotLogic::updateServoTargetsFromPs2(fCircle, servos, false, &pushState, &poseState);
-    TEST_ASSERT_TRUE(poseState.dropActive);
-
-    // Release and press Circle again -> still Drop/Place (no toggle back to Hold)
+    // Only Cross cancels a pending release; gripper button does not
     Ps2Frame fIdle = makeValidFrame();
-    RobotLogic::updateServoTargetsFromPs2(fIdle, servos, false, &pushState, &poseState);
+    RobotLogic::updateServoTargetsFromPs2(fIdle, servos, false, &pushState, &poseState, 3000UL);
     servos.rc1Deg = 0;
     servos.rc2Deg = 0;
-    RobotLogic::updateServoTargetsFromPs2(fCircle, servos, false, &pushState, &poseState);
-    TEST_ASSERT_TRUE(poseState.dropActive);
+    RobotLogic::updateServoTargetsFromPs2(fCircle, servos, false, &pushState, &poseState, 4000UL);
+    Ps2Frame fR2c = fCircle;
+    fR2c.r2       = true;
+    RobotLogic::updateServoTargetsFromPs2(fR2c, servos, false, &pushState, &poseState, 4100UL);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc1R2Deg, servos.rc1Deg);
+    RobotLogic::updateServoTargetsFromPs2(fCircle, servos, false, &pushState, &poseState, 9000UL);
     TEST_ASSERT_EQUAL_INT16(Config::kRc1PresetDropDeg, servos.rc1Deg);
-    TEST_ASSERT_EQUAL_INT16(Config::kRc2PresetDropDeg, servos.rc2Deg);
+
+    // Cross cancels the pending release
+    RobotLogic::updateServoTargetsFromPs2(fIdle, servos, false, &pushState, &poseState, 10000UL);
+    servos.rc1Deg = 0;
+    RobotLogic::updateServoTargetsFromPs2(fCircle, servos, false, &pushState, &poseState, 11000UL);
+    Ps2Frame fX = fCircle;
+    fX.cross    = true;
+    RobotLogic::updateServoTargetsFromPs2(fX, servos, false, &pushState, &poseState, 11100UL);
+    RobotLogic::updateServoTargetsFromPs2(fCircle, servos, false, &pushState, &poseState, 20000UL);
+    TEST_ASSERT_EQUAL_INT16(0, servos.rc1Deg);
 
     // Verify new Serial competition shortcuts: 'g' (Auto), 'z' (Precision), 'b' (Reverse), 'q' (Pose)
     SerialControl sc;

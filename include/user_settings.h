@@ -55,6 +55,8 @@ constexpr int16_t  kRc1L2Deg               = 100;     // ปุ่ม kGripperOp
 constexpr int16_t  kRc1R2Deg               = 180;       // ปุ่ม kGripperClose (R2)
 constexpr int16_t  kRc1PresetHoldDeg       = 100;      // พรีเซ็ตท่าถือ (ใช้เฉพาะ Serial q): กริปเปอร์จับ/ถือของ (ตรงกับ Auto)
 constexpr int16_t  kRc1PresetDropDeg       = 100;     // พรีเซ็ตวงกลม (ปุ่มวางอย่างเดียว): กริปเปอร์เปิด/ปล่อยของ (ตรงกับ Auto)
+constexpr uint32_t kPoseDropReleaseDelayMs = 600UL;   // ปุ่ม Circle: ขยับแขน RC2 ก่อน แล้วรอเท่านี้ (ms) ค่อยปล่อยกริปเปอร์ RC1
+                                                       // ช่วง 0..5000 | 0 = ปล่อยพร้อมแขน | เพิ่ม = ปล่อยช้าลง (ให้แขนลงถึงก่อน)
 
 // --- 2.1b) ท่าปุ่ม Triangle (kTrianglePose): กดครั้งเดียวตั้งมุมแล้วค้างไว้ ---
 constexpr int16_t  kRcTrianglePoseRc1Deg   = 100;     // RC1 (แขน R1) 0..180

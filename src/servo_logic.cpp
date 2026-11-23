@@ -40,7 +40,8 @@ void updateServoTargetsFromPs2(const Ps2Frame& frame,
                                ServoTargets& targets,
                                bool allowArmStep,
                                FrontArmPushState* pushState,
-                               ArmPosePresetState* poseState) {
+                               ArmPosePresetState* poseState,
+                               uint32_t nowMs) {
     using Controls::held;
     const bool armUp       = held(frame, Controls::kArmUp);
     const bool armDown     = held(frame, Controls::kArmDown);
@@ -112,10 +113,27 @@ void updateServoTargetsFromPs2(const Ps2Frame& frame,
             poseState->dropActive = false;
         }
     } else if (circleRising) {
-        // Circle = วางอย่างเดียว (ไม่สลับ); ท่าถือใช้ Serial 'q' เท่านั้น
-        targets.rc1Deg        = Config::kRc1PresetDropDeg;
+        // Circle = วางอย่างเดียว (ไม่สลับ): ขยับแขน RC2 ก่อน แล้วค่อยปล่อย RC1 หลัง kPoseDropReleaseDelayMs
+        // ท่าถือใช้ Serial 'q' เท่านั้น
         targets.rc2Deg        = Config::kRc2PresetDropDeg;
         poseState->dropActive = true;
+        if (Config::kPoseDropReleaseDelayMs == 0U) {
+            targets.rc1Deg            = Config::kRc1PresetDropDeg;
+            poseState->releasePending = false;
+        } else {
+            poseState->releasePending = true;
+            poseState->releaseAtMs    = nowMs + Config::kPoseDropReleaseDelayMs;
+        }
+    }
+
+    // มีเพียงปุ่ม Cross (kBrakeOrExit) เท่านั้นที่ยกเลิกการปล่อย RC1 ที่รออยู่
+    if (poseState != nullptr && held(frame, Controls::kBrakeOrExit)) {
+        poseState->releasePending = false;
+    }
+    if (poseState != nullptr && poseState->releasePending &&
+        static_cast<int32_t>(nowMs - poseState->releaseAtMs) >= 0) {
+        targets.rc1Deg            = Config::kRc1PresetDropDeg;
+        poseState->releasePending = false;
     }
 
     if (poseState != nullptr) {
