@@ -112,15 +112,10 @@ void updateServoTargetsFromPs2(const Ps2Frame& frame,
             poseState->dropActive = false;
         }
     } else if (circleRising) {
-        if (!poseState->dropActive) {
-            targets.rc1Deg        = Config::kRc1PresetDropDeg;
-            targets.rc2Deg        = Config::kRc2PresetDropDeg;
-            poseState->dropActive = true;
-        } else {
-            targets.rc1Deg        = Config::kRc1PresetHoldDeg;
-            targets.rc2Deg        = Config::kRc2PresetHoldDeg;
-            poseState->dropActive = false;
-        }
+        // Circle = วางอย่างเดียว (ไม่สลับ); ท่าถือใช้ Serial 'q' เท่านั้น
+        targets.rc1Deg        = Config::kRc1PresetDropDeg;
+        targets.rc2Deg        = Config::kRc2PresetDropDeg;
+        poseState->dropActive = true;
     }
 
     if (poseState != nullptr) {

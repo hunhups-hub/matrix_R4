@@ -53,8 +53,8 @@ constexpr int16_t  kSerialDefaultSpeed     = 100;     // ความเร็�
 constexpr int16_t  kRc1InitDeg             = 180;       // มุมเริ่มต้นของเซอร์โวเสริม (กริปเปอร์)
 constexpr int16_t  kRc1L2Deg               = 100;     // ปุ่ม kGripperOpen (L2)
 constexpr int16_t  kRc1R2Deg               = 180;       // ปุ่ม kGripperClose (R2)
-constexpr int16_t  kRc1PresetHoldDeg       = 75;      // พรีเซ็ตวงกลม A: กริปเปอร์จับ/ถือของ (ตรงกับ Auto)
-constexpr int16_t  kRc1PresetDropDeg       = 145;     // พรีเซ็ตวงกลม B: กริปเปอร์เปิด/ปล่อยของ (ตรงกับ Auto)
+constexpr int16_t  kRc1PresetHoldDeg       = 100;      // พรีเซ็ตท่าถือ (ใช้เฉพาะ Serial q): กริปเปอร์จับ/ถือของ (ตรงกับ Auto)
+constexpr int16_t  kRc1PresetDropDeg       = 100;     // พรีเซ็ตวงกลม (ปุ่มวางอย่างเดียว): กริปเปอร์เปิด/ปล่อยของ (ตรงกับ Auto)
 
 // --- 2.1b) ท่าปุ่ม Triangle (kTrianglePose): กดครั้งเดียวตั้งมุมแล้วค้างไว้ ---
 constexpr int16_t  kRcTrianglePoseRc1Deg   = 100;     // RC1 (แขน R1) 0..180
@@ -73,8 +73,8 @@ constexpr uint32_t kArmStepIntervalMs      = 50UL;    // คาบขยับ�
 constexpr bool     kRc2InvertDir           = true;    // กลับทิศ RC2: ขึ้น/หน้า ลดมุม, ลง/หลัง เพิ่มมุม
 constexpr int16_t  kRc2PresetHoldDeg       = 0
 
-;      // พรีเซ็ตวงกลม A: ท่ายกแขนถือของ (ตรงกับ Auto)
-constexpr int16_t  kRc2PresetDropDeg       = 165;     // พรีเซ็ตวงกลม B: ท่าลดแขนวางของ (ตรงกับ Auto)
+;      // พรีเซ็ตท่าถือ (ใช้เฉพาะ Serial q): ท่ายกแขนถือของ (ตรงกับ Auto)
+constexpr int16_t  kRc2PresetDropDeg       = 165;     // พรีเซ็ตวงกลม (ปุ่มวางอย่างเดียว): ท่าลดแขนวางของ (ตรงกับ Auto)
 constexpr int16_t  kRc2SmoothStepDeg       = 6;       // ขั้น slew ของ RC2 ต่อ 25 ms (6 องศา/25 ms = 240 องศา/วินาที)
                                                        // ช่วง 1..90 | เพิ่ม = แขนกวาดเร็วขึ้นในโหมดนุ่ม
 constexpr bool     kRc2SmoothDefault       = true;    // เปิดการเคลื่อนที่นุ่มนวลเป็นค่าเริ่มต้น เฉพาะ RC2

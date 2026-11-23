@@ -1691,13 +1691,15 @@ void test_circle_pose_preset_and_serial_competition_shortcuts(void) {
     RobotLogic::updateServoTargetsFromPs2(fCircle, servos, false, &pushState, &poseState);
     TEST_ASSERT_TRUE(poseState.dropActive);
 
-    // Release and press Circle again -> Hold/Carry preset (RC1=75, RC2=70)
+    // Release and press Circle again -> still Drop/Place (no toggle back to Hold)
     Ps2Frame fIdle = makeValidFrame();
     RobotLogic::updateServoTargetsFromPs2(fIdle, servos, false, &pushState, &poseState);
+    servos.rc1Deg = 0;
+    servos.rc2Deg = 0;
     RobotLogic::updateServoTargetsFromPs2(fCircle, servos, false, &pushState, &poseState);
-    TEST_ASSERT_FALSE(poseState.dropActive);
-    TEST_ASSERT_EQUAL_INT16(Config::kRc1PresetHoldDeg, servos.rc1Deg);
-    TEST_ASSERT_EQUAL_INT16(Config::kRc2PresetHoldDeg, servos.rc2Deg);
+    TEST_ASSERT_TRUE(poseState.dropActive);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc1PresetDropDeg, servos.rc1Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc2PresetDropDeg, servos.rc2Deg);
 
     // Verify new Serial competition shortcuts: 'g' (Auto), 'z' (Precision), 'b' (Reverse), 'q' (Pose)
     SerialControl sc;

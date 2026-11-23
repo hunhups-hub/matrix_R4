@@ -177,7 +177,7 @@ $$\text{Weighted Points} = \left(\frac{\text{Category Score}}{10}\right) \times 
 2. **การขับ Teleop เต็มกำลัง 100% & ระบบเบรก**:
    - ทดสอบเดินหน้า/ถอยหลัง/เลี้ยวโค้งความเร็วสูงด้วย `LY`/`RX`, ทดสอบ `Select` (Precision 55%), `R3` (Reverse-Front), `D-Pad L/R` (Micro-Turn), และ `Start + D-Pad L/R` (Motor Trim พร้อมรีบูตเช็ก EEPROM)
 3. **แขนกล & เซอร์โว `RC1..RC4`**:
-   - ทดสอบ `RC1` (`L2=100° / R2=180°`), `RC2` (`D-Pad U/D`), `RC3+RC4` (`L1=30° / R1=140° / Square`), และ `Circle` (Drop/Hold preset), `Triangle` (RC2=140° / RC1=100°)
+   - ทดสอบ `RC1` (`L2=100° / R2=180°`), `RC2` (`D-Pad U/D`), `RC3+RC4` (`L1=30° / R1=140° / Square`), และ `Circle` (Drop preset อย่างเดียว), `Triangle` (RC2=140° / RC1=100°)
 4. **Failsafe & ปุ่มหยุดฉุกเฉินทันที (`BTN_DOWN`)**:
    - ปิดจอยขณะล้อหมุน: หุ่นต้องหยุดและล็อกเบรกภายใน `~100 ms` (`FAILSAFE`) และกลับมาเป็น `PS2 OK` อัตโนมัติเมื่อเปิดจอยใหม่
    - ทดสอบกด **`BTN_DOWN` ค้างไว้**: หุ่นต้องเข้า `ESTOP!` ทันทีที่นิ้วกดลงโดยไม่ต้องรอปล่อยนิ้ว และกด `BTN_UP` เพื่อปลดล็อก

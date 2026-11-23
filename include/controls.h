@@ -28,7 +28,7 @@
 //     +-----------------------------------------------------------------+
 //     |     Up   = แขน RC2 ขึ้น              Triangle = ตั้งท่า RC2=140 RC1=100 |
 //     |  Left / Right = (ว่าง)               Square = สลับดันพื้น        |
-//     |     Down = แขน RC2 ลง               Circle = สลับท่า ถือ/วาง    |
+//     |     Down = แขน RC2 ลง               Circle = ท่าวางอย่างเดียว |
 //     |                                     Cross  = เบรก / ออก Auto    |
 //     |        Select = โหมด Precision    Start = เริ่ม Auto           |
 //     |   (ก้านซ้าย)  L3 = RC2 นุ่ม        R3 = สลับหน้า-หลัง (ก้านขวา) |
@@ -63,7 +63,7 @@ constexpr Btn kFrontArmsUp   = Btn::R1;       // RC3+RC4 ยกไปที่ k
 constexpr Btn kPushGround    = Btn::Square;   // สลับท่าดันพื้น (กดครั้งที่ 2 คืนค่าเดิม)
 constexpr Btn kGripperOpen   = Btn::L2;       // RC1 -> kRc1L2Deg
 constexpr Btn kGripperClose  = Btn::R2;       // RC1 -> kRc1R2Deg
-constexpr Btn kPosePreset    = Btn::Circle;   // สลับท่า ถือ/วาง (RC1+RC2)
+constexpr Btn kPosePreset    = Btn::Circle;   // ท่าวาง (RC1+RC2) อย่างเดียว ไม่สลับ
 constexpr Btn kTrianglePose  = Btn::Triangle; // กดครั้งเดียว: RC1 -> kRcTrianglePoseRc1Deg, RC2 -> kRcTrianglePoseRc2Deg
 constexpr Btn kArmUp         = Btn::Up;       // RC2 ขยับขึ้น (ทิศกลับด้วย kRc2InvertDir)
 constexpr Btn kArmDown       = Btn::Down;     // RC2 ขยับลง
