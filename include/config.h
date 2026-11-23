@@ -77,8 +77,8 @@ constexpr int16_t  kServoMinDeg            = 0;
 constexpr int16_t  kServoMaxDeg            = 180;
 constexpr int16_t  kRc2MinDeg              = 0;
 constexpr int16_t  kRc2MaxDeg              = 180;
-constexpr uint32_t kArmStepIntervalMs      = 50UL;
-constexpr uint32_t kServoBootStaggerMs     = 60UL;    // ลดกระแสพุ่งตอนเริ่มระบบ
+// kArmStepIntervalMs (คาบขยับแขน RC2) ย้ายไปอยู่ใน user_settings.h หมวด 2.2
+constexpr uint32_t kServoBootStaggerMs    = 60UL;    // ลดกระแสพุ่งตอนเริ่มระบบ
 
 // --- กำลังไฟ / อะแดปเตอร์ DC (รองรับอะแดปเตอร์ 9V-18V หรือแบต 2S-4S) -------
 constexpr float    kPowerFullVolt          = 19.5f;   // <= 25.5V (uint8 หน่วยหนึ่งส่วนสิบ)
@@ -140,5 +140,75 @@ constexpr uint8_t  kStabilityRecoverStep     = 2U;
 constexpr uint8_t  kStabilityTipMaxPen       = 15U;     // แขน RC2 สูงสุด + ล้อเต็มกำลัง
 constexpr uint8_t  kStabilityStallPen        = 15U;     // ล้อติด (stall detector ทำงาน)
 constexpr uint8_t  kStabilityDriveMaxPen     = 25U;
+
+// ============================================================================
+// --- ตัวตรวจค่าตอน build (ค่าการบังคับใน user_settings.h) ---
+//  ถ้า build หยุดที่บรรทัดใดด้านล่าง ให้แก้ค่าใน user_settings.h ตามข้อความ
+//  ตัวตรวจนี้ไม่เปลี่ยนการทำงานของโปรแกรม ทำงานเฉพาะตอนคอมไพล์
+// ============================================================================
+
+/** เป็นจริงเมื่อ lo <= v <= hi (ใช้ใน static_assert ด้านล่าง) */
+constexpr bool inRange(int32_t v, int32_t lo, int32_t hi) {
+    return v >= lo && v <= hi;
+}
+
+/** เป็นจริงเมื่อมุมอยู่ในช่วงเซอร์โว kServoMinDeg..kServoMaxDeg */
+constexpr bool servoDegOk(int32_t deg) {
+    return inRange(deg, kServoMinDeg, kServoMaxDeg);
+}
+
+/** เป็นจริงเมื่อมุมอยู่ในช่วงแขน RC2 kRc2MinDeg..kRc2MaxDeg */
+constexpr bool rc2DegOk(int32_t deg) {
+    return inRange(deg, kRc2MinDeg, kRc2MaxDeg);
+}
+
+// --- 1) ความเร็วขับ ---
+static_assert(inRange(kNormalMaxPower, 1, kMotorMaxPower),
+              "user_settings.h: kNormalMaxPower ต้องอยู่ในช่วง 1..100");
+static_assert(inRange(kPrecisionMaxPower, 1, kNormalMaxPower),
+              "user_settings.h: kPrecisionMaxPower ต้องอยู่ในช่วง 1..kNormalMaxPower");
+static_assert(inRange(kMicroTurnPower, 0, kMotorMaxPower),
+              "user_settings.h: kMicroTurnPower ต้องอยู่ในช่วง 0..100");
+static_assert(inRange(kPrecisionMicroTurnPower, 0, kMotorMaxPower),
+              "user_settings.h: kPrecisionMicroTurnPower ต้องอยู่ในช่วง 0..100");
+static_assert(inRange(kTurnMaxRatioPct, 1, 100),
+              "user_settings.h: kTurnMaxRatioPct ต้องอยู่ในช่วง 1..100");
+static_assert(inRange(kSerialDefaultSpeed, kSerialMinSpeed, kMotorMaxPower),
+              "user_settings.h: kSerialDefaultSpeed ต้องอยู่ในช่วง 20..100");
+
+// --- 2) เซอร์โว ---
+static_assert(servoDegOk(kRc1InitDeg) && servoDegOk(kRc1L2Deg) && servoDegOk(kRc1R2Deg) &&
+                  servoDegOk(kRc1PresetHoldDeg) && servoDegOk(kRc1PresetDropDeg),
+              "user_settings.h: มุม RC1 (kRc1...Deg) ต้องอยู่ในช่วง 0..180");
+static_assert(rc2DegOk(kRc2InitDeg) && rc2DegOk(kRc2PresetHoldDeg) && rc2DegOk(kRc2PresetDropDeg),
+              "user_settings.h: มุม RC2 (kRc2...Deg) ต้องอยู่ในช่วง 0..180");
+static_assert(rc2DegOk(kCoMLowArmDeg),
+              "user_settings.h: kCoMLowArmDeg ต้องอยู่ในช่วง 0..180");
+static_assert(servoDegOk(kRc3InitDeg) && servoDegOk(kRc3L1Deg) && servoDegOk(kRc3R1Deg) &&
+                  servoDegOk(kRc3SquareDeg),
+              "user_settings.h: มุม RC3 (kRc3...Deg) ต้องอยู่ในช่วง 0..180");
+static_assert(servoDegOk(kRc4InitDeg) && servoDegOk(kRc4L1Deg) && servoDegOk(kRc4R1Deg) &&
+                  servoDegOk(kRc4SquareDeg),
+              "user_settings.h: มุม RC4 (kRc4...Deg) ต้องอยู่ในช่วง 0..180");
+static_assert(inRange(kRc2StepDeg, 1, 90),
+              "user_settings.h: kRc2StepDeg ต้องอยู่ในช่วง 1..90");
+static_assert(inRange(kRc2SmoothStepDeg, 1, 90),
+              "user_settings.h: kRc2SmoothStepDeg ต้องอยู่ในช่วง 1..90");
+static_assert(kArmStepIntervalMs >= kControlPeriodMs,
+              "user_settings.h: kArmStepIntervalMs ต้องไม่น้อยกว่าคาบลูป 25 ms");
+
+// --- 3) ความรู้สึกการขับ ---
+static_assert(kStickDeadzoneRaw < 127U,
+              "user_settings.h: kStickDeadzoneRaw ต้องอยู่ในช่วง 0..126");
+static_assert(kThrottleExpoPct <= 100U && kTurnExpoPct <= 100U &&
+                  kPrecisionThrottleExpoPct <= 100U && kPrecisionTurnExpoPct <= 100U,
+              "user_settings.h: ค่า ...ExpoPct ต้องอยู่ในช่วง 0..100");
+static_assert(inRange(kMotorAccelSlewStep, 1, 100) && inRange(kMotorDecelSlewStep, 1, 100) &&
+                  inRange(kAngularAccelSlewStep, 1, 100) && inRange(kAngularDecelSlewStep, 1, 100),
+              "user_settings.h: ค่า ...SlewStep ต้องอยู่ในช่วง 1..100");
+static_assert(inRange(kMotorStictionMinPower, 0, 50),
+              "user_settings.h: kMotorStictionMinPower ต้องอยู่ในช่วง 0..50");
+static_assert(inRange(kMaxMotorTrimPct, 0, 50),
+              "user_settings.h: kMaxMotorTrimPct ต้องอยู่ในช่วง 0..50");
 
 } // namespace Config

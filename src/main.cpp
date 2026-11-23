@@ -130,7 +130,7 @@ void applyDriveToMotors(uint32_t nowMs) {
 /** Effective max drive power = min(mode cap [precision/normal], battery power cap). */
 int16_t computeMaxDriveSpeed(const MotorPowerProfile& profile) {
     const int16_t modeCap =
-        g_snap.precisionMode ? Config::kPrecisionMaxPower : Config::kMotorMaxPower;
+        g_snap.precisionMode ? Config::kPrecisionMaxPower : Config::kNormalMaxPower;
     return (modeCap < profile.maxPowerCap) ? modeCap : profile.maxPowerCap;
 }
 
@@ -181,10 +181,19 @@ void initOled() {
 
 // --- Shared configuration actions (Serial + PS2) -------------------------------
 
-void togglePrecisionMode(const char* onMsg, const char* offMsg) {
+/** Toggles Precision mode; the event text reads the power caps from Config. */
+void togglePrecisionMode(const char* prefix) {
     g_snap.precisionMode = !g_snap.precisionMode;
     g_oled.beepConfirm();
-    g_serial.printEvent("CFG", g_snap.precisionMode ? onMsg : offMsg);
+    char msg[48];
+    if (g_snap.precisionMode) {
+        snprintf(msg, sizeof(msg), "%sPrecision %d%% ON (session)", prefix,
+                 static_cast<int>(Config::kPrecisionMaxPower));
+    } else {
+        snprintf(msg, sizeof(msg), "%sPrecision OFF %d%%", prefix,
+                 static_cast<int>(Config::kNormalMaxPower));
+    }
+    g_serial.printEvent("CFG", msg);
 }
 
 void toggleReverseDrive(const char* onMsg, const char* offMsg) {
@@ -426,7 +435,7 @@ void updateStabilityMetrics(bool frameValid, uint8_t compPercent, uint32_t loopD
 
 void applySerialConfigActions(const SerialActions& act) {
     if (act.togglePrecision) {
-        togglePrecisionMode("Precision 55% ON (session)", "Precision OFF 100%");
+        togglePrecisionMode("");
     }
     if (act.toggleReverseDrive) {
         toggleReverseDrive("Reverse-Front ON", "Reverse-Front OFF");
@@ -696,8 +705,7 @@ void handlePs2ConfigCombos() {
     const bool      modifier = held(f, Controls::kTrimModifier);
 
     if (held(f, Controls::kPrecisionToggle) && !g_prevPs2.precision) {
-        togglePrecisionMode("PS2: Precision 55% ON (session)",
-                            "PS2: Precision OFF 100%");
+        togglePrecisionMode("PS2: ");
     }
     if (held(f, Controls::kReverseToggle) && !g_prevPs2.reverse) {
         toggleReverseDrive("PS2: Reverse-Front ON", "PS2: Reverse-Front OFF");

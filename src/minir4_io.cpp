@@ -709,37 +709,19 @@ void MiniR4IO::applyServos(const ServoTargets& targets, uint32_t nowMs) {
     }
     lastServoAttemptMs_ = nowMs;
 
-    // Per-channel sends; stop at first failure so a dead UART blocks at most one timeout per cycle.
-    bool allOk = true;
-    if (send1) {
-        if (MiniR4.RC1.setAngle(static_cast<uint16_t>(safe.rc1Deg))) {
-            lastServos_.rc1Deg = safe.rc1Deg;
-        } else {
-            allOk = false;
-        }
-    }
-    if (allOk && send2) {
-        if (MiniR4.RC2.setAngle(static_cast<uint16_t>(cmdRc2))) {
-            lastServos_.rc2Deg = cmdRc2;
-        } else {
-            allOk = false;
-        }
-    }
-    if (allOk && send3) {
-        const int16_t hwRc3 = RobotLogic::applyServoDirection(safe.rc3Deg, Config::kRc3InvertDir);
-        if (MiniR4.RC3.setAngle(static_cast<uint16_t>(hwRc3))) {
-            lastServos_.rc3Deg = safe.rc3Deg;
-        } else {
-            allOk = false;
-        }
-    }
-    if (allOk && send4) {
-        const int16_t hwRc4 = RobotLogic::applyServoDirection(safe.rc4Deg, Config::kRc4InvertDir);
-        if (MiniR4.RC4.setAngle(static_cast<uint16_t>(hwRc4))) {
-            lastServos_.rc4Deg = safe.rc4Deg;
-        } else {
-            allOk = false;
-        }
+    // One packet carries all four channels, so RC3 and RC4 (and RC1/RC2) start moving on the same
+    // STM32 frame. A single failure costs at most one UART timeout per cycle.
+    const int16_t hwRc3 = RobotLogic::applyServoDirection(safe.rc3Deg, Config::kRc3InvertDir);
+    const int16_t hwRc4 = RobotLogic::applyServoDirection(safe.rc4Deg, Config::kRc4InvertDir);
+    const bool    allOk =
+        mmL.SetAllServoAngle(static_cast<uint16_t>(safe.rc1Deg), static_cast<uint16_t>(cmdRc2),
+                             static_cast<uint16_t>(hwRc3), static_cast<uint16_t>(hwRc4)) ==
+        MMLower::RESULT::OK;
+    if (allOk) {
+        lastServos_.rc1Deg = safe.rc1Deg;
+        lastServos_.rc2Deg = cmdRc2;
+        lastServos_.rc3Deg = safe.rc3Deg;
+        lastServos_.rc4Deg = safe.rc4Deg;
     }
 
     if (allOk) {

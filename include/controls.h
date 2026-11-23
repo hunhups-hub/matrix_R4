@@ -20,6 +20,22 @@
 //     (คีย์ Serial: src/serial_control.cpp, ปุ่มบนบอร์ด: src/minir4_io.cpp)
 //   - รูปแบบแพ็กเก็ตจอย (การถอดรหัส/ตรวจความถูกต้อง) อยู่ใน src/link_failsafe.cpp
 //     และไม่ต้องแก้เมื่อเปลี่ยนปุ่ม
+//   - ถ้าตั้งปุ่มซ้ำกัน build จะหยุดพร้อมข้อความภาษาไทย (ตัวตรวจอยู่ท้ายไฟล์นี้)
+// ============================================================================
+//  ผังปุ่มปัจจุบัน (ถ้าแก้ปุ่มด้านล่าง ให้แก้รูปนี้ตามด้วย):
+//
+//        L2 = กริปเปอร์เปิด (RC1)             R2 = กริปเปอร์ปิด (RC1)
+//        L1 = แขนหน้าลง (RC3+RC4)             R1 = แขนหน้าขึ้น (RC3+RC4)
+//     +-----------------------------------------------------------------+
+//     |     Up   = แขน RC2 ขึ้น              Triangle = เริ่ม Auto      |
+//     |  Left / Right = หมุนละเอียด         Square = สลับดันพื้น        |
+//     |     Down = แขน RC2 ลง               Circle = สลับท่า ถือ/วาง    |
+//     |                                     Cross  = เบรก / ออก Auto    |
+//     |        Select = โหมด Precision    Start = ปุ่มร่วม trim         |
+//     |   (ก้านซ้าย)  L3 = RC2 นุ่ม        R3 = สลับหน้า-หลัง (ก้านขวา) |
+//     +-----------------------------------------------------------------+
+//     ก้านซ้ายแกน Y = เดินหน้า/ถอยหลัง     ก้านขวาแกน X = เลี้ยว
+//     Start + Left / Right = trim -1% / +1%     Start + L3 = รีเซ็ต trim
 // ============================================================================
 
 namespace Controls {
@@ -90,5 +106,39 @@ inline bool held(const Ps2Frame& f, Btn b) {
     }
     return false;
 }
+
+// --- ตัวตรวจปุ่มซ้ำตอน build (ไม่เปลี่ยนการทำงาน ทำงานเฉพาะตอนคอมไพล์) ---------------
+
+/** นับจำนวนหน้าที่ใน list[i..n) ที่ใช้ปุ่ม b */
+constexpr uint8_t countBtn(const Btn* list, uint8_t n, uint8_t i, Btn b) {
+    return (i >= n) ? 0U
+                    : static_cast<uint8_t>((list[i] == b ? 1U : 0U) +
+                                                countBtn(list, n, static_cast<uint8_t>(i + 1U), b));
+}
+
+/** เป็นจริงเมื่อทุกหน้าที่ใน list[i..n) ใช้ปุ่มไม่ซ้ำกัน */
+constexpr bool allUnique(const Btn* list, uint8_t n, uint8_t i) {
+    return (i >= n) || (countBtn(list, n, 0U, list[i]) == 1U && allUnique(list, n, static_cast<uint8_t>(i + 1U)));
+}
+
+// หน้าที่ที่กดใช้แยกกันได้อิสระ จึงต้องเป็นคนละปุ่มทั้งหมด
+// (kTrimLeft / kTrimRight ไม่อยู่ในลิสต์นี้ เพราะใช้คู่กับ kTrimModifier จึงซ้ำ kMicroTurn ได้)
+constexpr Btn kIndependentButtons[] = {
+    kFrontArmsDown, kFrontArmsUp,   kPushGround,     kGripperOpen,
+    kGripperClose,  kPosePreset,    kArmUp,          kArmDown,
+    kPrecisionToggle, kReverseToggle, kSmoothToggle, kTrimModifier,
+    kMicroTurnLeft, kMicroTurnRight, kAutoStart,     kBrakeOrExit,
+};
+constexpr uint8_t kIndependentButtonCount =
+    static_cast<uint8_t>(sizeof(kIndependentButtons) / sizeof(kIndependentButtons[0]));
+
+static_assert(allUnique(kIndependentButtons, kIndependentButtonCount, 0U),
+              "controls.h: มีสองหน้าที่ใช้ปุ่มเดียวกัน ให้แก้ปุ่มทางขวาของ constexpr Btn kXxx ให้ไม่ซ้ำ");
+static_assert(kTrimLeft != kTrimRight,
+              "controls.h: kTrimLeft กับ kTrimRight ต้องเป็นคนละปุ่ม");
+static_assert(kTrimLeft != kTrimModifier && kTrimRight != kTrimModifier,
+              "controls.h: kTrimLeft / kTrimRight ต้องไม่ใช่ปุ่มเดียวกับ kTrimModifier");
+static_assert(kSmoothToggle != kTrimModifier,
+              "controls.h: kSmoothToggle ต้องไม่ใช่ปุ่มเดียวกับ kTrimModifier (ใช้คู่กันเพื่อรีเซ็ต trim)");
 
 } // namespace Controls

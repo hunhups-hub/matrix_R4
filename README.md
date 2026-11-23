@@ -1123,6 +1123,7 @@ flowchart TD
 | `kWdtTimeoutMs` | `3000` | ms | เวลาฮาร์ดแวร์ Watchdog Timer รีเซ็ตระบบหากค้าง (3 วินาที) |
 | `kMotorLeftReverseInit` | `false` | bool | ค่าเริ่มต้นการกลับทิศมอเตอร์ล้อซ้าย `M1` |
 | `kMotorRightReverseInit` | `true` | bool | ค่าเริ่มต้นการกลับทิศมอเตอร์ล้อขวา `M2` |
+| `kNormalMaxPower` | `100` | % | เพดานกำลังสูงสุดเมื่อโยกก้านสุดในโหมดปกติ (ต้องไม่เกิน `kMotorMaxPower = 100`) |
 | `kPrecisionMaxPower` | `55` | % | เพดานกำลังสูงสุดและค่าสเกลเต็มก้านโยกในโหมดช้า Precision Mode |
 | `kPrecisionThrottleExpoPct` / `Turn` | `55` / `60` | % | สัดส่วนความโค้ง Cubic Expo ช่วงนุ่มละเอียดใน Precision Mode |
 | `kPrecisionMicroTurnPower` | `18` | % | กำลังหมุนตัวละเอียด D-Pad ซ้าย/ขวาใน Precision Mode |
@@ -1145,6 +1146,7 @@ flowchart TD
 | `kRc1InitDeg` / `L2` / `R2` | `180` / `180` / `0` | deg | มุมเริ่มต้น, มุมปุ่ม `L2` (กาง/เปิด), และมุมปุ่ม `R2` (หุบ/ปิด) ของเซอร์โวมือจับ `RC1` |
 | `kRc1PresetHoldDeg` / `DropDeg` | `75` / `145` | deg | มุมเซอร์โว `RC1` สำหรับท่าถือเก็บ (`75°`) และท่าวางปล่อย (`145°`) เมื่อกดปุ่ม `Circle` |
 | `kRc2InitDeg` / `StepDeg` | `90` / `10` | deg | มุมเริ่มต้นและก้าวการปรับมุมทีละ `10°` ของเซอร์โวแขนยก `RC2` |
+| `kArmStepIntervalMs` | `50` | ms | คาบขยับแขน `RC2` หนึ่งขั้นเมื่อกด D-Pad ค้าง (ความเร็วแขน = `kRc2StepDeg / kArmStepIntervalMs` = `200°/s`; ต้องไม่น้อยกว่า `25 ms`) |
 | `kRc2InvertDir` | `true` | bool | กลับทิศปุ่ม D-Pad ของ `RC2` (กด UP ลดองศา, กด DOWN เพิ่มองศา) |
 | `kRc2PresetHoldDeg` / `DropDeg` | `70` / `140` | deg | มุมเซอร์โว `RC2` สำหรับท่าถือเก็บ (`70°`) และท่าวางปล่อย (`140°`) เมื่อกดปุ่ม `Circle` |
 | `kRc2SmoothStepDeg` / `Default` | `6` / `true` | deg/tick | ก้าวการกวาดมุมสมูทของ `RC2` (`6°/25ms = 240°/s`) และค่าเริ่มต้นเปิดใช้งาน |
@@ -1177,6 +1179,14 @@ flowchart TD
 | พิน คาบเวลา ขีดจำกัดฮาร์ดแวร์ | [include/config.h](include/config.h) | `kControlPeriodMs`, `kPs2ClkPin` |
 
 หลังแก้ให้รัน `pio test -e native` แล้ว `pio run -e uno_r4_wifi` ตารางพารามิเตอร์ในหัวข้อ 7.4 ด้านบนยังใช้ชื่อค่าคงที่เดิมทุกตัว เพียงแต่ค่าที่ปรับบ่อยย้ายไปอยู่ใน `user_settings.h`
+
+**ปรับค่าการบังคับ (เรียงตามที่แก้บ่อย):**
+
+1. **ความเร็วขับ**: `user_settings.h` หมวด 1 (`kNormalMaxPower`, `kPrecisionMaxPower`, `kMicroTurnPower`, `kTurnMaxRatioPct`)
+2. **มุมเซอร์โว / แขนยก**: `user_settings.h` หมวด 2 แยกเป็น 2.1 RC1 กริปเปอร์, 2.2 RC2 แขนยก (รวม `kRc2StepDeg` กับ `kArmStepIntervalMs`), 2.3 RC3+RC4 แขนหน้า แต่ละบรรทัดบอกปุ่มที่สั่ง
+3. **ปุ่มจอย**: `controls.h` มีรูปผังจอยที่หัวไฟล์
+
+คอมเมนต์ของแต่ละค่าบอกช่วงที่ใช้ได้และผลเมื่อเพิ่มค่า ถ้าใส่ค่านอกช่วง (เช่นมุมเซอร์โวเกิน `0..180`) หรือตั้งสองหน้าที่ให้ใช้ปุ่มเดียวกัน `pio run` จะหยุดพร้อมข้อความภาษาไทยบอกว่าต้องแก้ค่าไหน ตัวตรวจค่าอยู่ท้าย `config.h` และตัวตรวจปุ่มอยู่ท้าย `controls.h` ตัวตรวจทั้งสองทำงานเฉพาะตอนคอมไพล์ ไม่เปลี่ยนการทำงานของหุ่น
 
 ---
 
