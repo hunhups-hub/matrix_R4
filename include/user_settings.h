@@ -60,7 +60,7 @@ constexpr uint32_t kPoseDropReleaseDelayMs = 600UL;   // ปุ่ม Circle: �
 
 // --- 2.1b) ท่าปุ่ม Triangle (kTrianglePose): กดครั้งเดียวตั้งมุมแล้วค้างไว้ ---
 constexpr int16_t  kRcTrianglePoseRc1Deg   = 100;     // RC1 (แขน R1) 0..180
-constexpr int16_t  kRcTrianglePoseRc2Deg   = 140;     // RC2 (แขน R2) ช่วง kRc2MinDeg..kRc2MaxDeg
+constexpr int16_t  kRcTrianglePoseRc2Deg   = 100;    // RC2 (แขน R2) ช่วง kRc2MinDeg..kRc2MaxDeg
 
 // --- 2.2) RC2 แขนยก  (ปุ่ม kArmUp / kArmDown / kPosePreset / kSmoothToggle) ---
 //  ความเร็วแขนเมื่อกดค้าง = kRc2StepDeg / kArmStepIntervalMs

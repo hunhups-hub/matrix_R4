@@ -1656,7 +1656,7 @@ void test_precision_mode_full_stick_scaling_and_micro_turn(void) {
     TEST_ASSERT_NOT_NULL(strstr(NativeSerial::output(), "prec=1"));
 }
 
-void test_triangle_sets_rc2_140_and_rc1_100(void) {
+void test_triangle_sets_rc2_100_and_rc1_100(void) {
     ServoTargets       servos{};
     FrontArmPushState  pushState{};
     ArmPosePresetState poseState{};
@@ -1665,7 +1665,7 @@ void test_triangle_sets_rc2_140_and_rc1_100(void) {
     fTri.triangle = true;
     RobotLogic::updateServoTargetsFromPs2(fTri, servos, false, &pushState, &poseState);
     TEST_ASSERT_EQUAL_INT16(100, servos.rc1Deg);
-    TEST_ASSERT_EQUAL_INT16(140, servos.rc2Deg);
+    TEST_ASSERT_EQUAL_INT16(100, servos.rc2Deg);
 
     // Holding Triangle does not override a later R2 gripper command
     Ps2Frame fR2 = fTri;
@@ -2119,7 +2119,7 @@ int main(int argc, char** argv) {
     RUN_TEST(test_2dof_kinodynamic_slew_and_coulomb_stiction);
     RUN_TEST(test_kinodynamic_drive_reverse_front_and_dpad_micro_turn);
     RUN_TEST(test_precision_mode_full_stick_scaling_and_micro_turn);
-    RUN_TEST(test_triangle_sets_rc2_140_and_rc1_100);
+    RUN_TEST(test_triangle_sets_rc2_100_and_rc1_100);
     RUN_TEST(test_circle_pose_preset_and_serial_competition_shortcuts);
 
     // 10. Phase 2: RC2 Smooth Trajectory, Motor Trim, EEPROM CRC-16, Auto Stall Detection
