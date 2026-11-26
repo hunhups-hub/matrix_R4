@@ -162,7 +162,6 @@ void latchAllPs2Edges(bool valid) {
 
 void syncPs2Snapshot() {
     g_snap.ps2Link      = g_linkSm.state();
-    g_snap.ps2Glitching = g_linkSm.isLinkGlitching();
     g_snap.ps2Mode      = g_lastPs2Frame.modeId;
     g_snap.ps2Sync      = g_lastPs2Frame.syncByte;
     g_snap.ps2Ly        = g_lastPs2Frame.ly;
@@ -625,7 +624,7 @@ void runAutoSession(uint32_t nowMs) {
         g_armPushState.active = false;
     }
 
-    g_io.restoreAfterAuto(exitMs);
+    g_io.restoreAfterAuto();
     g_stallDet.reset();
     g_snap.drive           = {0, 0};
     g_snap.holdBrakeActive = g_io.isBrakeEngaged();

@@ -88,11 +88,11 @@ bool isPs2FrameValid(const Ps2Frame& frame) {
 bool shouldStartAutoMode(bool sysReady,
                          bool ps2Operational,
                          bool frameValid,
-                         bool trianglePressed,
-                         bool prevTrianglePressed,
+                         bool autoStartPressed,
+                         bool prevAutoStartPressed,
                          bool crossPressed) {
     return sysReady && ps2Operational && frameValid &&
-           trianglePressed && !prevTrianglePressed && !crossPressed;
+           autoStartPressed && !prevAutoStartPressed && !crossPressed;
 }
 
 bool shouldAbortAutoMode(bool frameValid, bool crossPressed) {

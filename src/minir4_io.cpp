@@ -378,8 +378,7 @@ void MiniR4IO::pollButtons(uint32_t nowMs, ButtonEvents& outEvents) {
         pollUpTurn_ = !pollUpTurn_;
     }
 
-    outEvents.upPressed   = btnUp_.stableState;
-    outEvents.downPressed = btnDown_.stableState;
+    outEvents.upPressed = btnUp_.stableState;
 
     // E-stop must fire the instant BTN_DOWN is pressed (never suppressed, never waits for release).
     // The press is consumed here so releasing the button does not emit a second shortDown event.
@@ -643,8 +642,7 @@ void MiniR4IO::forceMotorsStop(bool engageBrake, uint32_t nowMs, bool forceImmed
     }
 }
 
-void MiniR4IO::restoreAfterAuto(uint32_t nowMs) {
-    (void)nowMs;
+void MiniR4IO::restoreAfterAuto() {
     // Restore deterministic PS2 bit-bang SPI pins & DAT pull-up in case D2/D3 or MiniR4.PS2 ran.
     ps2_.restorePins();
 
@@ -718,10 +716,7 @@ void MiniR4IO::applyServos(const ServoTargets& targets, uint32_t nowMs) {
         lastServos_.rc1Deg = safe.rc1Deg;
         lastServos_.rc2Deg = cmdRc2;
         lastServos_.rc3Deg = safe.rc3Deg;
-    }
-
-    if (allOk) {
-        lastServoSendMs_ = nowMs;
+        lastServoSendMs_   = nowMs;
         servosSynced_    = true;
     } else {
         servosSynced_       = false;

@@ -285,7 +285,6 @@ void pollExitControls(uint32_t nowMs) {
     }
 
     s_snap->ps2Link      = s_linkSm->state();
-    s_snap->ps2Glitching = s_linkSm->isLinkGlitching();
     s_snap->ps2Mode      = s_lastFrame->modeId;
     s_snap->ps2Sync      = s_lastFrame->syncByte;
     s_snap->ps2Ly        = s_lastFrame->ly;

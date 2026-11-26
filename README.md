@@ -860,7 +860,7 @@ matrix_R4/
 │   ├── main.cpp                                # [21] จุดเริ่มต้นโปรแกรม (setup/loop), 40 Hz Scheduler, Auto และ Bootloader
 │   ├── robot_logic.cpp                         # [22] [Pure] จลนพลศาสตร์การขับ, Slew, Sag และการคำนวณมอเตอร์
 │   ├── persistent_config.cpp                   # [23] [Pure] CRC-16 และแพ็ก/ถอดรหัส EEPROM
-│   ├── auto_heading.cpp                        # [24] [Pure] ManualStallDetector และซิงก์ทิศมอเตอร์ Auto
+│   ├── stall_detect.cpp                        # [24] [Pure] ManualStallDetector และซิงก์ทิศมอเตอร์ Auto
 │   ├── servo_logic.cpp                         # [25] [Pure] เป้าหมายเซอร์โว, พรีเซ็ต, ท่ากลับทิศ
 │   ├── link_failsafe.cpp                       # [26] [Pure] ถอดรหัสแพ็กเก็ต PS2 และ FailsafeStateMachine
 │   ├── power_stability.cpp                     # [27] [Pure] BatteryStabilizer และ StabilityMonitor
@@ -881,7 +881,7 @@ matrix_R4/
 > **อัปเดตโครงสร้าง**: `src/robot_logic.cpp` ถูกแยกเป็น 6 ไฟล์ลอจิกบริสุทธิ์ (Pure C++11, คอมไพล์ใน `env:native` ทั้งหมด) โดย `robot_logic.h` ยังเป็นอินเทอร์เฟซเดียวเหมือนเดิม:
 > - `robot_logic.cpp` — จลนพลศาสตร์การขับและ Slew
 > - `persistent_config.cpp` — CRC-16 และแพ็ก/ถอดรหัส EEPROM
-> - `auto_heading.cpp` — `ManualStallDetector`, ซิงก์ทิศมอเตอร์ Auto
+> - `stall_detect.cpp` — `ManualStallDetector`, ซิงก์ทิศมอเตอร์ Auto
 > - `servo_logic.cpp` — เป้าหมายเซอร์โว, พรีเซ็ต, ท่ากลับทิศ
 > - `link_failsafe.cpp` — ถอดรหัสแพ็กเก็ต PS2 และ `FailsafeStateMachine`
 > - `power_stability.cpp` — `BatteryStabilizer` และ `StabilityMonitor`
@@ -901,7 +901,7 @@ matrix_R4/
 2. **`[env:native]` (Target จำลองบนคอมพิวเตอร์โฮสต์)**:
    - `platform = native`, `platform_packages = platformio/toolchain-gccmingw32@^1.40900.0`
    - `build_flags = -std=c++11 -Wall -Wextra -Werror -Iinclude`
-   - `build_src_filter` รวม 7 ไฟล์ (`robot_logic`, `persistent_config`, `auto_heading`, `servo_logic`, `link_failsafe`, `power_stability`, `serial_control`) และ `test_build_src = yes`: ดึงโมดูลลอจิกบริสุทธิ์และตัวแยกคำสั่ง Serial มาคอมไพล์รันชุดทดสอบทั้ง 44 ข้อบนคอมพิวเตอร์ได้โดยตรงโดยไม่ต้องต่อบอร์ดจริง
+   - `build_src_filter` รวม 7 ไฟล์ (`robot_logic`, `persistent_config`, `stall_detect`, `servo_logic`, `link_failsafe`, `power_stability`, `serial_control`) และ `test_build_src = yes`: ดึงโมดูลลอจิกบริสุทธิ์และตัวแยกคำสั่ง Serial มาคอมไพล์รันชุดทดสอบทั้ง 44 ข้อบนคอมพิวเตอร์ได้โดยตรงโดยไม่ต้องต่อบอร์ดจริง
 
 ##### 7.2.2 [README.md](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/README.md) — คู่มือการใช้งานและเอกสารวิศวกรรมฉบับสมบูรณ์ภาษาไทย
 ไฟล์เอกสารคู่มือฉบับสมบูรณ์ที่คุณกำลังอ่านอยู่นี้ ครอบคลุมตั้งแต่สถาปัตยกรรมระบบ, ผังพิน, การติดตั้ง PlatformIO, คู่มือการบังคับด้วยจอยสติ๊กและคีย์บอร์ด, การวางโค้ดโหมดอัตโนมัติจาก MATRIXblock R4, แบบจำลองฟิสิกส์จลนพลศาสตร์ 5 ขั้นตอน, คำอธิบายโค้ดครบทั้ง 36 ไฟล์ ไปจนถึงการแก้ไขปัญหาหน้างาน

@@ -50,14 +50,13 @@ public:
     bool isBrakeEngaged() const { return lastBrakeEngaged_; }
 
     /** Restores PS2 pins, STM32 motor polarity/ranges, and stops all motors after Auto exits. */
-    void restoreAfterAuto(uint32_t nowMs);
+    void restoreAfterAuto();
 
     /** Sends servo targets RC1..RC3 when changed, unsynced, or on periodic keepalive. */
     void applyServos(const ServoTargets& targets, uint32_t nowMs);
 
     /** Enables or disables smooth trajectory slew limiting strictly for arm RC2. */
     void setRc2SmoothEnabled(bool enabled) { rc2SmoothEnabled_ = enabled; }
-    bool rc2SmoothEnabled() const { return rc2SmoothEnabled_; }
 
     /** Synchronizes cached servo angles (e.g. after Auto mode modifies servos directly). */
     void syncServoCache(const ServoTargets& current);

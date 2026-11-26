@@ -36,7 +36,7 @@ Bootloader entry if upload cannot find the port: hold BTN_UP + BTN_DOWN for
 ## Architecture
 
 - **Host-testable pure C++11**: `src/serial_control.cpp` and the six `RobotLogic` files
-  (`robot_logic`, `persistent_config`, `auto_heading`, `servo_logic`, `link_failsafe`,
+  (`robot_logic`, `persistent_config`, `stall_detect`, `servo_logic`, `link_failsafe`,
   `power_stability`), all declared in `include/robot_logic.h`. These are the only sources in
   the `native` `build_src_filter` (add new pure files there). Keep them free of Arduino
   and hardware headers.

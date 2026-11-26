@@ -212,8 +212,8 @@ bool isPs2FrameValid(const Ps2Frame& frame);
 bool shouldStartAutoMode(bool sysReady,
                          bool ps2Operational,
                          bool frameValid,
-                         bool trianglePressed,
-                         bool prevTrianglePressed,
+                         bool autoStartPressed,
+                         bool prevAutoStartPressed,
                          bool crossPressed);
 
 /** Returns true when a valid PS2 frame reports Cross (X) pressed to exit Auto mode. */

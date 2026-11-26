@@ -101,7 +101,6 @@ struct PersistentConfig {
 
 struct ButtonEvents {
     bool  upPressed          = false;
-    bool  downPressed        = false;
     bool  shortUp            = false;
     bool  shortDown          = false;
     bool  downPressEdge      = false; // Debounced BTN_DOWN press (fires immediately, not on release)
@@ -126,7 +125,6 @@ struct SystemSnapshot {
     uint8_t       ps2Sync        = 0xFF;
     uint8_t       ps2Ly          = 128;
     uint8_t       ps2Rx          = 128;
-    bool          ps2Glitching   = false;
     ControlSource activeSource   = ControlSource::None;
     bool          precisionMode  = false;
     bool          reverseDrive   = false;
