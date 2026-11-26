@@ -17,6 +17,12 @@ Ps2Frame makeValidFrame(uint8_t ly = 128U, uint8_t rx = 128U) {
 
 } // namespace
 
+// Feeds raw serial input then polls once; the usual one-step driver for SerialControl tests.
+static void feedPoll(SerialControl& sc, const char* data, uint32_t nowMs, int16_t speedPct, SerialActions& act) {
+    NativeSerial::feed(data);
+    sc.poll(nowMs, speedPct, act);
+}
+
 void setUp(void) {
     NativeSerial::reset();
 }
@@ -1178,8 +1184,7 @@ void test_serial_wasd_hold_expiry_and_stop(void) {
     sc.begin(115200UL);
 
     // Lowercase & uppercase WASD
-    NativeSerial::feed("w");
-    sc.poll(1000UL, 60, act);
+    feedPoll(sc, "w", 1000UL, 60, act);
     TEST_ASSERT_TRUE(act.driveCmd.active);
     TEST_ASSERT_EQUAL_INT16(60, act.driveCmd.targetLeft);
     TEST_ASSERT_EQUAL_INT16(60, act.driveCmd.targetRight);
@@ -1192,30 +1197,25 @@ void test_serial_wasd_hold_expiry_and_stop(void) {
     TEST_ASSERT_EQUAL_INT16(0, act.driveCmd.targetLeft);
     TEST_ASSERT_EQUAL_INT16(0, act.driveCmd.targetRight);
 
-    NativeSerial::feed("S");
-    sc.poll(2000UL, 55, act);
+    feedPoll(sc, "S", 2000UL, 55, act);
     TEST_ASSERT_TRUE(act.driveCmd.active);
     TEST_ASSERT_EQUAL_INT16(-55, act.driveCmd.targetLeft);
     TEST_ASSERT_EQUAL_INT16(-55, act.driveCmd.targetRight);
 
     // Space immediately stops
-    NativeSerial::feed(" ");
-    sc.poll(2050UL, 55, act);
+    feedPoll(sc, " ", 2050UL, 55, act);
     TEST_ASSERT_FALSE(act.driveCmd.active);
 
-    NativeSerial::feed("a");
-    sc.poll(2100UL, 45, act);
+    feedPoll(sc, "a", 2100UL, 45, act);
     TEST_ASSERT_TRUE(act.driveCmd.active);
     TEST_ASSERT_EQUAL_INT16(-45, act.driveCmd.targetLeft);
     TEST_ASSERT_EQUAL_INT16(45, act.driveCmd.targetRight);
 
     // 'X' immediately stops
-    NativeSerial::feed("X");
-    sc.poll(2150UL, 45, act);
+    feedPoll(sc, "X", 2150UL, 45, act);
     TEST_ASSERT_FALSE(act.driveCmd.active);
 
-    NativeSerial::feed("D");
-    sc.poll(2200UL, 50, act);
+    feedPoll(sc, "D", 2200UL, 50, act);
     TEST_ASSERT_TRUE(act.driveCmd.active);
     TEST_ASSERT_EQUAL_INT16(50, act.driveCmd.targetLeft);
     TEST_ASSERT_EQUAL_INT16(-50, act.driveCmd.targetRight);
@@ -1231,8 +1231,7 @@ void test_serial_direct_motor_bounds_and_garbage_rejection(void) {
     SerialActions act{};
 
     // Adversarial clamping on m 99999 -99999
-    NativeSerial::feed("m 99999 -99999\n");
-    sc.poll(1000UL, 60, act);
+    feedPoll(sc, "m 99999 -99999\n", 1000UL, 60, act);
     TEST_ASSERT_TRUE(act.driveCmd.active);
     TEST_ASSERT_EQUAL_INT16(100, act.driveCmd.targetLeft);
     TEST_ASSERT_EQUAL_INT16(-100, act.driveCmd.targetRight);
@@ -1244,8 +1243,7 @@ void test_serial_direct_motor_bounds_and_garbage_rejection(void) {
     TEST_ASSERT_FALSE(act.driveCmd.active);
 
     // Uppercase 'M', comma separator, trailing spaces accepted
-    NativeSerial::feed("M -45, 75  \r\n");
-    sc.poll(4000UL, 60, act);
+    feedPoll(sc, "M -45, 75  \r\n", 4000UL, 60, act);
     TEST_ASSERT_TRUE(act.driveCmd.active);
     TEST_ASSERT_EQUAL_INT16(-45, act.driveCmd.targetLeft);
     TEST_ASSERT_EQUAL_INT16(75, act.driveCmd.targetRight);
@@ -1261,8 +1259,7 @@ void test_serial_direct_motor_bounds_and_garbage_rejection(void) {
     };
     for (size_t i = 0U; i < sizeof(badMotorLines) / sizeof(badMotorLines[0]); ++i) {
         NativeSerial::reset();
-        NativeSerial::feed(badMotorLines[i]);
-        sc.poll(5000UL + static_cast<uint32_t>(i * 50U), 60, act);
+        feedPoll(sc, badMotorLines[i], 5000UL + static_cast<uint32_t>(i * 50U), 60, act);
         TEST_ASSERT_FALSE(act.driveCmd.active);
         TEST_ASSERT_NOT_NULL(strstr(NativeSerial::output(), "Unknown line"));
     }
@@ -1272,21 +1269,18 @@ void test_serial_servo_commands_and_flip_exact_match(void) {
     SerialControl sc;
     SerialActions act{};
 
-    NativeSerial::feed("c 1 135\n");
-    sc.poll(1000UL, 60, act);
+    feedPoll(sc, "c 1 135\n", 1000UL, 60, act);
     TEST_ASSERT_TRUE(act.hasDirectServo);
     TEST_ASSERT_EQUAL_UINT8(1U, act.directServoCh);
     TEST_ASSERT_EQUAL_INT16(135, act.directServoDeg);
 
     // Uppercase 'C', adversarial degree clamping
-    NativeSerial::feed("C 3, 99999\r\n");
-    sc.poll(1050UL, 60, act);
+    feedPoll(sc, "C 3, 99999\r\n", 1050UL, 60, act);
     TEST_ASSERT_TRUE(act.hasDirectServo);
     TEST_ASSERT_EQUAL_UINT8(3U, act.directServoCh);
     TEST_ASSERT_EQUAL_INT16(180, act.directServoDeg);
 
-    NativeSerial::feed("c 2 -50  \n");
-    sc.poll(1100UL, 60, act);
+    feedPoll(sc, "c 2 -50  \n", 1100UL, 60, act);
     TEST_ASSERT_TRUE(act.hasDirectServo);
     TEST_ASSERT_EQUAL_UINT8(2U, act.directServoCh);
     TEST_ASSERT_EQUAL_INT16(0, act.directServoDeg);
@@ -1299,36 +1293,30 @@ void test_serial_servo_commands_and_flip_exact_match(void) {
         "c 2 45 90\n",
     };
     for (size_t i = 0U; i < sizeof(badServoLines) / sizeof(badServoLines[0]); ++i) {
-        NativeSerial::feed(badServoLines[i]);
-        sc.poll(1200UL + static_cast<uint32_t>(i * 25U), 60, act);
+        feedPoll(sc, badServoLines[i], 1200UL + static_cast<uint32_t>(i * 25U), 60, act);
         TEST_ASSERT_FALSE(act.hasDirectServo);
     }
 
     // Exact f1/f2 (case-insensitive & trailing spaces allowed)
-    NativeSerial::feed("f1\n");
-    sc.poll(2000UL, 60, act);
+    feedPoll(sc, "f1\n", 2000UL, 60, act);
     TEST_ASSERT_TRUE(act.toggleLeftReverse);
     TEST_ASSERT_FALSE(act.toggleRightReverse);
 
-    NativeSerial::feed("F2  \r\n");
-    sc.poll(2050UL, 60, act);
+    feedPoll(sc, "F2  \r\n", 2050UL, 60, act);
     TEST_ASSERT_FALSE(act.toggleLeftReverse);
     TEST_ASSERT_TRUE(act.toggleRightReverse);
 
     // Reject trailing garbage on f1/f2
-    NativeSerial::feed("f1foo\n");
-    sc.poll(2100UL, 60, act);
+    feedPoll(sc, "f1foo\n", 2100UL, 60, act);
     TEST_ASSERT_FALSE(act.toggleLeftReverse);
     TEST_ASSERT_FALSE(act.toggleRightReverse);
 
-    NativeSerial::feed("f2bar\n");
-    sc.poll(2150UL, 60, act);
+    feedPoll(sc, "f2bar\n", 2150UL, 60, act);
     TEST_ASSERT_FALSE(act.toggleLeftReverse);
     TEST_ASSERT_FALSE(act.toggleRightReverse);
 
     // "f " must abort dangling line collection AND stop active drive motion
-    NativeSerial::feed("wf ");
-    sc.poll(2200UL, 60, act);
+    feedPoll(sc, "wf ", 2200UL, 60, act);
     TEST_ASSERT_FALSE(sc.isCollectingLine());
     TEST_ASSERT_FALSE(act.driveCmd.active);
 }
@@ -1338,20 +1326,17 @@ void test_serial_speed_batching_timeout_and_estop_interrupt(void) {
     SerialActions act{};
 
     // Multiple ']' in one poll batch step cumulatively (+15% each)
-    NativeSerial::feed("]]");
-    sc.poll(1000UL, 60, act);
+    feedPoll(sc, "]]", 1000UL, 60, act);
     TEST_ASSERT_TRUE(act.speedPctChanged);
     TEST_ASSERT_EQUAL_INT16(90, act.newSpeedPct);
 
     // Multiple '[' in one poll batch clamp at kSerialMinSpeed (20%)
-    NativeSerial::feed("[[[[");
-    sc.poll(1050UL, 60, act);
+    feedPoll(sc, "[[[[", 1050UL, 60, act);
     TEST_ASSERT_TRUE(act.speedPctChanged);
     TEST_ASSERT_EQUAL_INT16(Config::kSerialMinSpeed, act.newSpeedPct);
 
     // Speed change + immediate drive in one batch uses new speed right away
-    NativeSerial::feed("]w");
-    sc.poll(1100UL, 60, act);
+    feedPoll(sc, "]w", 1100UL, 60, act);
     TEST_ASSERT_TRUE(act.speedPctChanged);
     TEST_ASSERT_EQUAL_INT16(75, act.newSpeedPct);
     TEST_ASSERT_TRUE(act.driveCmd.active);
@@ -1360,36 +1345,30 @@ void test_serial_speed_batching_timeout_and_estop_interrupt(void) {
     sc.stopMotion();
 
     // Line timeout (1500 ms): abandoned "m 50" expires cleanly before new single-key command
-    NativeSerial::feed("m 50");
-    sc.poll(2000UL, 60, act);
+    feedPoll(sc, "m 50", 2000UL, 60, act);
     TEST_ASSERT_TRUE(sc.isCollectingLine());
     TEST_ASSERT_EQUAL_UINT8(4U, sc.lineLen());
 
-    NativeSerial::feed("w");
-    sc.poll(2000UL + Config::kLineTimeoutMs, 60, act);
+    feedPoll(sc, "w", 2000UL + Config::kLineTimeoutMs, 60, act);
     TEST_ASSERT_FALSE(sc.isCollectingLine());
     TEST_ASSERT_TRUE(act.driveCmd.active);
     TEST_ASSERT_EQUAL_INT16(60, act.driveCmd.targetLeft);
     sc.stopMotion();
 
     // '!' interrupts an active line buffer immediately and prevents stale line replay on '\n'
-    NativeSerial::feed("m 80 ");
-    sc.poll(4000UL, 60, act);
+    feedPoll(sc, "m 80 ", 4000UL, 60, act);
     TEST_ASSERT_TRUE(sc.isCollectingLine());
 
-    NativeSerial::feed("80!\n");
-    sc.poll(4020UL, 60, act);
+    feedPoll(sc, "80!\n", 4020UL, 60, act);
     TEST_ASSERT_TRUE(act.estopRequested);
     TEST_ASSERT_FALSE(sc.isCollectingLine());
     TEST_ASSERT_FALSE(act.driveCmd.active);
 
     // Single-key actions + telemetry print smoke verification
-    NativeSerial::feed("R");
-    sc.poll(4100UL, 60, act);
+    feedPoll(sc, "R", 4100UL, 60, act);
     TEST_ASSERT_TRUE(act.resumeRequested);
 
-    NativeSerial::feed("IKJLOPT");
-    sc.poll(4150UL, 60, act);
+    feedPoll(sc, "IKJLOPT", 4150UL, 60, act);
     TEST_ASSERT_TRUE(act.armUpStep);
     TEST_ASSERT_TRUE(act.armDownStep);
     TEST_ASSERT_TRUE(act.gripOpen);
@@ -1414,8 +1393,8 @@ void test_serial_speed_batching_timeout_and_estop_interrupt(void) {
     TEST_ASSERT_NOT_NULL(strstr(NativeSerial::output(), "src=AUTO"));
 }
 
-void test_auto_mode_triangle_start_and_cross_exit(void) {
-    // Starts ONLY on a rising Triangle press while Ready, PS2 Operational, valid frame, and X clear.
+void test_auto_mode_start_edge_and_cross_exit(void) {
+    // Starts ONLY on a rising Start (Controls::kAutoStart) press while Ready, PS2 Operational, valid frame, and X clear.
     TEST_ASSERT_TRUE(RobotLogic::shouldStartAutoMode(true, true, true, true, false, false));
 
     // Must NOT start if held from previous tick (edge trigger), ESTOP, disconnected/sync, invalid, or X held.
@@ -1764,8 +1743,7 @@ void test_circle_pose_preset_and_serial_competition_shortcuts(void) {
     // Verify new Serial competition shortcuts: 'g' (Auto), 'z' (Precision), 'b' (Reverse), 'q' (Pose)
     SerialControl sc;
     SerialActions act{};
-    NativeSerial::feed("gzbq");
-    sc.poll(5000UL, 65, act);
+    feedPoll(sc, "gzbq", 5000UL, 65, act);
     TEST_ASSERT_TRUE(act.autoStartRequested);
     TEST_ASSERT_TRUE(act.togglePrecision);
     TEST_ASSERT_TRUE(act.toggleReverseDrive);
@@ -1912,8 +1890,7 @@ void test_serial_phase2_trim_and_rc2_smooth_keys(void) {
     SerialControl sc;
     SerialActions act{};
 
-    NativeSerial::feed(",.0y");
-    sc.poll(6000UL, 65, act);
+    feedPoll(sc, ",.0y", 6000UL, 65, act);
     TEST_ASSERT_TRUE(act.trimLeftStep);
     TEST_ASSERT_TRUE(act.trimRightStep);
     TEST_ASSERT_TRUE(act.trimReset);
@@ -2001,8 +1978,7 @@ void test_serial_estop_batch_help_and_telemetry_fields(void) {
     SerialActions act{};
 
     // 1. ESTOP '!' followed by drive key 'w' in the same RX batch must keep driveCmd stopped.
-    NativeSerial::feed("!w");
-    sc.poll(7000UL, 80, act);
+    feedPoll(sc, "!w", 7000UL, 80, act);
     TEST_ASSERT_TRUE(act.estopRequested);
     TEST_ASSERT_FALSE(act.driveCmd.active);
     TEST_ASSERT_EQUAL_INT16(0, act.driveCmd.targetLeft);
@@ -2010,8 +1986,7 @@ void test_serial_estop_batch_help_and_telemetry_fields(void) {
 
     // 2. Help text accurately matches o=180 / p=0 and documents 'v' I2C diag.
     NativeSerial::reset();
-    NativeSerial::feed("?");
-    sc.poll(7050UL, 80, act);
+    feedPoll(sc, "?", 7050UL, 80, act);
     TEST_ASSERT_NOT_NULL(strstr(NativeSerial::output(), "Aux RC1 180 / 0 deg"));
     TEST_ASSERT_NOT_NULL(strstr(NativeSerial::output(), "I2C diag"));
 
@@ -2473,7 +2448,7 @@ int main(int argc, char** argv) {
     RUN_TEST(test_serial_speed_batching_timeout_and_estop_interrupt);
 
     // 8. Auto Mode Trigger & Abort Logic
-    RUN_TEST(test_auto_mode_triangle_start_and_cross_exit);
+    RUN_TEST(test_auto_mode_start_edge_and_cross_exit);
 
     // 9. Physics Kinodynamic & Electromechanical Models + Competition Controls
     RUN_TEST(test_cubic_expo_shaping_symmetry_and_bounds);
