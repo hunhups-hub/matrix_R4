@@ -43,10 +43,10 @@ bool MiniR4IO::begin() {
     const bool lowerOk = (mmL.Init() == MMLower::RESULT::OK);
 
     // Always initialize UNO R4 onboard peripherals regardless of STM32 link state.
-    MiniR4.LED.begin(7);
+    MiniR4.LED.begin(Config::kLedPin);
     MiniR4.LED.setColor(1, 0, 0, 0);
     MiniR4.LED.setColor(2, 0, 0, 0);
-    MiniR4.Buzzer.begin(6);
+    MiniR4.Buzzer.begin(Config::kBuzzerPin);
 
     // Arm Wire1 timeout before OLED init so a shorted/hung I2C1 bus cannot stall boot.
     Wire1.begin();

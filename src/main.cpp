@@ -268,7 +268,7 @@ void togglePosePreset() {
     g_oled.showBootloaderScreen();
     g_serial.printEvent("BOOT", source ? source : "Entering upload bootloader...");
     Serial.flush();
-    delay(120);
+    delay(Config::kBootloaderFlushDelayMs);
     WDT.refresh();
 
 #ifdef NO_USB
@@ -969,7 +969,7 @@ bool initPs2Link(uint32_t nowMs) {
                 break;
             }
             if (i + 1U < Config::kPs2StableFrames) {
-                delay(4);
+                delay(Config::kBootPs2FrameGapMs);
             }
         }
         latchAllPs2Edges(bootValid);

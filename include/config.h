@@ -43,6 +43,12 @@ constexpr uint8_t  kMotorRightId           = 2U;
 constexpr int16_t  kMotorMinPower          = -100;
 constexpr int16_t  kMotorMaxPower          = 100;
 
+// --- พินบอร์ดและดีเลย์ตายตัว -------------------------------------------------
+constexpr uint8_t  kLedPin                 = 7U;      // D7 WS2812B ในตัว
+constexpr uint8_t  kBuzzerPin              = 6U;      // D6 บัซเซอร์ในตัว
+constexpr uint32_t kBootloaderFlushDelayMs = 120UL;   // รอให้ Serial/จอแสดงผลเสร็จก่อนกระโดดเข้า bootloader
+constexpr uint32_t kBootPs2FrameGapMs      = 4UL;     // เว้นช่วงระหว่างเฟรม PS2 ตอนบูต
+
 // --- OLED SSD1306 128x32 และบัส I2C Wire1 (ตายตัวตามบอร์ด) -----------------
 constexpr uint8_t  kOledWidth              = 128U;
 constexpr uint8_t  kOledHeight             = 32U;
