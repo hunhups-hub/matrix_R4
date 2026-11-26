@@ -219,8 +219,8 @@ void SerialControl::printHelp() {
     Serial.println(F("  Space / x : Instant STOP motors   | ! : ESTOP | r : Resume | g : Run AUTO"));
     Serial.println(F("  z / b     : Toggle Precision(55% session) / Reverse-Front | [ / ] : Speed -/+ 15%"));
     Serial.println(F("  , / . / 0 : Motor Balance Trim L(-1%)/R(+1%)/Reset(0%) (saved to EEPROM)"));
-    Serial.println(F("  i / k / y : RC2 Up(-10)/Dn(+10)/Toggle Smooth RC2 | j / l : Front RC3+RC4"));
-    Serial.println(F("  o / p     : Aux RC1 180 / 0 deg | q : Toggle Hold/Drop | c <1..4> <deg>"));
+    Serial.println(F("  i / k / y : RC2 Up(-10)/Dn(+10)/Toggle Smooth RC2 | j / l : Front RC3"));
+    Serial.println(F("  o / p     : Aux RC1 180 / 0 deg | q : Toggle Hold/Drop | c <1..3> <deg>"));
     Serial.println(F("  m <L> <R> : Direct M1/M2 (-100..100 for 2.5s) | f1 / f2 : Flip M1/M2 dir"));
     Serial.println(F("  t / v     : Toggle status stream / I2C diag | u : Bootloader | ? : Help\n"));
 }
@@ -228,7 +228,7 @@ void SerialControl::printHelp() {
 void SerialControl::printBanner() {
     Serial.println(F("\n================================================"));
     Serial.println(F("  MATRIX Mini R4 Robot Firmware Ready"));
-    Serial.println(F("  Drive: M1(L) + M2(R) | Servos: RC1..RC4"));
+    Serial.println(F("  Drive: M1(L) + M2(R) | Servos: RC1..RC3"));
     Serial.println(F("  PS2/MJ2: D2(4p) + D3(2p) | Auto: START btn=Run, X=Exit"));
     Serial.println(F("  Upload: BTN UP+DOWN 2.5s or 'u'"));
     Serial.println(F("================================================"));
@@ -302,8 +302,6 @@ void SerialControl::printSnapshot(const SystemSnapshot& snap) {
     Serial.print(snap.servos.rc2Deg);
     Serial.print(',');
     Serial.print(snap.servos.rc3Deg);
-    Serial.print(',');
-    Serial.print(snap.servos.rc4Deg);
     Serial.print(F(") spd="));
     Serial.print(snap.serialSpeedPct);
     Serial.print(F("% rngErr="));
@@ -377,7 +375,7 @@ void SerialControl::parseLineCommand(uint32_t nowMs, SerialActions& outActions) 
         const char* p1     = skipArgSep(lineBuf_ + 1);
         char*       endPtr = nullptr;
         const long  ch     = strtol(p1, &endPtr, 10);
-        if (endPtr != nullptr && endPtr != p1 && ch >= 1L && ch <= 4L && isSepChar(*endPtr)) {
+        if (endPtr != nullptr && endPtr != p1 && ch >= 1L && ch <= 3L && isSepChar(*endPtr)) {
             const char* p2      = skipArgSep(endPtr);
             char*       endPtr2 = nullptr;
             const long  deg     = strtol(p2, &endPtr2, 10);

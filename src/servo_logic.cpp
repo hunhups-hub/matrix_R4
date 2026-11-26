@@ -24,7 +24,6 @@ ServoTargets clampServoTargets(const ServoTargets& targets) {
     clamped.rc1Deg = clamp16(targets.rc1Deg, Config::kServoMinDeg, Config::kServoMaxDeg);
     clamped.rc2Deg = clamp16(targets.rc2Deg, Config::kRc2MinDeg, Config::kRc2MaxDeg);
     clamped.rc3Deg = clamp16(targets.rc3Deg, Config::kServoMinDeg, Config::kServoMaxDeg);
-    clamped.rc4Deg = clamp16(targets.rc4Deg, Config::kServoMinDeg, Config::kServoMaxDeg);
     return clamped;
 }
 
@@ -68,26 +67,21 @@ void updateServoTargetsFromPs2(const Ps2Frame& frame,
 
     if (armsDown && !armsUp) {
         targets.rc3Deg = Config::kRc3L1Deg;
-        targets.rc4Deg = Config::kRc4L1Deg;
         if (pushState != nullptr) {
             pushState->active = false;
         }
     } else if (armsUp && !armsDown) {
         targets.rc3Deg = Config::kRc3R1Deg;
-        targets.rc4Deg = Config::kRc4R1Deg;
         if (pushState != nullptr) {
             pushState->active = false;
         }
     } else if (squareRising) {
         if (!pushState->active) {
             pushState->savedRc3Deg = clamp16(targets.rc3Deg, Config::kServoMinDeg, Config::kServoMaxDeg);
-            pushState->savedRc4Deg = clamp16(targets.rc4Deg, Config::kServoMinDeg, Config::kServoMaxDeg);
             targets.rc3Deg         = Config::kRc3SquareDeg;
-            targets.rc4Deg         = Config::kRc4SquareDeg;
             pushState->active      = true;
         } else {
             targets.rc3Deg    = pushState->savedRc3Deg;
-            targets.rc4Deg    = pushState->savedRc4Deg;
             pushState->active = false;
         }
     }

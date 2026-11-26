@@ -75,14 +75,12 @@ struct ServoTargets {
     int16_t rc1Deg = Config::kRc1InitDeg;
     int16_t rc2Deg = Config::kRc2InitDeg;
     int16_t rc3Deg = Config::kRc3InitDeg;
-    int16_t rc4Deg = Config::kRc4InitDeg;
 };
 
 struct FrontArmPushState {
     bool    active      = false;
     bool    prevSquare  = false;
     int16_t savedRc3Deg = Config::kRc3InitDeg;
-    int16_t savedRc4Deg = Config::kRc4InitDeg;
 };
 
 struct ArmPosePresetState {

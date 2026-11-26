@@ -429,10 +429,6 @@ void recordServoAngle(uint8_t channel, uint16_t angleDeg) {
             s_snap->servos.rc3Deg =
                 RobotLogic::applyServoDirection(bounded, Config::kRc3InvertDir);
             break;
-        case 4U:
-            s_snap->servos.rc4Deg =
-                RobotLogic::applyServoDirection(bounded, Config::kRc4InvertDir);
-            break;
         default: break;
     }
     s_snap->servos = RobotLogic::clampServoTargets(s_snap->servos);

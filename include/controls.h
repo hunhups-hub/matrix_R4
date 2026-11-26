@@ -24,7 +24,7 @@
 //  ผังปุ่มปัจจุบัน (ถ้าแก้ปุ่มด้านล่าง ให้แก้รูปนี้ตามด้วย):
 //
 //        L2 = กริปเปอร์เปิด (RC1)             R2 = กริปเปอร์ปิด (RC1)
-//        L1 = แขนหน้าลง (RC3+RC4)             R1 = แขนหน้าขึ้น (RC3+RC4)
+//        L1 = แขนหน้าลง (RC3)             R1 = แขนหน้าขึ้น (RC3)
 //     +-----------------------------------------------------------------+
 //     |     Up   = แขน RC2 ขึ้น              Triangle = ตั้งท่า RC2=100 RC1=100 |
 //     |  Left / Right = (ว่าง)               Square = สลับดันพื้น        |
@@ -58,8 +58,8 @@ enum class Btn : uint8_t {
 };
 
 // --- Servos -------------------------------------------------------------------
-constexpr Btn kFrontArmsDown = Btn::L1;       // RC3+RC4 ลงไปที่ kRc3L1Deg / kRc4L1Deg
-constexpr Btn kFrontArmsUp   = Btn::R1;       // RC3+RC4 ยกไปที่ kRc3R1Deg / kRc4R1Deg
+constexpr Btn kFrontArmsDown = Btn::L1;       // RC3 ลงไปที่ kRc3L1Deg
+constexpr Btn kFrontArmsUp   = Btn::R1;       // RC3 ยกไปที่ kRc3R1Deg
 constexpr Btn kPushGround    = Btn::Square;   // สลับท่าดันพื้น (กดครั้งที่ 2 คืนค่าเดิม)
 constexpr Btn kGripperOpen   = Btn::L2;       // RC1 -> kRc1L2Deg
 constexpr Btn kGripperClose  = Btn::R2;       // RC1 -> kRc1R2Deg

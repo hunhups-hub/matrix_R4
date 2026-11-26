@@ -230,7 +230,7 @@ void setPoseServo(int16_t& targetDeg, int16_t deg) {
     g_posePresetState.dropActive = false;
 }
 
-/** Manual RC3/RC4 moves cancel the Square push-ground hold. */
+/** Manual RC3 moves cancel the Square push-ground hold. */
 void setGripServo(int16_t& targetDeg, int16_t deg) {
     targetDeg             = deg;
     g_armPushState.active = false;
@@ -477,10 +477,8 @@ void applySerialServoActions(const SerialActions& act) {
 
     if (act.gripOpen) {
         setGripServo(servos.rc3Deg, Config::kRc3L1Deg);
-        setGripServo(servos.rc4Deg, Config::kRc4L1Deg);
     } else if (act.gripClose) {
         setGripServo(servos.rc3Deg, Config::kRc3R1Deg);
-        setGripServo(servos.rc4Deg, Config::kRc4R1Deg);
     }
 
     if (act.auxExtend) {
@@ -496,7 +494,6 @@ void applySerialServoActions(const SerialActions& act) {
             case 1: setPoseServo(servos.rc1Deg, act.directServoDeg); break;
             case 2: setPoseServo(servos.rc2Deg, act.directServoDeg); break;
             case 3: setGripServo(servos.rc3Deg, act.directServoDeg); break;
-            case 4: setGripServo(servos.rc4Deg, act.directServoDeg); break;
             default: break;
         }
     }
@@ -624,7 +621,7 @@ void runAutoSession(uint32_t nowMs) {
         g_posePresetState.dropActive     = false;
         g_posePresetState.releasePending = false;
     }
-    if (g_snap.servos.rc3Deg != preAuto.rc3Deg || g_snap.servos.rc4Deg != preAuto.rc4Deg) {
+    if (g_snap.servos.rc3Deg != preAuto.rc3Deg) {
         g_armPushState.active = false;
     }
 
@@ -1015,18 +1012,12 @@ void printServoBootLine() {
         Serial.println(g_io.servoRangeErr());
         return;
     }
-    Serial.print(F("[CFG] RC1..RC4 range 0..180deg OK | L1(RC3,RC4)=("));
+    Serial.print(F("[CFG] RC1..RC3 range 0..180deg OK | L1(RC3)=("));
     Serial.print(Config::kRc3L1Deg);
-    Serial.print(',');
-    Serial.print(Config::kRc4L1Deg);
     Serial.print(F(") | Sq=("));
     Serial.print(Config::kRc3SquareDeg);
-    Serial.print(',');
-    Serial.print(Config::kRc4SquareDeg);
-    Serial.print(F(") | inv3/4=("));
+    Serial.print(F(") | inv3=("));
     Serial.print(Config::kRc3InvertDir ? 1 : 0);
-    Serial.print(',');
-    Serial.print(Config::kRc4InvertDir ? 1 : 0);
     Serial.println(')');
 }
 

@@ -45,15 +45,15 @@ constexpr uint8_t  kTurnMaxRatioPct        = 100U;    // สัดส่วน�
 constexpr int16_t  kSerialDefaultSpeed     = 100;     // ความเร็วเริ่มต้นผ่าน Serial เต็ม 100% (ช่วง 20..100%)
 
 // ============================================================================
-// --- 2) เซอร์โว RC1..RC4  มุมต่างๆ / กลับทิศ / ช่วงพัลส์ (ปุ่มที่สั่ง ดู controls.h) ---
+// --- 2) เซอร์โว RC1..RC3  มุมต่างๆ / กลับทิศ / ช่วงพัลส์ (ปุ่มที่สั่ง ดู controls.h) ---
 //  มุมทุกตัว ช่วง 0..180 องศา
 // ============================================================================
 
 // --- 2.1) RC1 กริปเปอร์  (ปุ่ม kGripperOpen / kGripperClose / kPosePreset) ---
-constexpr int16_t  kRc1InitDeg             = 180;       // มุมเริ่มต้นของเซอร์โวเสริม (กริปเปอร์)
-constexpr int16_t  kRc1L2Deg               = 150;     // ปุ่ม kGripperOpen (L2)
-constexpr int16_t  kRc1R2Deg               = 80;       // ปุ่ม kGripperClose (R2)
-constexpr int16_t  kRc1ZeroDeg             = 180;       // ปุ่ม kGripperZero (D-Pad ขวา): RC1 -> 0°
+constexpr int16_t  kRc1InitDeg             = 25;       // มุมเริ่มต้นของเซอร์โวเสริม (กริปเปอร์)
+constexpr int16_t  kRc1L2Deg               = 25;     // ปุ่ม kGripperOpen (L2)
+constexpr int16_t  kRc1R2Deg               = 145;       // ปุ่ม kGripperClose (R2)
+constexpr int16_t  kRc1ZeroDeg             = 50;       // ปุ่ม kGripperZero (D-Pad ขวา): RC1 -> 0°
 constexpr int16_t  kRc1PresetHoldDeg      = 100;      // พรีเซ็ตท่าถือ (ใช้เฉพาะ Serial q): กริปเปอร์จับ/ถือของ (ตรงกับ Auto)
 constexpr int16_t  kRc1PresetDropDeg       = 150;     // พรีเซ็ตวงกลม (ปุ่มวางอย่างเดียว): กริปเปอร์เปิด/ปล่อยของ (ตรงกับ Auto)
 constexpr uint32_t kPoseDropReleaseDelayMs = 600UL;   // ปุ่ม Circle: ขยับแขน RC2 ก่อน แล้วรอเท่านี้ (ms) ค่อยปล่อยกริปเปอร์ RC1
@@ -82,17 +82,12 @@ constexpr int16_t  kRc2SmoothStepDeg       = 6;       // ขั้น slew ข�
                                                        // ช่วง 1..90 | เพิ่ม = แขนกวาดเร็วขึ้นในโหมดนุ่ม
 constexpr bool     kRc2SmoothDefault       = true;    // เปิดการเคลื่อนที่นุ่มนวลเป็นค่าเริ่มต้น เฉพาะ RC2
 
-// --- 2.3) RC3 + RC4 แขนหน้าซ้าย/ขวา  (ปุ่ม kFrontArmsDown / kFrontArmsUp / kPushGround) ---
-constexpr int16_t  kRc3InitDeg             = 30;      // มุมเริ่มต้นแขนหน้าซ้าย (คู่กับ RC4; จำกัด 0..180)
-constexpr int16_t  kRc3L1Deg               = 60;      // L1 กดลง (15 องศา; มุมน้อย = ลึกกว่า/กดแรงกว่า; ต่ำสุด 0)
-constexpr int16_t  kRc3R1Deg               = 140;     // R1 ยกขึ้น / เก็บกลาง (140 องศา)
+// --- 2.3) RC3 แขนหน้า  (ปุ่ม kFrontArmsDown / kFrontArmsUp / kPushGround) ---
+constexpr int16_t  kRc3InitDeg             = 0;      // มุมเริ่มต้นแขนหน้าซ้าย (คู่กับ RC4; จำกัด 0..180)
+constexpr int16_t  kRc3L1Deg               = 0;      // L1 กดลง (15 องศา; มุมน้อย = ลึกกว่า/กดแรงกว่า; ต่ำสุด 0)
+constexpr int16_t  kRc3R1Deg               = 50;     // R1 ยกขึ้น / เก็บกลาง (140 องศา)
 constexpr int16_t  kRc3SquareDeg           = 180;      // Square สลับกดพื้น (180 องศา)
 constexpr bool     kRc3InvertDir           = false;   // กลับมุมที่ส่งออกฮาร์ดแวร์ของ RC3 (องศา -> 180 - องศา)
-constexpr int16_t  kRc4InitDeg             = 30;      // มุมเริ่มต้นแขนหน้าขวา (คู่กับ RC3)
-constexpr int16_t  kRc4L1Deg               = 60;      // L1 กดลง (15 องศา; คู่กับ RC3)
-constexpr int16_t  kRc4R1Deg               = 140;     // R1 ยกขึ้น / เก็บกลาง (140 องศา)
-constexpr int16_t  kRc4SquareDeg           = 180;      // Square สลับกดพื้น (180 องศา)
-constexpr bool     kRc4InvertDir           = true;    // กลับมุมที่ส่งออกฮาร์ดแวร์ของ RC4 (องศา -> 180 - องศา)
 
 // ============================================================================
 // --- 3) ความรู้สึกการขับ (Drive feel, ขั้นสูง)  ค่าความนุ่ม/การกลับทิศมอเตอร์ ---

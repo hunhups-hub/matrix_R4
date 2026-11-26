@@ -274,7 +274,6 @@ bool MiniR4IO::configureServoRanges() {
 void MiniR4IO::staggerBootServos() {
     const ServoTargets safeInit = RobotLogic::clampServoTargets(ServoTargets{});
     const int16_t      hwRc3    = RobotLogic::applyServoDirection(safeInit.rc3Deg, Config::kRc3InvertDir);
-    const int16_t      hwRc4    = RobotLogic::applyServoDirection(safeInit.rc4Deg, Config::kRc4InvertDir);
     const bool ok1 = MiniR4.RC1.setAngle(static_cast<uint16_t>(safeInit.rc1Deg));
     if (ok1) {
         delay(Config::kServoBootStaggerMs);
@@ -288,10 +287,9 @@ void MiniR4IO::staggerBootServos() {
     if (ok3) {
         delay(Config::kServoBootStaggerMs);
     }
-    const bool ok4 = ok3 && MiniR4.RC4.setAngle(static_cast<uint16_t>(hwRc4));
 
     lastServos_   = safeInit;
-    servosSynced_ = ok1 && ok2 && ok3 && ok4;
+    servosSynced_ = ok1 && ok2 && ok3;
     if (servosSynced_) {
         lastServoSendMs_ = millis();
     } else {
@@ -682,7 +680,7 @@ void MiniR4IO::restoreAfterAuto(uint32_t nowMs) {
 void MiniR4IO::applyServos(const ServoTargets& targets, uint32_t nowMs) {
     const ServoTargets safe = RobotLogic::clampServoTargets(targets);
 
-    // Smooth trajectory slew is applied ONLY to arm RC2; RC1, RC3, RC4 actuate immediately.
+    // Smooth trajectory slew is applied ONLY to arm RC2; RC1, RC3 actuate immediately.
     const int16_t cmdRc2 = rc2SmoothEnabled_
                                ? RobotLogic::slewServoAngle(lastServos_.rc2Deg,
                                                             safe.rc2Deg,
@@ -694,9 +692,8 @@ void MiniR4IO::applyServos(const ServoTargets& targets, uint32_t nowMs) {
     const bool send1 = !servosSynced_ || (safe.rc1Deg != lastServos_.rc1Deg) || keepaliveDue;
     const bool send2 = !servosSynced_ || (cmdRc2 != lastServos_.rc2Deg) || keepaliveDue;
     const bool send3 = !servosSynced_ || (safe.rc3Deg != lastServos_.rc3Deg) || keepaliveDue;
-    const bool send4 = !servosSynced_ || (safe.rc4Deg != lastServos_.rc4Deg) || keepaliveDue;
 
-    if (!send1 && !send2 && !send3 && !send4) {
+    if (!send1 && !send2 && !send3) {
         return;
     }
 
@@ -709,19 +706,18 @@ void MiniR4IO::applyServos(const ServoTargets& targets, uint32_t nowMs) {
     }
     lastServoAttemptMs_ = nowMs;
 
-    // One packet carries all four channels, so RC3 and RC4 (and RC1/RC2) start moving on the same
-    // STM32 frame. A single failure costs at most one UART timeout per cycle.
+    // One packet carries all four STM32 servo channels; RC4 is unused (fixed neutral), so RC1..RC3
+    // start moving on the same STM32 frame. A single failure costs at most one UART timeout per cycle.
     const int16_t hwRc3 = RobotLogic::applyServoDirection(safe.rc3Deg, Config::kRc3InvertDir);
-    const int16_t hwRc4 = RobotLogic::applyServoDirection(safe.rc4Deg, Config::kRc4InvertDir);
+    constexpr uint16_t kUnusedRc4Deg = 90U; // RC4 removed; packet still needs a 4th angle
     const bool    allOk =
         mmL.SetAllServoAngle(static_cast<uint16_t>(safe.rc1Deg), static_cast<uint16_t>(cmdRc2),
-                             static_cast<uint16_t>(hwRc3), static_cast<uint16_t>(hwRc4)) ==
+                             static_cast<uint16_t>(hwRc3), kUnusedRc4Deg) ==
         MMLower::RESULT::OK;
     if (allOk) {
         lastServos_.rc1Deg = safe.rc1Deg;
         lastServos_.rc2Deg = cmdRc2;
         lastServos_.rc3Deg = safe.rc3Deg;
-        lastServos_.rc4Deg = safe.rc4Deg;
     }
 
     if (allOk) {
