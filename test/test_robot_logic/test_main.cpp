@@ -702,6 +702,44 @@ void test_battery_stabilizer_multiprofile_baselines(void) {
     TEST_ASSERT_EQUAL_UINT16(9300U, fullMv);
 }
 
+void test_auto_power_comp_pct_ratio_and_clamps(void) {
+    // 1. At the tuning voltage there is no compensation.
+    TEST_ASSERT_EQUAL_UINT8(100U, RobotLogic::computeAutoPowerCompPct(7800U, 7800U, 90U, 130U));
+    // 2. Weak 2S pack (6.8 V vs 7.8 V ref) -> 7800/6800 = 114.7% -> 115%.
+    TEST_ASSERT_EQUAL_UINT8(115U, RobotLogic::computeAutoPowerCompPct(6800U, 7800U, 90U, 130U));
+    // 3. Fresh 2S pack (8.4 V) -> 92.9% -> 93%, inside the 90% floor.
+    TEST_ASSERT_EQUAL_UINT8(93U, RobotLogic::computeAutoPowerCompPct(8400U, 7800U, 90U, 130U));
+    // 4. Clamps: nearly empty pack hits the ceiling, a high-voltage supply hits the floor.
+    TEST_ASSERT_EQUAL_UINT8(130U, RobotLogic::computeAutoPowerCompPct(5600U, 7800U, 90U, 130U));
+    TEST_ASSERT_EQUAL_UINT8(90U, RobotLogic::computeAutoPowerCompPct(12600U, 7800U, 90U, 130U));
+    // 5. USB only / failed read / zero reference -> 100 (no divide by zero).
+    TEST_ASSERT_EQUAL_UINT8(100U, RobotLogic::computeAutoPowerCompPct(0U, 7800U, 90U, 130U));
+    TEST_ASSERT_EQUAL_UINT8(100U, RobotLogic::computeAutoPowerCompPct(5000U, 7800U, 90U, 130U));
+    TEST_ASSERT_EQUAL_UINT8(100U, RobotLogic::computeAutoPowerCompPct(7000U, 0U, 90U, 130U));
+    // 6. Bad clamp settings can never invert the window around 100.
+    TEST_ASSERT_EQUAL_UINT8(100U, RobotLogic::computeAutoPowerCompPct(6800U, 7800U, 120U, 80U));
+    // 7. Extreme inputs stay in uint8 range (32-bit intermediates).
+    TEST_ASSERT_EQUAL_UINT8(200U, RobotLogic::computeAutoPowerCompPct(5500U, 25500U, 50U, 200U));
+}
+
+void test_auto_power_comp_apply_sign_zero_and_clamp(void) {
+    // Mission power 50 at 115% -> 58 (57.5 rounds half up); sign kept for reverse and pivots.
+    TEST_ASSERT_EQUAL_INT16(58, RobotLogic::applyAutoPowerComp(50, 115U));
+    TEST_ASSERT_EQUAL_INT16(-58, RobotLogic::applyAutoPowerComp(-50, 115U));
+    TEST_ASSERT_EQUAL_INT16(47, RobotLogic::applyAutoPowerComp(50, 93U));
+    // 0 stays 0, a tiny power never becomes 0, 100 or 0 percent is a pass-through.
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::applyAutoPowerComp(0, 130U));
+    TEST_ASSERT_EQUAL_INT16(1, RobotLogic::applyAutoPowerComp(1, 50U));
+    TEST_ASSERT_EQUAL_INT16(-1, RobotLogic::applyAutoPowerComp(-1, 50U));
+    TEST_ASSERT_EQUAL_INT16(50, RobotLogic::applyAutoPowerComp(50, 100U));
+    TEST_ASSERT_EQUAL_INT16(-50, RobotLogic::applyAutoPowerComp(-50, 0U));
+    // Clamp to +/-kMotorMaxPower, and no int16 overflow on extreme inputs.
+    TEST_ASSERT_EQUAL_INT16(100, RobotLogic::applyAutoPowerComp(100, 130U));
+    TEST_ASSERT_EQUAL_INT16(-100, RobotLogic::applyAutoPowerComp(-100, 130U));
+    TEST_ASSERT_EQUAL_INT16(100, RobotLogic::applyAutoPowerComp(INT16_MAX, 200U));
+    TEST_ASSERT_EQUAL_INT16(-100, RobotLogic::applyAutoPowerComp(INT16_MIN, 200U));
+}
+
 void test_battery_stabilizer_progressive_sag_tiers(void) {
     RobotLogic::BatteryStabilizer batt;
     batt.reset();
@@ -1621,11 +1659,15 @@ void test_precision_mode_full_stick_scaling_and_micro_turn(void) {
     TEST_ASSERT_GREATER_THAN_INT16(precMid.left, precHigh.left);
     TEST_ASSERT_GREATER_THAN_INT16(precHigh.left, precFull.left);
 
-    // 3. Pure pivot turn at full stick (rxRaw=255) steps by angular slew (35) then reaches +/-55%
+    // 3. Pure pivot turn at full stick (rxRaw=255) steps by angular slew (capped at the precision
+    //    ceiling when the slew step exceeds it) then reaches +/-55%
+    const int16_t precPivotStep = (Config::kAngularAccelSlewStep < Config::kPrecisionMaxPower)
+                                      ? Config::kAngularAccelSlewStep
+                                      : Config::kPrecisionMaxPower;
     const DriveOutput precPivot1 = RobotLogic::computeKinodynamicDrive(
         128U, 255U, 0, 0, Config::kMotorMaxPower, 100, 100, 100U, 140, false, false, false, 0, true);
-    TEST_ASSERT_EQUAL_INT16(Config::kAngularAccelSlewStep, precPivot1.left);
-    TEST_ASSERT_EQUAL_INT16(static_cast<int16_t>(-Config::kAngularAccelSlewStep), precPivot1.right);
+    TEST_ASSERT_EQUAL_INT16(precPivotStep, precPivot1.left);
+    TEST_ASSERT_EQUAL_INT16(static_cast<int16_t>(-precPivotStep), precPivot1.right);
     const DriveOutput precPivot2 = RobotLogic::computeKinodynamicDrive(
         128U, 255U, precPivot1.left, precPivot1.right, Config::kMotorMaxPower, 100, 100, 100U, 140, false, false, false, 0, true);
     TEST_ASSERT_EQUAL_INT16(Config::kPrecisionMaxPower, precPivot2.left);
@@ -1664,14 +1706,32 @@ void test_triangle_sets_rc2_100_and_rc1_100(void) {
     Ps2Frame fTri = makeValidFrame();
     fTri.triangle = true;
     RobotLogic::updateServoTargetsFromPs2(fTri, servos, false, &pushState, &poseState);
-    TEST_ASSERT_EQUAL_INT16(100, servos.rc1Deg);
-    TEST_ASSERT_EQUAL_INT16(100, servos.rc2Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRcTrianglePoseRc1Deg, servos.rc1Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRcTrianglePoseRc2Deg, servos.rc2Deg);
 
     // Holding Triangle does not override a later R2 gripper command
     Ps2Frame fR2 = fTri;
     fR2.r2 = true;
     RobotLogic::updateServoTargetsFromPs2(fR2, servos, false, &pushState, &poseState);
     TEST_ASSERT_EQUAL_INT16(Config::kRc1R2Deg, servos.rc1Deg);
+}
+
+void test_dpad_right_sets_rc1_zero(void) {
+    ServoTargets       servos{};
+    FrontArmPushState  pushState{};
+    ArmPosePresetState poseState{};
+    // Start away from the target so the assert proves the button moved RC1.
+    servos.rc1Deg = (Config::kRc1ZeroDeg == 0) ? 180 : 0;
+
+    Ps2Frame fRight = makeValidFrame();
+    fRight.right    = true;
+    RobotLogic::updateServoTargetsFromPs2(fRight, servos, false, &pushState, &poseState, 1000UL);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc1ZeroDeg, servos.rc1Deg);
+
+    // Value persists after release
+    Ps2Frame fIdle = makeValidFrame();
+    RobotLogic::updateServoTargetsFromPs2(fIdle, servos, false, &pushState, &poseState, 1100UL);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc1ZeroDeg, servos.rc1Deg);
 }
 
 void test_circle_pose_preset_and_serial_competition_shortcuts(void) {
@@ -2095,6 +2155,8 @@ int main(int argc, char** argv) {
     RUN_TEST(test_battery_stabilizer_progressive_sag_tiers);
     RUN_TEST(test_battery_stabilizer_hysteresis_and_timed_recovery);
     RUN_TEST(test_battery_stabilizer_regen_spike_protection);
+    RUN_TEST(test_auto_power_comp_pct_ratio_and_clamps);
+    RUN_TEST(test_auto_power_comp_apply_sign_zero_and_clamp);
 
     // 5. Stability Monitor
     RUN_TEST(test_stability_monitor_individual_penalties);
@@ -2120,6 +2182,7 @@ int main(int argc, char** argv) {
     RUN_TEST(test_kinodynamic_drive_reverse_front_and_dpad_micro_turn);
     RUN_TEST(test_precision_mode_full_stick_scaling_and_micro_turn);
     RUN_TEST(test_triangle_sets_rc2_100_and_rc1_100);
+    RUN_TEST(test_dpad_right_sets_rc1_zero);
     RUN_TEST(test_circle_pose_preset_and_serial_competition_shortcuts);
 
     // 10. Phase 2: RC2 Smooth Trajectory, Motor Trim, EEPROM CRC-16, Auto Stall Detection

@@ -44,6 +44,12 @@ uint8_t                 s_driveEncIdxR           = Config::kMotorRightId - 1U;
 bool                    s_driveTaskActive        = false;
 bool                    s_expectWheelMotion      = false;
 
+constexpr uint32_t      kPowerCompReadMs         = 200UL;
+uint8_t                 s_powerCompPct           = 100U;
+uint16_t                s_powerCompMv            = 0U;
+uint32_t                s_lastPowerReadMs        = 0UL;
+bool                    s_powerReadTried         = false;
+
 constexpr uint8_t       kSerialPassCap           = 32U;
 uint8_t                 s_serialBuf[kSerialPassCap]{};
 uint8_t                 s_serialHead             = 0U;
@@ -515,6 +521,37 @@ void endBlockingDriveTask() {
 
 void noteUserLoopActivity() {
     s_yieldCalled = true;
+}
+
+uint8_t samplePowerComp(bool force) {
+    if (!Config::kEnableAutoVoltComp) {
+        s_powerCompPct = 100U;
+        return s_powerCompPct;
+    }
+    const uint32_t nowMs = millis();
+    if (!force && s_powerReadTried &&
+        static_cast<uint32_t>(nowMs - s_lastPowerReadMs) < kPowerCompReadMs) {
+        return s_powerCompPct;
+    }
+    // Rate-limit failed reads too, so a dead UART never adds a timeout to every drive command.
+    s_powerReadTried  = true;
+    s_lastPowerReadMs = nowMs;
+
+    float v    = 0.0f;
+    float perc = 0.0f;
+    if (mmL.GetPowerInfo(v, perc) != MMLower::RESULT::OK) {
+        return s_powerCompPct;
+    }
+    const float    boundedV = (v < 0.0f) ? 0.0f : ((v > 25.5f) ? 25.5f : v);
+    const uint16_t mv       = static_cast<uint16_t>(boundedV * 1000.0f + 0.5f);
+    s_powerCompMv  = mv;
+    s_powerCompPct = RobotLogic::computeAutoPowerCompPct(
+        mv, Config::kAutoVoltRefMv, Config::kAutoCompMinPct, Config::kAutoCompMaxPct);
+    return s_powerCompPct;
+}
+
+uint16_t lastPowerCompMv() {
+    return s_powerCompMv;
 }
 
 int serialAvailable() {

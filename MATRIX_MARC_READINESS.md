@@ -16,7 +16,7 @@
 | องค์ประกอบหลัก | ผลลัพธ์ | ป้ายสถานะการตรวจสอบ |
 |---|---|---|
 | **คอมไพล์เฟิร์มแวร์จริง (`uno_r4_wifi`)** | ผ่าน (`SUCCESS`, 0 warnings/errors ภายใต้ `-Werror`), RAM `44.1%`, Flash `41.5%` | `[Verified: Build/Test Run]` |
-| **ชุดทดสอบอัตโนมัติ (`native` Unity)** | ผ่าน **`41 / 41`** เคส (0 Failures, 0 Ignored) ครอบคลุมครบทุกสาขาของ `robot_logic` และ `serial_control` | `[Verified: Build/Test Run]` |
+| **ชุดทดสอบอัตโนมัติ (`native` Unity)** | ผ่าน **`44 / 44`** เคส (0 Failures, 0 Ignored) ครอบคลุมครบทุกสาขาของ `robot_logic` และ `serial_control` | `[Verified: Build/Test Run]` |
 | **การวิเคราะห์โค้ดเชิงสถิต (`pio check`)** | ผ่านสะอาด (`src/`: **`0 HIGH, 0 MEDIUM`** ทั้งบน `uno_r4_wifi` และ `native`) | `[Verified: Build/Test Run]` |
 | **สถาปัตยกรรม Teleop, Failsafe & Auto Supervisor** | แข็งแรงระดับแข่งขัน (40 Hz scheduler, 5-stage kinodynamics 100% power, 1.4 ms SPI, 3s WDT, Rising-Edge E-Stop, Bounded STM32 Init/Guard) | `[Verified: Static Code Inspection]` |
 | **ตรรกะภารกิจ Autonomous ปัจจุบัน (`auto_block_code.cpp`)** | ภารกิจยังเขียนด้วย `MoveDegs` (14 ครั้ง) + `delay()` (27 ครั้ง) แบบ Open-Loop; ไม่มี Gyro assist (นำออกแล้ว) | `[Verified: Static Code Inspection]` |
@@ -35,7 +35,7 @@
    - คงเพดานกำลังขับสูงสุด **100% เต็ม** (`kEnableBatterySagThrottle = false`) พร้อมชดเชยแรงบิดสูงสุด `115%` ในระดับ `Normal`/`Low`/`Critical` และตัดบูสต์ส่วนเกินเหลือ `100%` เฉพาะเมื่อแรงดันตกถึงระดับฉุกเฉิน `Emergency` (`<= 6.4V` หรือ `<= 69%` ของแรงดันฐาน) เพื่อลดความเสี่ยงไฟตกโดยหุ่นไม่หนืด (`src/robot_logic.cpp:1049-1058`) `[Verified: Build/Test Run]`
 
 ### 1.3 ความเสี่ยงและข้อจำกัดที่เหลืออยู่ก่อนลงแข่ง (Remaining Risks & Field Calibration Items)
-1. **[High] โค้ดภารกิจ Autonomous ปัจจุบันเดินแบบ Open-Loop Dead-Reckoning และมี `delay()` รวม 15.5 วินาที (`src/auto_block_code.cpp:630-682`)**: ใช้คำสั่ง `DriveDC.MoveDegs(±50, ±50, ...)` ล้วนจำนวน 11 ครั้ง และ `delay(500/1000)` ถึง 20 ครั้ง (รวม `15.5 s` + เบรกดีเลย์ `1.21 s` = `16.71 s`) โดยยังไม่ใช้ `MoveSyncDegs`/`MoveGyroDegs`/`TurnGyro` หรืออ่านเซนเซอร์สนาม ทำให้ระยะทางและมุมเลี้ยวไวต่อระดับแรงดันแบตเตอรี่และความเสียดทานพื้นสนามจริง `[Verified: Static Code Inspection]`
+1. **[High] โค้ดภารกิจ Autonomous ปัจจุบันเดินแบบ Open-Loop Dead-Reckoning และมี `delay()` รวม 15.5 วินาที (`src/auto_block_code.cpp:630-682`)**: ใช้คำสั่ง `DriveDC.MoveDegs(±50, ±50, ...)` ล้วนจำนวน 11 ครั้ง และ `delay(500/1000)` ถึง 20 ครั้ง (รวม `15.5 s` + เบรกดีเลย์ `1.21 s` = `16.71 s`) โดยยังไม่ใช้ `MoveSyncDegs`/`MoveGyroDegs`/`TurnGyro` หรืออ่านเซนเซอร์สนาม ทำให้ระยะทางและมุมเลี้ยวไวต่อระดับแรงดันแบตเตอรี่และความเสียดทานพื้นสนามจริง `[Verified: Static Code Inspection]` ลดผลของแรงดันแบตได้แล้วด้วยการชดเชยแรงดันใน Auto (`kEnableAutoVoltComp`, `kAutoVoltRefMv` ใน `include/user_settings.h`: คูณ power ของ `AutoDriveDCProxy` ด้วย `ref / แรงดันแบต` ช่วง `90%..130%`) แต่ยังต้องตั้ง `kAutoVoltRefMv` ให้ตรงแรงดันตอนจูน mission และทดสอบวิ่งจริงทั้งแบตเต็ม/แบตอ่อน `[Verified: Unit Test; Pending: Hardware Run]`
 2. **[Medium] การคงกำลังขับ 100% เมื่อแบตเตอรี่อ่อน (`kEnableBatterySagThrottle = false`, `include/config.h:144`)**: เพื่อให้หุ่นยนต์แรงและเร็วเต็ม 100% ตลอดแมตช์ตามความต้องการของผู้ขับ เฟิร์มแวร์จึงไม่ลดเพดานกำลังลงเหลือ 72%/50%/35% (แต่ได้ตัดบูสต์ 115% เหลือ 100% ที่ระดับ `Emergency` แล้ว) ดังนั้นทีมแข่งต้องเปลี่ยนแบตเตอรี่ก้อนใหม่ทุกครั้งเมื่อหน้าจอแสดงความจุต่ำกว่า `75%` หรือขึ้นแฟลก `L`/`C`/`E` `[Verified: Build/Test Run]`
 3. **[Low] ข้อควรระวังในการวางโค้ด Auto (`longjmp`) และมุมปุ่ม `Square`**: การตัดจบ Auto ใช้ `longjmp` (`src/auto_mode.cpp:127`) จึงไม่ควรประกาศตัวแปร C++ ที่มี destructor (เช่น `String`) ในโซนวางโค้ด `auto_block_code.cpp` และค่า `kRc3/4SquareDeg` (`30°`) ตั้งไว้ตรงกับ `kRc3/4InitDeg` และ `kRc3/4L1Deg` (`30°`) จึงเกิดการขยับสลับเมื่อกดหลังจากยกแขนด้วย `R1` (`140°`) `[Verified: Static Code Inspection]`
 
@@ -85,7 +85,7 @@ $$\text{Weighted Points} = \left(\frac{\text{Category Score}}{10}\right) \times 
 
 ### 3.2 การรันชุดทดสอบอัตโนมัติบนโฮสต์ (`pio test -e native -v`) `[Verified: Build/Test Run]`
 - **คำสั่ง**: `& "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" test -e native -v`
-- **สถานะ**: `PASSED` (Exit code `0`), ผ่านครบ **`41 Tests 0 Failures 0 Ignored`** ใน 11 หมวดหมู่ (`test/test_robot_logic/test_main.cpp:1887-1951`) รวมถึงการทดสอบ Glitch absorption โดยไม่หลุดจาก `Operational`, การคุมเพดานกำลัง 2-DOF Slew (`55%`/`35%`), ความปลอดภัยจาก `int16_t` overflow, การหยุด `!w` ในแบตช์เดียว, ข้อความ Help `o/p` + `v`, และฟิลด์ Telemetry `rf=`/`com=`
+- **สถานะ**: `PASSED` (Exit code `0`), ผ่านครบ **`44 Tests 0 Failures 0 Ignored`** ใน 11 หมวดหมู่ (`test/test_robot_logic/test_main.cpp:1887-1951`) รวมถึงการทดสอบ Glitch absorption โดยไม่หลุดจาก `Operational`, การคุมเพดานกำลัง 2-DOF Slew (`55%`/`35%`), ความปลอดภัยจาก `int16_t` overflow, การหยุด `!w` ในแบตช์เดียว, ข้อความ Help `o/p` + `v`, และฟิลด์ Telemetry `rf=`/`com=`
 
 ### 3.3 การวิเคราะห์โค้ดเชิงสถิตด้วย `cppcheck` (`pio check`) `[Verified: Build/Test Run]`
 1. **`pio check -e uno_r4_wifi --skip-packages`**: Exit code `255` เพราะพบคำเตือนในไลบรารี `.pio/libdeps/.../MatrixMiniR4` (ไม่ใช่โค้ดโปรเจกต์)
@@ -101,7 +101,7 @@ $$\text{Weighted Points} = \left(\frac{\text{Category Score}}{10}\right) \times 
 - **หลักฐานยืนยัน**:
   - คอมไพล์ผ่านภายใต้ `-Wall -Wextra -Werror` ทั้งบน `uno_r4_wifi` และ `native`; ขอบเขต `#pragma GCC diagnostic` ใน `src/auto_block_code.cpp:616-699` ถูกจำกัดเฉพาะโซนโค้ดที่ผู้ใช้คัดลอกมาจาก MATRIXblock เท่านั้น ทำให้ชั้น Proxy ความปลอดภัยทั้งหมดอยู่ภายใต้ `-Werror` เต็มรูปแบบ `[Verified: Build/Test Run]`
   - `pio check` รายงาน `0 HIGH, 0 MEDIUM` ใน `src/` ทั้งสองสภาพแวดล้อม `[Verified: Build/Test Run]`
-  - `pio test -e native -v` ผ่าน `41 / 41` เคส พร้อมอัปเดตคอมเมนต์และเพิ่ม assertion ครอบคลุมครบทุกสาขาของ `robot_logic.cpp` และ `serial_control.cpp` `[Verified: Build/Test Run]`
+  - `pio test -e native -v` ผ่าน `44 / 44` เคส พร้อมอัปเดตคอมเมนต์และเพิ่ม assertion ครอบคลุมครบทุกสาขาของ `robot_logic.cpp` และ `serial_control.cpp` `[Verified: Build/Test Run]`
 - **เหตุผลการหักคะแนน (`-1.0`)**:
   - โมดูลฮาร์ดแวร์ (`main.cpp`, `minir4_io.cpp`, `ps2_driver.cpp`, `oled_ui.cpp`, `auto_mode.cpp`, `auto_block_code.cpp`) ยังไม่มีชุดทดสอบจำลองฮาร์ดแวร์หรือ HIL อัตโนมัติ (`-1.0`) `[Verified: Static Code Inspection]`
 

@@ -63,7 +63,8 @@ constexpr Btn kFrontArmsUp   = Btn::R1;       // RC3+RC4 ยกไปที่ k
 constexpr Btn kPushGround    = Btn::Square;   // สลับท่าดันพื้น (กดครั้งที่ 2 คืนค่าเดิม)
 constexpr Btn kGripperOpen   = Btn::L2;       // RC1 -> kRc1L2Deg
 constexpr Btn kGripperClose  = Btn::R2;       // RC1 -> kRc1R2Deg
-constexpr Btn kPosePreset    = Btn::Circle;   // ท่าวาง (RC1+RC2) อย่างเดียว ไม่สลับ
+constexpr Btn kGripperZero   = Btn::Right;    // RC1 -> kRc1ZeroDeg (0°)
+constexpr Btn kPosePreset    = Btn::Circle;  // ท่าวาง (RC1+RC2) อย่างเดียว ไม่สลับ
 constexpr Btn kTrianglePose  = Btn::Triangle; // กดครั้งเดียว: RC1 -> kRcTrianglePoseRc1Deg, RC2 -> kRcTrianglePoseRc2Deg
 constexpr Btn kArmUp         = Btn::Up;       // RC2 ขยับขึ้น (ทิศกลับด้วย kRc2InvertDir)
 constexpr Btn kArmDown       = Btn::Down;     // RC2 ขยับลง
@@ -117,7 +118,7 @@ constexpr bool allUnique(const Btn* list, uint8_t n, uint8_t i) {
 // หน้าที่ที่กดใช้แยกกันได้อิสระ จึงต้องเป็นคนละปุ่มทั้งหมด
 constexpr Btn kIndependentButtons[] = {
     kFrontArmsDown, kFrontArmsUp,   kPushGround,     kGripperOpen,
-    kGripperClose,  kPosePreset,    kTrianglePose,   kArmUp,          kArmDown,
+    kGripperClose,  kGripperZero,   kPosePreset,   kTrianglePose,   kArmUp,          kArmDown,
     kPrecisionToggle, kReverseToggle, kSmoothToggle,
     kAutoStart,     kBrakeOrExit,
 };

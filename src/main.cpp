@@ -559,6 +559,25 @@ void enterAutoSession(uint32_t nowMs) {
     g_oled.render(g_snap, nowMs, true);
     g_oled.beepConfirm();
     g_serial.printEvent("AUTO", "Started -> Press X / BTN_UP / 'x' to exit");
+
+    // Fresh rested reading (motors just stopped) so the first mission move is already compensated.
+    if (Config::kEnableAutoVoltComp) {
+        const uint8_t  pct = AutoMode::samplePowerComp(true);
+        const uint16_t mv  = AutoMode::lastPowerCompMv();
+        char           buf[48];
+        if (mv == 0U) {
+            snprintf(buf, sizeof(buf), "volt comp %u%% (no battery reading)",
+                     static_cast<unsigned>(pct));
+        } else {
+            snprintf(buf, sizeof(buf), "volt comp %u%% @%u.%02uV (ref %u.%02uV)",
+                     static_cast<unsigned>(pct),
+                     static_cast<unsigned>(mv / 1000U),
+                     static_cast<unsigned>((mv % 1000U) / 10U),
+                     static_cast<unsigned>(Config::kAutoVoltRefMv / 1000U),
+                     static_cast<unsigned>((Config::kAutoVoltRefMv % 1000U) / 10U));
+        }
+        g_serial.printEvent("AUTO", buf);
+    }
 }
 
 /** Re-reads the PS2 pad after Auto and seeds edge latches so held buttons don't re-fire. */

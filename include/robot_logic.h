@@ -348,4 +348,20 @@ uint8_t computeDriveStabilityPenalty(uint8_t comScalePct,
  */
 void classifyBatteryPack(uint16_t baselineMv, uint16_t& emptyMv, uint16_t& fullMv);
 
+/**
+ * Auto voltage compensation factor (%) = refMv / battMv, clamped to [minPct, maxPct].
+ * PWM duty sets wheel speed only in proportion to pack voltage, so scaling the commanded
+ * power by this ratio keeps the real wheel speed (and the coast after a braked MoveDegs)
+ * the same as when the mission was tuned at refMv. Returns 100 (no change) when battMv is
+ * below Config::kExtPowerPresentMv (USB only / bad read) or refMv is 0.
+ */
+uint8_t computeAutoPowerCompPct(uint16_t battMv, uint16_t refMv, uint8_t minPct, uint8_t maxPct);
+
+/**
+ * Scales a signed drive power by compPct (%), rounding half up. Keeps the sign, keeps 0 at 0,
+ * never turns a non-zero power into 0, and clamps to +/-Config::kMotorMaxPower.
+ * compPct 0 or 100 returns the power unchanged.
+ */
+int16_t applyAutoPowerComp(int16_t power, uint8_t compPct);
+
 } // namespace RobotLogic

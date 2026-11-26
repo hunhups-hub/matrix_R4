@@ -87,6 +87,17 @@ void endBlockingDriveTask();
 /** Records that AutoBlockUser::loop() performed meaningful user activity beyond boilerplate polling. */
 void noteUserLoopActivity();
 
+/**
+ * Auto voltage compensation (%) for DriveDC power, from the STM32 battery reading.
+ * Reads at most every kPowerCompReadMs unless `force`; a failed read keeps the last value
+ * (100 before the first good read) and never aborts Auto. Always 100 when
+ * Config::kEnableAutoVoltComp is false.
+ */
+uint8_t samplePowerComp(bool force = false);
+
+/** Battery mV behind the last good samplePowerComp() reading (0 = none yet). */
+uint16_t lastPowerCompMv();
+
 /** Abort-safe Serial pass-through for Auto code (emergency keys are always intercepted first). */
 int serialAvailable();
 int serialRead();

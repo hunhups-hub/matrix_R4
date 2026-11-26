@@ -213,8 +213,11 @@ struct AutoDriveDCProxy {
     }
 
     uint8_t Move(int16_t leftPower, int16_t rightPower) const {
+        const uint8_t pct = AutoMode::samplePowerComp();
+        const int16_t l   = comp(leftPower, pct);
+        const int16_t r   = comp(rightPower, pct);
         return sendDriveCmd([&]() {
-            return mmL.Set_Drive_Move_Func(leftPower, rightPower, 1U);
+            return mmL.Set_Drive_Move_Func(l, r, 1U);
         });
     }
     uint8_t MoveDegs(int16_t leftPower,
@@ -242,14 +245,19 @@ struct AutoDriveDCProxy {
                      bool asyncWait = false) const {
         const uint32_t timeMs       = secondsToMs(seconds);
         const bool     expectMotion = (leftPower != 0 || rightPower != 0) && timeMs > 0UL;
+        const uint8_t  pct          = AutoMode::samplePowerComp();
+        const int16_t  l            = comp(leftPower, pct);
+        const int16_t  r            = comp(rightPower, pct);
         return runBlockingDriveCmd(asyncWait, expectMotion, [&]() {
-            return mmL.Set_Drive_Move_Time(
-                leftPower, rightPower, timeMs, brakeOnStop, asyncWait, 1U);
+            return mmL.Set_Drive_Move_Time(l, r, timeMs, brakeOnStop, asyncWait, 1U);
         });
     }
     uint8_t MoveSync(int16_t leftPower, int16_t rightPower) const {
+        const uint8_t pct = AutoMode::samplePowerComp();
+        const int16_t l   = comp(leftPower, pct);
+        const int16_t r   = comp(rightPower, pct);
         return sendDriveCmd([&]() {
-            return mmL.Set_Drive_MoveSync_Func(leftPower, rightPower, 1U);
+            return mmL.Set_Drive_MoveSync_Func(l, r, 1U);
         });
     }
     uint8_t MoveSyncDegs(int16_t leftPower,
@@ -257,10 +265,12 @@ struct AutoDriveDCProxy {
                          uint16_t degrees,
                          bool brakeOnStop,
                          bool asyncWait = false) const {
-        const bool expectMotion = (leftPower != 0 || rightPower != 0) && degrees != 0U;
+        const bool    expectMotion = (leftPower != 0 || rightPower != 0) && degrees != 0U;
+        const uint8_t pct          = AutoMode::samplePowerComp();
+        const int16_t l            = comp(leftPower, pct);
+        const int16_t r            = comp(rightPower, pct);
         return runBlockingDriveCmd(asyncWait, expectMotion, [&]() {
-            return mmL.Set_Drive_MoveSync_Degs(
-                leftPower, rightPower, degrees, brakeOnStop, asyncWait, 1U);
+            return mmL.Set_Drive_MoveSync_Degs(l, r, degrees, brakeOnStop, asyncWait, 1U);
         });
     }
     uint8_t MoveSyncTime(int16_t leftPower,
@@ -270,14 +280,17 @@ struct AutoDriveDCProxy {
                          bool asyncWait = false) const {
         const uint32_t timeMs       = secondsToMs(seconds);
         const bool     expectMotion = (leftPower != 0 || rightPower != 0) && timeMs > 0UL;
+        const uint8_t  pct          = AutoMode::samplePowerComp();
+        const int16_t  l            = comp(leftPower, pct);
+        const int16_t  r            = comp(rightPower, pct);
         return runBlockingDriveCmd(asyncWait, expectMotion, [&]() {
-            return mmL.Set_Drive_MoveSync_Time(
-                leftPower, rightPower, timeMs, brakeOnStop, asyncWait, 1U);
+            return mmL.Set_Drive_MoveSync_Time(l, r, timeMs, brakeOnStop, asyncWait, 1U);
         });
     }
     uint8_t MoveGyro(int16_t power, int16_t targetYawDeg) const {
+        const int16_t p = comp(power, AutoMode::samplePowerComp());
         return sendDriveCmd([&]() {
-            return mmL.Set_Drive_MoveGyro_Func(power, targetYawDeg, 1U);
+            return mmL.Set_Drive_MoveGyro_Func(p, targetYawDeg, 1U);
         });
     }
     uint8_t MoveGyroDegs(int16_t power,
@@ -285,10 +298,11 @@ struct AutoDriveDCProxy {
                          uint16_t degrees,
                          bool brakeOnStop,
                          bool asyncWait = false) const {
-        const bool expectMotion = (power != 0) && degrees != 0U;
+        const bool    expectMotion = (power != 0) && degrees != 0U;
+        const int16_t p            = comp(power, AutoMode::samplePowerComp());
         const uint8_t res = runBlockingDriveCmd(asyncWait, expectMotion, [&]() {
             return mmL.Set_Drive_MoveGyro_Degs(
-                power, targetYawDeg, degrees, brakeOnStop, asyncWait, 1U);
+                p, targetYawDeg, degrees, brakeOnStop, asyncWait, 1U);
         });
         return res;
     }
@@ -299,9 +313,10 @@ struct AutoDriveDCProxy {
                          bool asyncWait = false) const {
         const uint32_t timeMs       = secondsToMs(seconds);
         const bool     expectMotion = (power != 0) && timeMs > 0UL;
+        const int16_t  p            = comp(power, AutoMode::samplePowerComp());
         const uint8_t  res = runBlockingDriveCmd(asyncWait, expectMotion, [&]() {
             return mmL.Set_Drive_MoveGyro_Time(
-                power, targetYawDeg, timeMs, brakeOnStop, asyncWait, 1U);
+                p, targetYawDeg, timeMs, brakeOnStop, asyncWait, 1U);
         });
         return res;
     }
@@ -310,10 +325,11 @@ struct AutoDriveDCProxy {
                      uint8_t mode,
                      bool brakeOnStop,
                      bool asyncWait = false) const {
-        const bool expectMotion = (power != 0);
+        const bool    expectMotion = (power != 0);
+        const int16_t p            = comp(power, AutoMode::samplePowerComp());
         const uint8_t res = runBlockingDriveCmd(asyncWait, expectMotion, [&]() {
             return mmL.Set_Drive_TurnGyro(
-                power, targetYawDeg, mode, brakeOnStop, asyncWait, 1U);
+                p, targetYawDeg, mode, brakeOnStop, asyncWait, 1U);
         });
         return res;
     }
@@ -351,15 +367,23 @@ struct AutoDriveDCProxy {
     operator MiniR4DriveDC<1>&() const { return real(); }
 
 private:
+    // Auto voltage compensation (Config::kEnableAutoVoltComp): one factor per command for both
+    // wheels, so the L/R ratio and the sign of every power stay exactly as written in the mission.
+    static int16_t comp(int16_t power, uint8_t pct) {
+        return RobotLogic::applyAutoPowerComp(power, pct);
+    }
+
     uint8_t moveDegsLegacy(int16_t leftPower,
                            int16_t rightPower,
                            uint16_t degrees,
                            bool brakeOnStop,
                            bool asyncWait) const {
-        const bool expectMotion = (leftPower != 0 || rightPower != 0) && degrees != 0U;
+        const bool    expectMotion = (leftPower != 0 || rightPower != 0) && degrees != 0U;
+        const uint8_t pct          = AutoMode::samplePowerComp();
+        const int16_t l            = comp(leftPower, pct);
+        const int16_t r            = comp(rightPower, pct);
         return runBlockingDriveCmd(asyncWait, expectMotion, [&]() {
-            return mmL.Set_Drive_Move_Degs(
-                leftPower, rightPower, degrees, brakeOnStop, asyncWait, 1U);
+            return mmL.Set_Drive_Move_Degs(l, r, degrees, brakeOnStop, asyncWait, 1U);
         });
     }
 
@@ -671,6 +695,22 @@ inline bool servoTo(uint8_t channel, uint16_t deg, uint16_t settleMs = 300U) {
 #define ENABLE_DRIVEDC_BRAKE_DELAY
 #include "MatrixMiniR4.h"
 
+void release() {
+  MiniR4.RC1.setAngle(180);
+}
+
+void keep() {
+  MiniR4.RC1.setAngle(80);
+}
+
+void up() {
+  MiniR4.RC2.setAngle(95);
+}
+
+void down() {
+  MiniR4.RC2.setAngle(165);
+}
+
 void setup()
 {
   MiniR4.begin();
@@ -678,60 +718,57 @@ void setup()
   Serial.begin(9600);
   MiniR4.I2C1.MJ5.begin();
   MiniR4.DriveDC.begin(1, 2, false, true);
-  MiniR4.RC2.setAngle(70);
-  MiniR4.RC1.setAngle(75);
-  if(MiniR4.PS2.Button(PSB_TRIANGLE))
-  {
-    MiniR4.DriveDC.MoveDegs((-50), (-50), 415, true);
-    delay(1000);
-    MiniR4.RC2.setAngle(165);
-    delay(1000);
-    MiniR4.RC1.setAngle(145);
-    delay(1000);
-    MiniR4.RC2.setAngle(0);
-    delay(1000);
-    MiniR4.DriveDC.MoveDegs((-50), 50, 275, true);
-    delay(1000);
-    MiniR4.DriveDC.MoveDegs((-50), (-50), 1300, true);
-    delay(1000);
-    MiniR4.RC2.setAngle(125);
-    delay(500);
-    MiniR4.RC1.setAngle(75);
-    delay(1000);
-    MiniR4.DriveDC.MoveDegs(50, 50, 300, true);
-    delay(500);
-    MiniR4.DriveDC.MoveDegs(50, (-50), 255, true);
-    delay(500);
-    MiniR4.DriveDC.MoveDegs((-50), (-50), 300, true);
-    delay(500);
-    MiniR4.DriveDC.MoveDegs(50, (-50), 255, true);
-    delay(500);
-    MiniR4.RC2.setAngle(140);
-    delay(1000);
-    MiniR4.DriveDC.MoveDegs((-50), (-50), 450, true);
-    delay(500);
-    MiniR4.RC1.setAngle(145);
-    delay(1000);
-    MiniR4.DriveDC.MoveDegs(50, 50, 300, true);
-    delay(500);
-    MiniR4.DriveDC.MoveDegs(50, (-50), 515, true);
-    delay(500);
-    MiniR4.DriveDC.MoveDegs((-50), (-50), 400, true);
-    delay(500);
-    MiniR4.RC2.setAngle(120);
-    delay(1000);
-    MiniR4.RC1.setAngle(75);
-    delay(1000);
-  }
+  MiniR4.RC3.setAngle(140);
+  MiniR4.RC4.setAngle(40);
+  MiniR4.RC2.setAngle(35);
+  release();
 }
 
 void loop()
 {
   MiniR4.PS2.read_gamepad(false, 0);
+  if(MiniR4.PS2.Button(PSB_START))
+  {
+    MiniR4.DriveDC.MoveDegs((-50), (-50), 170, true);
+    delay(500);
+    MiniR4.DriveDC.MoveDegs((-50), 50, 90, true);
+    delay(500);
+    MiniR4.DriveDC.MoveDegs((-50), (-50), 150, true); 
+    delay(500);
+    down();
+    delay(1000);
+    keep();
+    delay(1000);
+    MiniR4.RC2.setAngle(110);
+    delay(750);
+    MiniR4.DriveDC.MoveDegs((-50), (-50), 270, true);
+    delay(500);
+    MiniR4.DriveDC.MoveDegs((-50), 50, 260, true); //อาจจะแก้
+    delay(500);
+    up();
+    delay(750);
+    MiniR4.DriveDC.MoveDegs((-50), (-50), 520, true); 
+    delay(500);
+    MiniR4.RC2.setAngle(135); //...
+    delay(750);
+    release();
+    delay(1000);
+    MiniR4.DriveDC.MoveDegs(50, 50, 150, true);
+    delay(750);
+    MiniR4.DriveDC.MoveDegs(50, (-50), 260, true);
+    delay(500);
+    MiniR4.RC2.setAngle(130 ); //ที่แขนติดคานบ่อยๆ 
+    delay(750);
+    MiniR4.DriveDC.MoveDegs((-50), (-50), 150, true);
+    delay(500);
+    MiniR4.DriveDC.MoveDegs(50, (-50), 215, true);
+    delay(500);
+    MiniR4.DriveDC.MoveDegs((-50), (-50), 440, true);
+    delay(500);
+    keep();
+  }
 
 }
-
-
 
 
 // ============================================================================

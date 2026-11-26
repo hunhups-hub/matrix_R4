@@ -21,7 +21,7 @@ carrier, using the `matrix-robotics/MatrixMiniR4@^1.2.6` library.
 
 ```powershell
 $pio = "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe"
-& $pio test -e native                          # Unity host tests, expect 40/40 pass
+& $pio test -e native                          # Unity host tests, expect 44/44 pass
 & $pio test -e native -f test_robot_logic      # the only test suite
 & $pio run -e uno_r4_wifi                      # firmware build, -Werror on src/
 & $pio run -e uno_r4_wifi --target upload      # flash board
@@ -85,5 +85,5 @@ Bootloader entry if upload cannot find the port: hold BTN_UP + BTN_DOWN for
   goes below the diagnostic pragmas, inside `namespace AutoBlockUser`. Proxy
   classes there wrap `MiniR4` and `Serial`. Do not remove the pragmas or proxies.
 - `src/` must build warning-free (`-Wall -Wextra -Werror`).
-- The README states the test count (40), the file count (28), and the
+- The README states the test count (44), the file count (28), and the
   `config.h` parameter table. Update the README when any of these change.

@@ -50,6 +50,7 @@ void updateServoTargetsFromPs2(const Ps2Frame& frame,
     const bool push        = held(frame, Controls::kPushGround);
     const bool gripOpen    = held(frame, Controls::kGripperOpen);
     const bool gripClose   = held(frame, Controls::kGripperClose);
+    const bool gripZero    = held(frame, Controls::kGripperZero);
     const bool posePreset  = held(frame, Controls::kPosePreset);
 
     if (allowArmStep) {
@@ -111,6 +112,12 @@ void updateServoTargetsFromPs2(const Ps2Frame& frame,
         targets.rc1Deg = Config::kRc1R2Deg;
         if (poseState != nullptr) {
             poseState->dropActive = false;
+        }
+    } else if (gripZero) {
+        targets.rc1Deg = Config::kRc1ZeroDeg;
+        if (poseState != nullptr) {
+            poseState->dropActive     = false;
+            poseState->releasePending = false;
         }
     } else if (circleRising) {
         // Circle = วางอย่างเดียว (ไม่สลับ): ขยับแขน RC2 ก่อน แล้วค่อยปล่อย RC1 หลัง kPoseDropReleaseDelayMs

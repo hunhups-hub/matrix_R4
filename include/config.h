@@ -176,7 +176,7 @@ static_assert(inRange(kSerialDefaultSpeed, kSerialMinSpeed, kMotorMaxPower),
               "user_settings.h: kSerialDefaultSpeed ต้องอยู่ในช่วง 20..100");
 
 // --- 2) เซอร์โว ---
-static_assert(servoDegOk(kRc1InitDeg) && servoDegOk(kRc1L2Deg) && servoDegOk(kRc1R2Deg) &&
+static_assert(servoDegOk(kRc1InitDeg) && servoDegOk(kRc1L2Deg) && servoDegOk(kRc1R2Deg) && servoDegOk(kRc1ZeroDeg) &&
                   servoDegOk(kRc1PresetHoldDeg) && servoDegOk(kRc1PresetDropDeg),
               "user_settings.h: มุม RC1 (kRc1...Deg) ต้องอยู่ในช่วง 0..180");
 static_assert(servoDegOk(kRcTrianglePoseRc1Deg) && rc2DegOk(kRcTrianglePoseRc2Deg),
@@ -213,5 +213,9 @@ static_assert(inRange(kMotorStictionMinPower, 0, 50),
               "user_settings.h: kMotorStictionMinPower ต้องอยู่ในช่วง 0..50");
 static_assert(inRange(kMaxMotorTrimPct, 0, 50),
               "user_settings.h: kMaxMotorTrimPct ต้องอยู่ในช่วง 0..50");
+static_assert(inRange(kAutoVoltRefMv, kExtPowerPresentMv, 25500),
+              "user_settings.h: kAutoVoltRefMv ต้องอยู่ในช่วง 5500..25500");
+static_assert(inRange(kAutoCompMinPct, 50, 100) && inRange(kAutoCompMaxPct, 100, 200),
+              "user_settings.h: kAutoCompMinPct ต้องอยู่ในช่วง 50..100 และ kAutoCompMaxPct ในช่วง 100..200");
 
 } // namespace Config

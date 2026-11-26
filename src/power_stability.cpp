@@ -325,6 +325,39 @@ void classifyBatteryPack(uint16_t baselineMv, uint16_t& emptyMv, uint16_t& fullM
     }
 }
 
+uint8_t computeAutoPowerCompPct(uint16_t battMv, uint16_t refMv, uint8_t minPct, uint8_t maxPct) {
+    if (battMv < Config::kExtPowerPresentMv || refMv == 0U) {
+        return 100U;
+    }
+    // The clamp window always contains 100 so a bad setting can never invert the compensation.
+    const uint32_t lo  = (minPct > 100U) ? 100UL : static_cast<uint32_t>(minPct);
+    const uint32_t hi  = (maxPct < 100U) ? 100UL : static_cast<uint32_t>(maxPct);
+    const uint32_t pct = (static_cast<uint32_t>(refMv) * 100UL + (battMv / 2U)) / battMv;
+    if (pct < lo) {
+        return static_cast<uint8_t>(lo);
+    }
+    if (pct > hi) {
+        return static_cast<uint8_t>(hi);
+    }
+    return static_cast<uint8_t>(pct);
+}
+
+int16_t applyAutoPowerComp(int16_t power, uint8_t compPct) {
+    if (power == 0 || compPct == 0U || compPct == 100U) {
+        return power;
+    }
+    const bool    negative = (power < 0);
+    const int32_t mag      = negative ? -static_cast<int32_t>(power) : static_cast<int32_t>(power);
+    int32_t       scaled   = (mag * static_cast<int32_t>(compPct) + 50L) / 100L;
+    if (scaled < 1L) {
+        scaled = 1L;
+    }
+    if (scaled > static_cast<int32_t>(Config::kMotorMaxPower)) {
+        scaled = static_cast<int32_t>(Config::kMotorMaxPower);
+    }
+    return static_cast<int16_t>(negative ? -scaled : scaled);
+}
+
 uint8_t computeDriveStabilityPenalty(uint8_t comScalePct,
                                      int16_t driveLeft,
                                      int16_t driveRight,

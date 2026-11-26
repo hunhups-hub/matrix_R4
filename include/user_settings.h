@@ -40,7 +40,7 @@ constexpr int16_t  kMicroTurnPower         = 26;      // กำลังหม�
                                                        // ช่วง 0..100 | ตอนนี้ไม่มีปุ่มจอยผูกกับหมุนละเอียด (D-Pad ซ้าย/ขวาว่าง)
 constexpr int16_t  kPrecisionMicroTurnPower    = 18;   // กำลังหมุนละเอียดเมื่อกด D-Pad ซ้าย/ขวา ในโหมดแม่นยำ (%)
                                                        // ช่วง 0..100
-constexpr uint8_t  kTurnMaxRatioPct        = 80U;     // สัดส่วนกำลังเลี้ยวสูงสุดที่ความเร็วปกติ (%)
+constexpr uint8_t  kTurnMaxRatioPct        = 100U;    // สัดส่วนกำลังเลี้ยวสูงสุดที่ความเร็วปกติ (%)
                                                        // ช่วง 1..100 | เพิ่ม = เลี้ยวแรง/เร็วขึ้น
 constexpr int16_t  kSerialDefaultSpeed     = 100;     // ความเร็วเริ่มต้นผ่าน Serial เต็ม 100% (ช่วง 20..100%)
 
@@ -51,16 +51,17 @@ constexpr int16_t  kSerialDefaultSpeed     = 100;     // ความเร็�
 
 // --- 2.1) RC1 กริปเปอร์  (ปุ่ม kGripperOpen / kGripperClose / kPosePreset) ---
 constexpr int16_t  kRc1InitDeg             = 180;       // มุมเริ่มต้นของเซอร์โวเสริม (กริปเปอร์)
-constexpr int16_t  kRc1L2Deg               = 100;     // ปุ่ม kGripperOpen (L2)
-constexpr int16_t  kRc1R2Deg               = 180;       // ปุ่ม kGripperClose (R2)
-constexpr int16_t  kRc1PresetHoldDeg       = 100;      // พรีเซ็ตท่าถือ (ใช้เฉพาะ Serial q): กริปเปอร์จับ/ถือของ (ตรงกับ Auto)
-constexpr int16_t  kRc1PresetDropDeg       = 100;     // พรีเซ็ตวงกลม (ปุ่มวางอย่างเดียว): กริปเปอร์เปิด/ปล่อยของ (ตรงกับ Auto)
+constexpr int16_t  kRc1L2Deg               = 150;     // ปุ่ม kGripperOpen (L2)
+constexpr int16_t  kRc1R2Deg               = 80;       // ปุ่ม kGripperClose (R2)
+constexpr int16_t  kRc1ZeroDeg             = 180;       // ปุ่ม kGripperZero (D-Pad ขวา): RC1 -> 0°
+constexpr int16_t  kRc1PresetHoldDeg      = 100;      // พรีเซ็ตท่าถือ (ใช้เฉพาะ Serial q): กริปเปอร์จับ/ถือของ (ตรงกับ Auto)
+constexpr int16_t  kRc1PresetDropDeg       = 150;     // พรีเซ็ตวงกลม (ปุ่มวางอย่างเดียว): กริปเปอร์เปิด/ปล่อยของ (ตรงกับ Auto)
 constexpr uint32_t kPoseDropReleaseDelayMs = 600UL;   // ปุ่ม Circle: ขยับแขน RC2 ก่อน แล้วรอเท่านี้ (ms) ค่อยปล่อยกริปเปอร์ RC1
                                                        // ช่วง 0..5000 | 0 = ปล่อยพร้อมแขน | เพิ่ม = ปล่อยช้าลง (ให้แขนลงถึงก่อน)
 
 // --- 2.1b) ท่าปุ่ม Triangle (kTrianglePose): กดครั้งเดียวตั้งมุมแล้วค้างไว้ ---
-constexpr int16_t  kRcTrianglePoseRc1Deg   = 100;     // RC1 (แขน R1) 0..180
-constexpr int16_t  kRcTrianglePoseRc2Deg   = 100;    // RC2 (แขน R2) ช่วง kRc2MinDeg..kRc2MaxDeg
+constexpr int16_t  kRcTrianglePoseRc1Deg   = 150;     // RC1 (แขน R1) 0..180
+constexpr int16_t  kRcTrianglePoseRc2Deg   = 130;    // RC2 (แขน R2) ช่วง kRc2MinDeg..kRc2MaxDeg
 
 // --- 2.2) RC2 แขนยก  (ปุ่ม kArmUp / kArmDown / kPosePreset / kSmoothToggle) ---
 //  ความเร็วแขนเมื่อกดค้าง = kRc2StepDeg / kArmStepIntervalMs
@@ -76,19 +77,19 @@ constexpr bool     kRc2InvertDir           = true;    // กลับทิศ R
 constexpr int16_t  kRc2PresetHoldDeg       = 0
 
 ;      // พรีเซ็ตท่าถือ (ใช้เฉพาะ Serial q): ท่ายกแขนถือของ (ตรงกับ Auto)
-constexpr int16_t  kRc2PresetDropDeg       = 165;     // พรีเซ็ตวงกลม (ปุ่มวางอย่างเดียว): ท่าลดแขนวางของ (ตรงกับ Auto)
+constexpr int16_t  kRc2PresetDropDeg       = 164;     // พรีเซ็ตวงกลม (ปุ่มวางอย่างเดียว): ท่าลดแขนวางของ (ตรงกับ Auto)
 constexpr int16_t  kRc2SmoothStepDeg       = 6;       // ขั้น slew ของ RC2 ต่อ 25 ms (6 องศา/25 ms = 240 องศา/วินาที)
                                                        // ช่วง 1..90 | เพิ่ม = แขนกวาดเร็วขึ้นในโหมดนุ่ม
 constexpr bool     kRc2SmoothDefault       = true;    // เปิดการเคลื่อนที่นุ่มนวลเป็นค่าเริ่มต้น เฉพาะ RC2
 
 // --- 2.3) RC3 + RC4 แขนหน้าซ้าย/ขวา  (ปุ่ม kFrontArmsDown / kFrontArmsUp / kPushGround) ---
 constexpr int16_t  kRc3InitDeg             = 30;      // มุมเริ่มต้นแขนหน้าซ้าย (คู่กับ RC4; จำกัด 0..180)
-constexpr int16_t  kRc3L1Deg               = 30;      // L1 กดลง (30 องศา; มุมน้อย = ลึกกว่า; ต่ำสุด 0)
+constexpr int16_t  kRc3L1Deg               = 60;      // L1 กดลง (15 องศา; มุมน้อย = ลึกกว่า/กดแรงกว่า; ต่ำสุด 0)
 constexpr int16_t  kRc3R1Deg               = 140;     // R1 ยกขึ้น / เก็บกลาง (140 องศา)
 constexpr int16_t  kRc3SquareDeg           = 180;      // Square สลับกดพื้น (180 องศา)
 constexpr bool     kRc3InvertDir           = false;   // กลับมุมที่ส่งออกฮาร์ดแวร์ของ RC3 (องศา -> 180 - องศา)
 constexpr int16_t  kRc4InitDeg             = 30;      // มุมเริ่มต้นแขนหน้าขวา (คู่กับ RC3)
-constexpr int16_t  kRc4L1Deg               = 30;      // L1 กดลง (30 องศา; คู่กับ RC3)
+constexpr int16_t  kRc4L1Deg               = 60;      // L1 กดลง (15 องศา; คู่กับ RC3)
 constexpr int16_t  kRc4R1Deg               = 140;     // R1 ยกขึ้น / เก็บกลาง (140 องศา)
 constexpr int16_t  kRc4SquareDeg           = 180;      // Square สลับกดพื้น (180 องศา)
 constexpr bool     kRc4InvertDir           = true;    // กลับมุมที่ส่งออกฮาร์ดแวร์ของ RC4 (องศา -> 180 - องศา)
@@ -101,20 +102,20 @@ constexpr bool     kMotorRightReverseInit  = true;
 constexpr bool     kEnableSmartHoldBrake   = true;    // ล็อก M1/M2 ด้วยเบรก H-bridge ตอนหยุดนิ่ง (0,0)
 constexpr uint8_t  kStickDeadzoneRaw       = 18U;     // เดดโซนกลางก้านจอย ~14% (127/128)
                                                        // ช่วง 0..126 | เพิ่ม = ต้องโยกก้านมากขึ้นก่อนหุ่นขยับ
-constexpr uint8_t  kThrottleExpoPct        = 35U;     // เส้นโค้งลูกบาศก์ 35% ที่คันเร่ง ลดอาการกระชาก
+constexpr uint8_t  kThrottleExpoPct        = 15U;     // เส้นโค้งลูกบาศก์ 15% ที่คันเร่ง ลดอาการกระชาก
                                                        // ช่วง 0..100 | เพิ่ม = ช่วงต้นก้านนุ่มขึ้น
-constexpr uint8_t  kTurnExpoPct            = 45U;     // เส้นโค้งลูกบาศก์ 45% ที่การเลี้ยว
+constexpr uint8_t  kTurnExpoPct            = 30U;     // เส้นโค้งลูกบาศก์ 30% ที่การเลี้ยว
 constexpr uint8_t  kPrecisionThrottleExpoPct   = 55U;  // เส้นโค้ง expo ลูกบาศก์ของคันเร่งให้นุ่มขึ้นในโหมดแม่นยำ
 constexpr uint8_t  kPrecisionTurnExpoPct       = 60U;  // เส้นโค้ง expo ลูกบาศก์ของการเลี้ยวให้นุ่มขึ้นในโหมดแม่นยำ
 // ขั้น slew ทุกตัว ช่วง 1..100 | เพิ่ม = ตอบสนองเร็วขึ้นแต่กระชากขึ้น
-constexpr int16_t  kMotorAccelSlewStep     = 25;      // 0 -> 100% ใช้เวลา ~100 ms
+constexpr int16_t  kMotorAccelSlewStep     = 50;      // 0 -> 100% ใช้เวลา ~50 ms
 constexpr int16_t  kMotorDecelSlewStep     = 50;      // 100% -> 0 ใช้เวลา ~50 ms
-constexpr int16_t  kAngularAccelSlewStep   = 35;      // ขั้น slew ของการหมุน (2-DOF) ตอนเร่ง
+constexpr int16_t  kAngularAccelSlewStep   = 60;    // ขั้น slew ของการหมุน (2-DOF) ตอนเร่ง
 constexpr int16_t  kAngularDecelSlewStep   = 60;      // ขั้น slew ของการหมุน (2-DOF) ตอนเบรก
-constexpr int16_t  kMaxCentripetalLatAccel = 52;      // ขีดจำกัดวงกลมการยึดเกาะ |v * w| / 100 <= 52
-constexpr int16_t  kMotorStictionMinPower  = 12;      // กำลังขั้นต่ำชนะแรงเสียดทานสถิต (%)
+constexpr int16_t  kMaxCentripetalLatAccel = 75;      // ขีดจำกัดวงกลมการยึดเกาะ |v * w| / 100 <= 75
+constexpr int16_t  kMotorStictionMinPower  = 18;    // กำลังขั้นต่ำชนะแรงเสียดทานสถิต (%)
                                                        // ช่วง 0..50
-constexpr uint8_t  kCoMHighMinScalePct     = 65U;     // สเกลเร่ง/แรงสู่ศูนย์กลางต่ำสุดเมื่อยกแขนสูง (RC2->0)
+constexpr uint8_t  kCoMHighMinScalePct     = 85U;   // สเกลเร่ง/แรงสู่ศูนย์กลางต่ำสุดเมื่อยกแขนสูง (RC2->0)
 constexpr int16_t  kCoMLowArmDeg           = 140;     // มุม RC2 >= ค่านี้ ถือว่าจุดศูนย์ถ่วงต่ำ (สเกลไดนามิก 100%)
 constexpr int8_t   kMaxMotorTrimPct        = 15;      // ค่าชดเชยซ้าย/ขวาสูงสุดเพื่อให้วิ่งตรง (+/-15%)
                                                        // ช่วง 0..50
@@ -125,6 +126,14 @@ constexpr int16_t  kBattLowMaxPower        = 72;      // เพดานกำ�
 constexpr int16_t  kBattCritMaxPower       = 50;
 constexpr int16_t  kBattEmergMaxPower      = 35;
 constexpr uint8_t  kBattCompMaxPct         = 115U;    // เพดานการชดเชยแรงบิดแบบจำกัดขอบเขต
+
+// ชดเชยแรงดันใน Auto: power ของ DriveDC (MoveDegs/MoveTime/MoveSync*/MoveGyro*/TurnGyro) คูณด้วย
+// kAutoVoltRefMv / แรงดันแบต ล้อจึงหมุนเร็วเท่าตอนจูน mission ระยะและมุมเลี้ยวไม่เพี้ยนตอนแบตอ่อน
+// ตั้งค่าอ้างอิง: เข้า Auto ด้วยแบตระดับที่ใช้จูน แล้วดู event "AUTO volt comp ...% @x.xxV" ใน Serial
+constexpr bool     kEnableAutoVoltComp     = true;    // false = ส่ง power ตามที่เขียนใน mission ตรงๆ
+constexpr uint16_t kAutoVoltRefMv          = 8200U;   // ช่วง 5500..25500 | แรงดันแบต (mV) ตอนจูน mission
+constexpr uint8_t  kAutoCompMinPct         = 90U;     // ช่วง 50..100 | แบตสูงกว่าค่าอ้างอิง: ลด power ได้สุด 10%
+constexpr uint8_t  kAutoCompMaxPct         = 130U;    // ช่วง 100..200 | แบตอ่อน: เพิ่ม power ได้สุด 30%
 
 // --- 5) โหมด Auto  เวลา / ตรวจล้อติด ---
 constexpr uint32_t kAutoStartBtnHoldMs     = 1200UL;  // กด BTN_UP ค้างเท่านี้เพื่อเริ่ม Auto โดยไม่ใช้ PS2

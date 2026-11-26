@@ -21,7 +21,7 @@
    - การเปิดโปรเจกต์และการโหลด Toolchain อัตโนมัติ
    - การเรียกใช้งาน PlatformIO ผ่าน Terminal และ CLI
 5. [คู่มือการคอมไพล์ ทดสอบ และอัปโหลดโปรแกรม (Build, Test & Upload Step-by-Step)](#5-คู่มือการคอมไพล์-ทดสอบ-และอัปโหลดโปรแกรม-build-test--upload-step-by-step)
-   - 5.1 การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์ (`pio test -e native` — ครบ 41 รายการ 11 หมวดหมู่)
+   - 5.1 การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์ (`pio test -e native` — ครบ 44 รายการ 11 หมวดหมู่)
    - 5.2 การคอมไพล์โค้ดสำหรับฮาร์ดแวร์ (`pio run -e uno_r4_wifi`)
    - 5.3 การอัปโหลดเฟิร์มแวร์ลงบอร์ด (`pio run -e uno_r4_wifi --target upload`)
    - 5.4 ทางลัดเข้าสู่โหมดอัปโหลด Bootloader (Upload Bootloader Mode Shortcut)
@@ -113,7 +113,7 @@
 
 - **ไดรเวอร์จอยสติ๊ก PS2 แบบ Deterministic Bit-Bang SPI (~1.4 ms)**: แก้ปัญหาคอขวดของไดรเวอร์เดิม (`PS2X::read_gamepad()`) ที่ใช้การวนลูปหน่วงเวลาแบบบล็อกการทำงาน (Blocking) นานถึง 150–240 ms เมื่อสัญญาณหลุด โดยไดรเวอร์ใหม่เข้าถึงรีจิสเตอร์พอร์ตฮาร์ดแวร์โดยตรง (`POSR`, `PORR`, `PIDR`) ทำให้การอ่านค่าจอยสติ๊กทำเสร็จสิ้นได้ในเวลาคงที่เพียง ~1.4 ms ต่อรอบ และเมื่อไม่ได้เสียบตัวรับจะตัดจบการโพรบภายใน ~0.8 ms โดยไม่กระทบต่อลูปควบคุม 40 Hz
 - **แบบจำลองฟิสิกส์จลนพลศาสตร์และไฟฟ้ากล 5 ขั้นตอน (`computeKinodynamicDrive`)**:
-  1. **Cubic Expo Input Shaping (`applyCubicExpo`)**: ปรับโค้งคันเร่ง (`35%`) และโค้งการเลี้ยว (`45%`) ด้วยพหุนามกำลังสาม ลดความกระตุก (Jerk) บริเวณกึ่งกลางก้านโยกเพื่อการเล็งที่ละเอียด แต่ยังคงกำลังสูงสุด $\pm 100\%$ เมื่อโยกสุด
+  1. **Cubic Expo Input Shaping (`applyCubicExpo`)**: ปรับโค้งคันเร่ง (`15%`) และโค้งการเลี้ยว (`30%`) ด้วยพหุนามกำลังสาม ลดความกระตุก (Jerk) บริเวณกึ่งกลางก้านโยกเพื่อการเล็งที่ละเอียด แต่ยังคงกำลังสูงสุด $\pm 100\%$ เมื่อโยกสุด
   2. **Centripetal Traction Circle Limiter (`limitCentripetalTurn`)**: จำกัดความเร่งหนีศูนย์กลางขณะเข้าโค้งความเร็วสูง ($|v \cdot \omega| / 100 \le 52$) ป้องกันล้อไถลหรือท้ายปัด โดยยังคงกำลังหมุนตัวอยู่กับที่ (Pivot Turn) เต็ม 100%
   3. **Dynamic Center-of-Mass (CoM) Anti-Tip Scaling (`computeCoMDynamicScale`)**: คำนวณความสูงจุดศูนย์ถ่วงจากมุมแขนยก `RC2` แบบเรียลไทม์ เมื่อยกแขนสูงขึ้น (`140° -> 0°`) ระบบจะลดอัตราเร่งและขีดจำกัดแรงเหวี่ยงเข้าโค้งลงตามสัดส่วน (`100% -> 65%`) ป้องกันหุ่นยนต์หน้าหงายหรือคะมำ
   4. **Coupled 2-DOF Rigid-Body Slew Limiter (`apply2DofKinodynamicSlew`)**: ควบคุมอัตราเร่งและอัตราเบรกแยกอิสระในพิกัดความเร็วเชิงเส้น ($v$) และความเร็วเชิงมุม ($\omega$) แบบเลขจำนวนเต็มสองเท่า (Zero-Rounding Loss) ช่วยรักษาความโค้งของเส้นทาง ($\omega / v$) ขณะเร่งหรือเบรกไม่ให้เพี้ยน
@@ -326,16 +326,16 @@
 ```
 *(หรือพิมพ์ `pio test -e native` หากตั้งค่า Environment Path แล้ว)*
 
-**ผลลัพธ์ที่คาดหวัง**: ระบบจะรันชุดทดสอบ Unity Unit Tests ครบทั้ง **41 รายการ (11 หมวดหมู่)** โดยจะผ่านทั้งหมด (`[PASSED]`) 100% ภายในเวลาไม่กี่วินาที:
+**ผลลัพธ์ที่คาดหวัง**: ระบบจะรันชุดทดสอบ Unity Unit Tests ครบทั้ง **44 รายการ (11 หมวดหมู่)** โดยจะผ่านทั้งหมด (`[PASSED]`) 100% ภายในเวลาไม่กี่วินาที:
 ```text
 =================================== SUMMARY ===================================
 Environment    Test              Status    Duration
 -------------  ----------------  --------  ------------
 native         test_robot_logic  PASSED    00:00:02.729
-================= 41 test cases: 41 succeeded in 00:00:02.729 =================
+================= 44 test cases: 44 succeeded in 00:00:02.729 =================
 ```
 
-**คำอธิบายชุดทดสอบทั้ง 41 รายการ (11 หมวดหมู่หลัก)** ใน [test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp):
+**คำอธิบายชุดทดสอบทั้ง 44 รายการ (11 หมวดหมู่หลัก)** ใน [test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp):
 1. **การคำนวณจลนศาสตร์ล้อและการตัด Deadzone (Differential Drive Kinematics - 4 รายการ)**:
    - `test_axis_deadzone_and_extremes`: ตรวจสอบว่าช่วง Deadband ตรงกลางของจอยสติ๊ก (`109..146`) ตัดเป็น `0` อย่างสมบูรณ์ และเมื่อโยกสุดจะได้ `±100%` แน่นอน
    - `test_differential_drive_zero_speed_boundary`: ตรวจสอบว่าเมื่อขีดจำกัดความเร็วเป็น `0` หรือติดลบ มอเตอร์จะไม่ขยับหรือค่อยๆ ลดความเร็วสู่ `0`
@@ -350,7 +350,9 @@ native         test_robot_logic  PASSED    00:00:02.729
    - `test_failsafe_persistent_loss_disconnect_and_reinit_cooldown`: ตรวจสอบการเข้าสู่สถานะหลุดการเชื่อมต่อ (`Disconnected`) เมื่อสัญญาณหายเกิน 3 วินาที (120 เฟรม) หรือจอยรีเซ็ตโหมดเป็น `0x41` ครบ 3 เฟรม พร้อมการหน่วง Cooldown 500 ms
    - `test_servo_bounds_and_ps2_presets`: ตรวจสอบการจำกัดขอบเขตองศาเซอร์โวให้อยู่ในช่วง `0°..180°` และการขยับ `RC1..RC4` ด้วยปุ่ม L1, R1, L2, R2, D-Pad
    - `test_square_push_ground_toggle_and_l1_r1_override`: ตรวจสอบปุ่ม `Square` กดครั้งที่ 1 ดันพื้น (`RC3=30°, RC4=30°`), กดครั้งที่ 2 คืนค่าเดิมก่อนกด และการยกเลิกอัตโนมัติเมื่อกด `L1`/`R1` แทรก
-4. **ระบบป้องกันไฟตกแบบปรับตัว (Adaptive Battery Sag Protection - 4 รายการ)**:
+4. **ระบบป้องกันไฟตกแบบปรับตัว (Adaptive Battery Sag Protection - 6 รายการ)**:
+   - `test_auto_power_comp_pct_ratio_and_clamps`: ตรวจสอบตัวคูณชดเชยแรงดันของ Auto (`kAutoVoltRefMv / แรงดันแบต`) เช่น `6.8V` เทียบ ref `7.8V` = `115%`, การจำกัดช่วง `90%..130%` และการคืน `100%` เมื่อไม่มีไฟแบต/อ่านค่าไม่ได้
+   - `test_auto_power_comp_apply_sign_zero_and_clamp`: ตรวจสอบว่าการคูณ power คงเครื่องหมาย, `0` ยังเป็น `0`, ค่าเล็กไม่กลายเป็น `0`, ตัดที่ `±100` และไม่ล้น `int16_t`
    - `test_battery_stabilizer_multiprofile_baselines`: ตรวจสอบการจำแนกโปรไฟล์แรงดันไฟอัตโนมัติ (USB, LiPo 2S, หม้อแปลง 9V, LiPo 3S, LiPo 4S, หม้อแปลง 18V)
    - `test_battery_stabilizer_progressive_sag_tiers`: ตรวจสอบการจัดลำดับขั้นแรงดันไฟตก (`Normal` -> `Low` -> `Critical` -> `Emergency`) และโปรไฟล์มอเตอร์
    - `test_battery_stabilizer_hysteresis_and_timed_recovery`: ตรวจสอบการหน่วงเวลาฟื้นตัว `1500 ms` และระยะบัฟเฟอร์ Hysteresis `350 mV` ก่อนปรับระดับพลังงานขึ้นทีละขั้น
@@ -524,6 +526,7 @@ Flash: [====      ]  41.5% (used 108820 bytes from 262144 bytes)
 | **ปุ่ม Start** | **เริ่มโหมด Auto (MATRIXblock R4)** | กดหนึ่งครั้ง (Rising Edge) ขณะระบบ `Ready` และจอย `Operational` (โดยไม่ได้กดปุ่ม X ค้างไว้) เพื่อเข้าโหมด Auto และรันโค้ดใน [src/auto_block_code.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/src/auto_block_code.cpp) |
 | **ปุ่ม Cross (กากบาท ✖)** | **เบรกหยุดทันที / ออกจากโหมด Auto** | - **ในโหมด Manual**: ตัดกำลัง M1/M2 เป็น 0 พร้อมล็อกเบรก H-Bridge ทันที (ชนะคำสั่งขับจาก Serial)<br>- **ในโหมด Auto**: หยุดมอเตอร์และ `DriveDC` ทุกช่องทันทีแล้วออกจากโหมด Auto กลับสู่ Manual (หากกดพร้อมสามเหลี่ยม ปุ่ม Cross ชนะเสมอ) |
 | **ปุ่ม Circle (วงกลม ○)** | **ท่าวางอย่างเดียว (`RC1+RC2`)** | กด (Rising Edge) เพื่อตั้ง **ท่าวาง/ปล่อย (Drop/Place Preset)**: `RC2` ไป `165°` ทันที แล้วรอ `kPoseDropReleaseDelayMs` (`600 ms`) จึงสั่ง `RC1 = 100°` (ปล่อยของ) ทุกครั้ง ไม่สลับกลับเป็นท่าถือ ระหว่างรอมีเพียงปุ่ม `Cross ✕` เท่านั้นที่ยกเลิกการปล่อย `RC1` (ปุ่มอื่นไม่ยกเลิก) (ท่าถือ `RC1 = 100°`, `RC2 = 0°` ใช้ได้จากคีย์ Serial `q` เท่านั้น) |
+| **D-Pad ขวา (Right)** | **RC1 = 0°** | กดแล้วสั่ง `RC1` ไปที่ `0°` (`kRc1ZeroDeg` ใน `user_settings.h`, ปุ่มกำหนดที่ `kGripperZero` ใน `controls.h`) ค่าค้างหลังปล่อยปุ่ม และยกเลิกการปล่อย `RC1` ที่รอจากปุ่ม Circle |
 | **ปุ่ม Triangle (สามเหลี่ยม ▲)** | **ตั้งท่าเซอร์โว (`RC2 = 100°`, `RC1 = 100°`)** | กดหนึ่งครั้ง (Rising Edge) สั่ง `RC2` ไปที่ `100°` และ `RC1` ไปที่ `100°` พร้อมกัน (`kRcTrianglePoseRc2Deg`, `kRcTrianglePoseRc1Deg` ใน `user_settings.h`) กดค้างไม่ทำซ้ำ ปุ่ม L2/R2/D-Pad กดทับค่าได้ภายหลัง และล้างสถานะท่า Circle ที่ค้างอยู่ |
 | **ปุ่ม Square (สี่เหลี่ยม ◼)** | **ดันพื้นสลับสถานะ (`RC3, RC4 = 180°`)** | กดครั้งที่ 1 เพื่อบันทึกมุมเดิมและสั่ง `RC3, RC4` ไปที่ `180°` พร้อมกัน, กดครั้งที่ 2 เพื่อยกเลิกและกลับไปองศาเดิมก่อนกด (หากกด `L1`/`R1` แทรก ระบบจะล้างสถานะดันพื้นอัตโนมัติ) |
 | **ปุ่ม L1** | **ก้มแขนหน้าคู่ลง (`30°`)** | สั่งให้เซอร์โว `RC3` และ `RC4` หมุนไปที่ `30°` พร้อมกันในเฟรมเดียวทันที |
@@ -874,7 +877,7 @@ matrix_R4/
 └── test/                                       # ส่วนการทดสอบซอฟต์แวร์อัตโนมัติ (Automated Unit Tests - 2 ไฟล์)
     ├── README                                  # [35] คำแนะนำมาตรฐานของ PlatformIO สำหรับ Test Runner และ Unit Testing
     └── test_robot_logic/
-        └── test_main.cpp                       # [36] ชุดแบบทดสอบอัตโนมัติ 41 รายการ บน Native Host ด้วย Unity
+        └── test_main.cpp                       # [36] ชุดแบบทดสอบอัตโนมัติ 44 รายการ บน Native Host ด้วย Unity
 ```
 
 > **อัปเดตโครงสร้าง**: `src/robot_logic.cpp` ถูกแยกเป็น 6 ไฟล์ลอจิกบริสุทธิ์ (Pure C++11, คอมไพล์ใน `env:native` ทั้งหมด) โดย `robot_logic.h` ยังเป็นอินเทอร์เฟซเดียวเหมือนเดิม:
@@ -900,7 +903,7 @@ matrix_R4/
 2. **`[env:native]` (Target จำลองบนคอมพิวเตอร์โฮสต์)**:
    - `platform = native`, `platform_packages = platformio/toolchain-gccmingw32@^1.40900.0`
    - `build_flags = -std=c++11 -Wall -Wextra -Werror -Iinclude`
-   - `build_src_filter` รวม 7 ไฟล์ (`robot_logic`, `persistent_config`, `auto_heading`, `servo_logic`, `link_failsafe`, `power_stability`, `serial_control`) และ `test_build_src = yes`: ดึงโมดูลลอจิกบริสุทธิ์และตัวแยกคำสั่ง Serial มาคอมไพล์รันชุดทดสอบทั้ง 41 ข้อบนคอมพิวเตอร์ได้โดยตรงโดยไม่ต้องต่อบอร์ดจริง
+   - `build_src_filter` รวม 7 ไฟล์ (`robot_logic`, `persistent_config`, `auto_heading`, `servo_logic`, `link_failsafe`, `power_stability`, `serial_control`) และ `test_build_src = yes`: ดึงโมดูลลอจิกบริสุทธิ์และตัวแยกคำสั่ง Serial มาคอมไพล์รันชุดทดสอบทั้ง 44 ข้อบนคอมพิวเตอร์ได้โดยตรงโดยไม่ต้องต่อบอร์ดจริง
 
 ##### 7.2.2 [README.md](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/README.md) — คู่มือการใช้งานและเอกสารวิศวกรรมฉบับสมบูรณ์ภาษาไทย
 ไฟล์เอกสารคู่มือฉบับสมบูรณ์ที่คุณกำลังอ่านอยู่นี้ ครอบคลุมตั้งแต่สถาปัตยกรรมระบบ, ผังพิน, การติดตั้ง PlatformIO, คู่มือการบังคับด้วยจอยสติ๊กและคีย์บอร์ด, การวางโค้ดโหมดอัตโนมัติจาก MATRIXblock R4, แบบจำลองฟิสิกส์จลนพลศาสตร์ 5 ขั้นตอน, คำอธิบายโค้ดครบทั้ง 36 ไฟล์ ไปจนถึงการแก้ไขปัญหาหน้างาน
@@ -1066,8 +1069,8 @@ matrix_R4/
 ##### 7.2.27 [test/README](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/README) — คู่มือมาตรฐาน PlatformIO สำหรับระบบรันการทดสอบ Unit Testing
 เอกสารคำแนะนำมาตรฐานของ PlatformIO สำหรับการสร้างและรันชุดแบบทดสอบ Unit Testing
 
-##### 7.2.28 [test/test_robot_logic/test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp) — ตัวรันชุดแบบทดสอบ Unity Unit Tests ครบทั้ง 41 รายการ (11 หมวดหมู่) บน Native Host
-ไฟล์ชุดแบบทดสอบอัตโนมัติขนาดกว่า 1,900 บรรทัดที่ใช้เฟรมเวิร์ก Unity Test Framework ตรวจสอบความถูกต้องของอัลกอริทึมทุกส่วนในโปรเจกต์ครบทั้ง 41 รายการ (ดูรายละเอียดทั้ง 41 รายการได้ในหัวข้อ [5.1](#51-การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์-pio-test--e-native))
+##### 7.2.28 [test/test_robot_logic/test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp) — ตัวรันชุดแบบทดสอบ Unity Unit Tests ครบทั้ง 44 รายการ (11 หมวดหมู่) บน Native Host
+ไฟล์ชุดแบบทดสอบอัตโนมัติขนาดกว่า 1,900 บรรทัดที่ใช้เฟรมเวิร์ก Unity Test Framework ตรวจสอบความถูกต้องของอัลกอริทึมทุกส่วนในโปรเจกต์ครบทั้ง 44 รายการ (ดูรายละเอียดทั้ง 44 รายการได้ในหัวข้อ [5.1](#51-การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์-pio-test--e-native))
 
 ---
 
@@ -1077,10 +1080,10 @@ matrix_R4/
 
 ```mermaid
 flowchart TD
-    A["Raw PS2 Stick (lyRaw, rxRaw) + D-Pad + R3 Reverse"] --> B["Stage 1: Deadzone & Cubic Expo Shaping\napplyCubicExpo (Throttle 35%, Turn 45%, Moving Turn Ratio 80%)"]
+    A["Raw PS2 Stick (lyRaw, rxRaw) + D-Pad + R3 Reverse"] --> B["Stage 1: Deadzone & Cubic Expo Shaping\napplyCubicExpo (Throttle 15%, Turn 30%, Moving Turn Ratio 100%)"]
     B --> C["Stage 2: Dynamic CoM Anti-Tip Scaling\ncomputeCoMDynamicScale(rc2Deg) -> 65%..100%"]
-    C --> D["Stage 3: Centripetal Traction Circle Limiter\nlimitCentripetalTurn (|v * w| / 100 <= 52 * CoMScale)"]
-    D --> E["Stage 4: Inverse Kinematics + Sag Torque Comp + Motor Trim + Coulomb Stiction\ndesaturateAndClampDrive -> applyMotorBalanceTrim -> applyCoulombStiction (>= 12%)"]
+    C --> D["Stage 3: Centripetal Traction Circle Limiter\nlimitCentripetalTurn (|v * w| / 100 <= 75 * CoMScale)"]
+    D --> E["Stage 4: Inverse Kinematics + Sag Torque Comp + Motor Trim + Coulomb Stiction\ndesaturateAndClampDrive -> applyMotorBalanceTrim -> applyCoulombStiction (>= 18%)"]
     E --> F["Stage 5: Coupled 2-DOF Rigid-Body Slew Limiter + Envelope Cap\napply2DofKinodynamicSlew (Linear v: +25/-50, Angular w: +35/-60)"]
     F --> G["Smart Hold-Brake & STM32 H-Bridge Output\nMiniR4IO::applyMotors(M1, M2)"]
 ```
@@ -1088,19 +1091,19 @@ flowchart TD
 1. **Stage 1 — Cubic Polynomial Input Shaping (`applyCubicExpo`)**:
    - แปลงค่าก้านโยกที่ผ่านการตัด Deadzone (`±18` รอบจุดศูนย์กลาง `127/128`) เข้าสู่สมการพหุนามกำลังสามแบบเลขจำนวนเต็ม:
      $$u(x) = (1 - \alpha)x + \alpha \frac{x^3}{100^2}$$
-   - โดยใช้ $\alpha = 35\%$ สำหรับคันเร่ง (`kThrottleExpoPct`) และ $\alpha = 45\%$ สำหรับการเลี้ยว (`kTurnExpoPct`) ช่วยลดอนุพันธ์ของความเร่ง (Jerk $da/dt$) รอบจุดกึ่งกลางทำให้คุมหุ่นเดินช้าๆ ได้ละเอียดมาก ในขณะที่เมื่อดันก้านสุด ($x = \pm 100$) จะยังคงได้กำลังเต็ม $\pm 100\%$
+   - โดยใช้ $\alpha = 15\%$ สำหรับคันเร่ง (`kThrottleExpoPct`) และ $\alpha = 30\%$ สำหรับการเลี้ยว (`kTurnExpoPct`) ช่วยลดอนุพันธ์ของความเร่ง (Jerk $da/dt$) รอบจุดกึ่งกลางทำให้คุมหุ่นเดินช้าๆ ได้ละเอียดมาก ในขณะที่เมื่อดันก้านสุด ($x = \pm 100$) จะยังคงได้กำลังเต็ม $\pm 100\%$
 2. **Stage 2 — Center-of-Mass (CoM) Dynamic Pitch Scaling (`computeCoMDynamicScale`)**:
    - เมื่อแขนยก `RC2` อยู่ที่มุมต่ำ (`140°..180°`) จุดศูนย์ถ่วงของหุ่นจะอยู่ต่ำ ตัวคูณ `comScale` จะเป็น `100%`
-   - เมื่อยกแขน `RC2` สูงขึ้นเข้าใกล้ `0°` ตัวคูณ `comScale` จะลดลงเชิงเส้นจนถึง `65%` (`kCoMHighMinScalePct`) เพื่อนำไปลดทั้งอัตราเร่งเชิงเส้น (`linAccel`, `linDecel`) และเพดานความเร่งหนีศูนย์กลางขณะเลี้ยว ป้องกันหุ่นยนต์หงายท้องหรือหน้าทิ่มตอนเบรกขณะที่ยกชิ้นงานขึ้นสูง
+   - เมื่อยกแขน `RC2` สูงขึ้นเข้าใกล้ `0°` ตัวคูณ `comScale` จะลดลงเชิงเส้นจนถึง `85%` (`kCoMHighMinScalePct`) เพื่อนำไปลดทั้งอัตราเร่งเชิงเส้น (`linAccel`, `linDecel`) และเพดานความเร่งหนีศูนย์กลางขณะเลี้ยว ป้องกันหุ่นยนต์หงายท้องหรือหน้าทิ่มตอนเบรกขณะที่ยกชิ้นงานขึ้นสูง
 3. **Stage 3 — Unicycle Centripetal Traction Circle Limiter (`limitCentripetalTurn`)**:
    - ความเร่งหนีศูนย์กลางขณะเข้าโค้งแปรผันตามผลคูณของความเร็วเชิงเส้นและความเร็วเชิงมุม ($a_c \propto |v \cdot \omega|$)
    - ระบบบังคับเงื่อนไข:
      $$\frac{|v \cdot \omega|}{100} \le a_{\text{lat,max}}$$
-     โดยที่ $a_{\text{lat,max}} = 52 \times \text{comScale}$ หากผู้เล่นดันคันเร่งเต็มที่แล้วหักเลี้ยวสุด ระบบจะจำกัด $|\omega| \le \frac{100 \cdot a_{\text{lat,max}}}{|v|}$ โดยอัตโนมัติเพื่อไม่ให้ล้อหลุดการยึดเกาะ (Traction Circle) แต่ถ้าหยุดนิ่งอยู่กับที่ ($v = 0$) จะยังคงหมุนตัวได้เต็มกำลัง 100%
+     โดยที่ $a_{\text{lat,max}} = 75 \times \text{comScale}$ หากผู้เล่นดันคันเร่งเต็มที่แล้วหักเลี้ยวสุด ระบบจะจำกัด $|\omega| \le \frac{100 \cdot a_{\text{lat,max}}}{|v|}$ โดยอัตโนมัติเพื่อไม่ให้ล้อหลุดการยึดเกาะ (Traction Circle) แต่ถ้าหยุดนิ่งอยู่กับที่ ($v = 0$) จะยังคงหมุนตัวได้เต็มกำลัง 100%
 4. **Stage 4 — Unicycle Inverse Kinematics, Torque Compensation, Balance Trim & Coulomb Stiction**:
    - คำนวณกำลังล้อซ้าย $L = v + \omega$ และล้อขวา $R = v - \omega$ พร้อมคูณชดเชยแรงดันแบตเตอรี่ตก (`compPercent` สูงสุด `115%`) และปรับสเกลรักษาสัดส่วน (`desaturateAndClampDrive`)
    - ปรับชดเชยสมดุลล้อซ้าย-ขวาด้วย `applyMotorBalanceTrim(L, R, motorTrimPct)`
-   - ชดเชยแรงเสียดทานสถิตของเฟืองเกียร์ด้วย `applyCoulombStiction()` โดยแมปคำสั่งที่ไม่ใช่ศูนย์จากช่วง `[1, limit]` ไปยัง `[12%, limit]` (`kMotorStictionMinPower = 12`) โดยใช้ `applyCoulombStictionPair()` ยกล้อที่แรงกว่าแล้วคูณล้อที่เบากว่าด้วยตัวคูณเดียวกัน เพื่อคงอัตราส่วน L/R (รัศมีโค้ง) ไว้ ล้อที่สั่ง 0 ยังคงเป็น 0
+   - ชดเชยแรงเสียดทานสถิตของเฟืองเกียร์ด้วย `applyCoulombStiction()` โดยแมปคำสั่งที่ไม่ใช่ศูนย์จากช่วง `[1, limit]` ไปยัง `[18%, limit]` (`kMotorStictionMinPower = 18`) โดยใช้ `applyCoulombStictionPair()` ยกล้อที่แรงกว่าแล้วคูณล้อที่เบากว่าด้วยตัวคูณเดียวกัน เพื่อคงอัตราส่วน L/R (รัศมีโค้ง) ไว้ ล้อที่สั่ง 0 ยังคงเป็น 0
 5. **Stage 5 — Coupled 2-DOF Rigid-Body Slew Limiter & Power Envelope Cap (`apply2DofKinodynamicSlew`)**:
    - แทนที่จะจำกัดอัตราเร่งแยกล้อซ้าย-ขวาแบบอิสระ (ซึ่งทำให้รัศมีการเลี้ยวโค้งเพี้ยนขณะเร่งความเร็ว) ระบบจะแปลงสถานะเป็นพิกัดสองเท่า $V_2 = L + R = 2v$ และ $W_2 = L - R = 2\omega$ แล้วใช้ `applyAsymmetricSlewStep()` แยกควบคุมความเร็วเชิงเส้น (`linAccelStep = 25`, `linDecelStep = 50`) และความเร็วเชิงมุม (`angAccelStep = 35`, `angDecelStep = 60`; ทั้งเชิงเส้นและเชิงมุมถูกคูณด้วย CoM Scale เมื่อยกแขน RC2 สูง) ก่อนแปลงกลับเป็น $(L, R)$ โดยไม่สูญเสียเศษจากการหารจำนวนเต็ม จากนั้นบังคับเพดานกำลัง Envelope (`envLimit = max(limit, max(|currentLeft|, |currentRight|))`) เพื่อไม่ให้การเปลี่ยนจากวิ่งตรงเป็นหมุนตัวกะทันหันพุ่งเกินเพดาน Precision (`55%`) หรือ Battery Emergency (`35%`)
 
@@ -1125,16 +1128,16 @@ flowchart TD
 | `kPrecisionMaxPower` | `55` | % | เพดานกำลังสูงสุดและค่าสเกลเต็มก้านโยกในโหมดช้า Precision Mode |
 | `kPrecisionThrottleExpoPct` / `Turn` | `55` / `60` | % | สัดส่วนความโค้ง Cubic Expo ช่วงนุ่มละเอียดใน Precision Mode |
 | `kPrecisionMicroTurnPower` | `18` | % | กำลังหมุนตัวละเอียด D-Pad ซ้าย/ขวาใน Precision Mode |
-| `kMotorAccelSlewStep` | `25` | %/tick | อัตราเร่งเชิงเส้นสูงสุดต่อรอบ 25 ms (`0 -> 100%` ใน ~100 ms) |
+| `kMotorAccelSlewStep` | `50` | %/tick | อัตราเร่งเชิงเส้นสูงสุดต่อรอบ 25 ms (`0 -> 100%` ใน ~50 ms) |
 | `kMotorDecelSlewStep` | `50` | %/tick | อัตราเบรกเชิงเส้นสูงสุดต่อรอบ 25 ms (`100% -> 0` ใน ~50 ms) |
-| `kThrottleExpoPct` | `35` | % | สัดส่วนความโค้ง Cubic Expo ของคันเร่งเดินหน้า/ถอยหลัง |
-| `kTurnExpoPct` | `45` | % | สัดส่วนความโค้ง Cubic Expo ของก้านเลี้ยวซ้าย/ขวา |
-| `kTurnMaxRatioPct` | `80` | % | สัดส่วนกำลังเลี้ยวสูงสุดขณะรถกำลังเคลื่อนที่เดินหน้า/ถอยหลัง |
-| `kMaxCentripetalLatAccel` | `52` | % | ขีดจำกัดความเร่งหนีศูนย์กลางสูงสุดขณะเลี้ยวโค้ง ($\|v \cdot \omega\| / 100$) |
-| `kMotorStictionMinPower` | `12` | % | กำลังขั้นต่ำเพื่อเอาชนะแรงเสียดทานสถิตของเกียร์มอเตอร์ (Coulomb Stiction) |
-| `kAngularAccelSlewStep` | `35` | %/tick | อัตราเร่งการหมุนตัวเชิงมุม (2-DOF Rotational Accel Slew) |
+| `kThrottleExpoPct` | `15` | % | สัดส่วนความโค้ง Cubic Expo ของคันเร่งเดินหน้า/ถอยหลัง |
+| `kTurnExpoPct` | `30` | % | สัดส่วนความโค้ง Cubic Expo ของก้านเลี้ยวซ้าย/ขวา |
+| `kTurnMaxRatioPct` | `100` | % | สัดส่วนกำลังเลี้ยวสูงสุดขณะรถกำลังเคลื่อนที่เดินหน้า/ถอยหลัง |
+| `kMaxCentripetalLatAccel` | `75` | % | ขีดจำกัดความเร่งหนีศูนย์กลางสูงสุดขณะเลี้ยวโค้ง ($\|v \cdot \omega\| / 100$) |
+| `kMotorStictionMinPower` | `18` | % | กำลังขั้นต่ำเพื่อเอาชนะแรงเสียดทานสถิตของเกียร์มอเตอร์ (Coulomb Stiction) |
+| `kAngularAccelSlewStep` | `60` | %/tick | อัตราเร่งการหมุนตัวเชิงมุม (2-DOF Rotational Accel Slew) |
 | `kAngularDecelSlewStep` | `60` | %/tick | อัตราเบรกการหมุนตัวเชิงมุม (2-DOF Rotational Decel Slew) |
-| `kCoMHighMinScalePct` | `65` | % | ตัวคูณลดอัตราเร่งต่ำสุดเมื่อยกแขน `RC2` ขึ้นสูงสุดที่ `0°` |
+| `kCoMHighMinScalePct` | `85` | % | ตัวคูณลดอัตราเร่งต่ำสุดเมื่อยกแขน `RC2` ขึ้นสูงสุดที่ `0°` |
 | `kCoMLowArmDeg` | `140` | deg | มุมแขน `RC2` ตั้งแต่ค่านี้ขึ้นไปถือว่าจุดศูนย์ถ่วงต่ำ (ตัวคูณ CoM = `100%`) |
 | `kMicroTurnPower` | `26` | % | กำลังหมุนตัวละเอียดเมื่อกดปุ่ม D-Pad ซ้าย/ขวา |
 | `kEnableSmartHoldBrake` | `true` | bool | เปิดใช้งานระบบล็อกเบรกแม่เหล็กไฟฟ้า H-Bridge เมื่อรถหยุดนิ่ง `(0,0)` |
@@ -1150,11 +1153,14 @@ flowchart TD
 | `kRc2PresetHoldDeg` / `DropDeg` | `0` / `165` | deg | มุมเซอร์โว `RC2` ท่าถือเก็บ (Serial `q`) และท่าวางปล่อย (ปุ่ม `Circle`) |
 | `kRc2SmoothStepDeg` / `Default` | `6` / `true` | deg/tick | ก้าวการกวาดมุมสมูทของ `RC2` (`6°/25ms = 240°/s`) และค่าเริ่มต้นเปิดใช้งาน |
 | `kRc3InitDeg` / `kRc4InitDeg` | `30` | deg | มุมเริ่มต้นของแขนหน้าซ้าย `RC3` และขวา `RC4` |
-| `kRc3L1Deg` / `kRc4L1Deg` | `30` | deg | มุมก้มแขนหน้าลงเมื่อกดปุ่ม `L1` |
+| `kRc3L1Deg` / `kRc4L1Deg` | `15` | deg | มุมก้มแขนหน้าลงเมื่อกดปุ่ม `L1` |
 | `kRc3R1Deg` / `kRc4R1Deg` | `140` | deg | มุมยกแขนหน้าขึ้นเมื่อกดปุ่ม `R1` |
 | `kRc3SquareDeg` / `kRc4SquareDeg` | `30` | deg | มุมดันพื้นเมื่อกดปุ่ม `Square` |
 | `kRc3InvertDir` / `kRc4InvertDir` | `false` / `true` | bool | กลับทิศองศาเอาต์พุตของเซอร์โว `RC3` / `RC4` (`deg -> 180 - deg`) |
 | `kEnableBatterySagThrottle` | `false` | bool | `false` = คงกำลังขับ 100% ตลอดการแข่งขัน, `true` = ลดเพดานกำลังเมื่อไฟตก (`72%/50%/35%`) |
+| `kEnableAutoVoltComp` | `true` | bool | ชดเชย power ของคำสั่ง DriveDC ใน Auto ตามแรงดันแบต ให้ระยะ/มุมเลี้ยวคงที่แม้แบตอ่อน (`user_settings.h`) |
+| `kAutoVoltRefMv` | `8200` | mV | แรงดันแบตตอนจูน mission (ที่ค่านี้ power ไม่เปลี่ยน) |
+| `kAutoCompMinPct` / `kAutoCompMaxPct` | `90` / `130` | % | ช่วงตัวคูณชดเชยของ Auto (แบตสูงกว่า ref ลดได้สุด 10%, แบตอ่อนเพิ่มได้สุด 30%) |
 | `kSerialDefaultSpeed` | `100` | % | ความเร็วเริ่มต้นของการขับเคลื่อนผ่านคีย์บอร์ด Serial Monitor (`20%..100%`) |
 | `kUploadComboHoldMs` | `2500` | ms | เวลากดปุ่ม `BTN_UP + BTN_DOWN` ค้างพร้อมกันเพื่อเข้า Bootloader (2.5 วินาที) |
 | `kAutoStartBtnHoldMs` | `1200` | ms | เวลากดปุ่ม `BTN_UP` ค้างเดี่ยวเพื่อเริ่มโหมด Auto โดยไม่ใช้จอย (1.2 วินาที) |
@@ -1240,6 +1246,11 @@ flowchart TD
      constexpr bool kEnableBatterySagThrottle = true;
      ```
      เมื่อตั้งเป็น `true` ระบบจะลดเพดานกำลังสูงสุดลงเป็น `72%` (`Low`), `50%` (`Critical`), และ `35%` (`Emergency`) พร้อมลดอัตราเร่งลงโดยอัตโนมัติเพื่อป้องกันไม่ให้บอร์ดดับ
+- **Auto เดินไม่ตรงค่าที่เขียนไว้ตอนแบตอ่อน (ระยะสั้นลง เลี้ยวไม่ถึงมุม)**:
+  - สาเหตุ: power ใน `MoveDegs(-50, -50, 170, true)` เป็น % PWM ไม่ใช่ความเร็ว แบตอ่อนทำให้ล้อหมุนช้าลง ระยะไหลหลังเบรกจึงลดลงตาม ค่าองศาที่จูนไว้ตอนแบตเต็มจึงไม่ตรง
+  - การแก้ (เปิดอยู่แล้ว `kEnableAutoVoltComp = true` ใน [include/user_settings.h](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/include/user_settings.h)): ก่อนส่งคำสั่ง DriveDC แต่ละครั้ง ตัวครอบ `AutoDriveDCProxy` จะอ่านแรงดันจาก STM32 (ทุก ≥ 200 ms) แล้วคูณ power ทั้งสองล้อด้วย `kAutoVoltRefMv / แรงดันแบต` (ช่วง `90%..130%`) เช่น แบต `6.8V` ref `7.8V`: `-50` -> `-58` ล้อจึงหมุนเร็วเท่าตอนจูน
+  - ตั้งค่าอ้างอิง: ใส่แบตระดับที่ใช้จูน mission เข้า Auto แล้วดูบรรทัด `AUTO volt comp 100% @7.80V (ref 7.80V)` ใน Serial Monitor นำค่า V ไปใส่ `kAutoVoltRefMv` (หน่วย mV)
+  - แนะนำเพิ่ม: ช่วงเดินตรงใช้ `MoveSyncDegs` แทน `MoveDegs` เพื่อให้ STM32 sync ล้อซ้าย/ขวา และเผื่อ `delay` หลังสั่ง RC2 ยกของเพราะเซอร์โวช้าลงตอนแบตอ่อน
 
 ---
 
@@ -1263,7 +1274,7 @@ flowchart TD
 
 ## 9. สรุปการยกระดับความปลอดภัยและความเสถียรล่าสุด (Security & Stability Hardening Summary)
 
-รายการปรับปรุงสำคัญจากการตรวจสอบโค้ดและฮาร์ดแวร์ครบทั้ง 36 ไฟล์ (ผ่าน `pio run -e uno_r4_wifi`, `pio test -e native` 41/41 เคส, และ `pio check` `0 HIGH, 0 MEDIUM` ใน `src/`):
+รายการปรับปรุงสำคัญจากการตรวจสอบโค้ดและฮาร์ดแวร์ครบทั้ง 36 ไฟล์ (ผ่าน `pio run -e uno_r4_wifi`, `pio test -e native` 44/44 เคส, และ `pio check` `0 HIGH, 0 MEDIUM` ใน `src/`):
 
 | หมวดงาน | ไฟล์หลักที่ปรับปรุง | สิ่งที่แก้ไขและพัฒนา |
 | :--- | :--- | :--- |
