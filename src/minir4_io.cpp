@@ -51,7 +51,7 @@ bool MiniR4IO::begin() {
     // Arm Wire1 timeout before OLED init so a shorted/hung I2C1 bus cannot stall boot.
     Wire1.begin();
     Wire1.setWireTimeout(static_cast<unsigned int>(Config::kWireTimeoutUs), true);
-    MiniR4.OLED = Adafruit_SSD1306(128, 32, &Wire1, -1);
+    MiniR4.OLED = Adafruit_SSD1306(Config::kOledWidth, Config::kOledHeight, &Wire1, -1);
     (void)MiniR4.OLED.begin(SSD1306_SWITCHCAPVCC, MATRIXMINIR4_OLED_ADDRESS, false, false);
     MiniR4.OLED.setTextColor(SSD1306_WHITE);
     MiniR4.OLED.clearDisplay();

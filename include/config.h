@@ -43,6 +43,16 @@ constexpr uint8_t  kMotorRightId           = 2U;
 constexpr int16_t  kMotorMinPower          = -100;
 constexpr int16_t  kMotorMaxPower          = 100;
 
+// --- OLED SSD1306 128x32 และบัส I2C Wire1 (ตายตัวตามบอร์ด) -----------------
+constexpr uint8_t  kOledWidth              = 128U;
+constexpr uint8_t  kOledHeight             = 32U;
+constexpr uint16_t kOledBufferBytes        = static_cast<uint16_t>(kOledWidth * (kOledHeight / 8U));
+constexpr uint8_t  kOledAddrPrimary        = 0x3CU;   // ที่อยู่ SSD1306 หลัก (ลองก่อน)
+constexpr uint8_t  kOledAddrAlt            = 0x3DU;   // ที่อยู่ SSD1306 สำรอง
+constexpr uint8_t  kI2cMuxAddr             = 0x70U;   // PCA9548A บน Wire1
+constexpr uint32_t kI2cFastHz              = 400000UL;
+constexpr uint32_t kI2cSlowHz              = 100000UL;
+
 // --- พารามิเตอร์ฟิสิกส์ Kinodynamic และไฟฟ้า-กล -----------------------------
 
 // --- ที่เก็บค่าตั้งใน EEPROM แบบไม่ลบเมื่อดับไฟ (เลี่ยงช่วง IMU cal ที่ 50..73) ---

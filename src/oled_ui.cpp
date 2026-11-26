@@ -131,11 +131,11 @@ bool OledUI::begin() {
     if (err3d_ == 0U) {
         lastI2cErr_ = 0U;
     } else {
-        err3c_ = probeSsd1306Cmd(Wire1, 0x3C, SSD1306_DISPLAYON);
+        err3c_ = probeSsd1306Cmd(Wire1, Config::kOledAddrPrimary, SSD1306_DISPLAYON);
         if (err3c_ == 0U) {
-            oledAddr_   = 0x3C;
+            oledAddr_   = Config::kOledAddrPrimary;
             lastI2cErr_ = 0U;
-            MiniR4.OLED.begin(SSD1306_SWITCHCAPVCC, 0x3C, false, false);
+            MiniR4.OLED.begin(SSD1306_SWITCHCAPVCC, Config::kOledAddrPrimary, false, false);
         } else {
             lastI2cErr_ = err3d_;
         }
@@ -150,9 +150,9 @@ bool OledUI::begin() {
 
     fastClockOk_ = (lastI2cErr_ == 0U);
     if (fastClockOk_) {
-        Wire1.setClock(400000UL);
+        Wire1.setClock(Config::kI2cFastHz);
     } else {
-        Wire1.setClock(100000UL);
+        Wire1.setClock(Config::kI2cSlowHz);
     }
     return (lastI2cErr_ == 0U);
 }
@@ -204,7 +204,7 @@ uint8_t OledUI::flushBufferChecked(const uint8_t* buf, uint16_t len) {
     if (err != 0U) {
         // Fallback to 100 kHz ONLY on error transition instead of thrashing FSP I2C per frame.
         // Preserve framebuffer because Adafruit_SSD1306::begin() calls clearDisplay().
-        constexpr uint16_t kMaxSavedBytes = 128U * (32U / 8U);
+        constexpr uint16_t kMaxSavedBytes = Config::kOledBufferBytes;
         uint8_t            savedBuf[kMaxSavedBytes];
         const uint16_t     copyLen = (len <= kMaxSavedBytes) ? len : kMaxSavedBytes;
         memcpy(savedBuf, buf, copyLen);
@@ -215,10 +215,10 @@ uint8_t OledUI::flushBufferChecked(const uint8_t* buf, uint16_t len) {
         uint8_t clks = 0U;
         recoverBus(sdaB, sdaA, clks);
         Wire1.begin();
-        Wire1.setClock(100000UL);
+        Wire1.setClock(Config::kI2cSlowHz);
         Wire1.setWireTimeout(static_cast<unsigned int>(Config::kWireTimeoutUs), true);
         MiniR4.OLED.begin(SSD1306_SWITCHCAPVCC, oledAddr_, false, false);
-        Wire1.setClock(100000UL);
+        Wire1.setClock(Config::kI2cSlowHz);
 
         uint8_t* oledBuf = MiniR4.OLED.getBuffer();
         if (oledBuf != nullptr) {
@@ -230,7 +230,7 @@ uint8_t OledUI::flushBufferChecked(const uint8_t* buf, uint16_t len) {
     lastI2cErr_ = err;
     if (oledAddr_ == MATRIXMINIR4_OLED_ADDRESS) {
         err3d_ = err;
-    } else if (oledAddr_ == 0x3CU) {
+    } else if (oledAddr_ == Config::kOledAddrPrimary) {
         err3c_ = err;
     }
     return err;
@@ -247,7 +247,7 @@ void OledUI::showBootloaderScreen() {
     MiniR4.OLED.print(F("UPLOAD BOOTLOADER"));
     MiniR4.OLED.setCursor(16, 19);
     MiniR4.OLED.print(F("Ready for Flash..."));
-    flushBufferChecked(MiniR4.OLED.getBuffer(), 128U * (32U / 8U));
+    flushBufferChecked(MiniR4.OLED.getBuffer(), Config::kOledBufferBytes);
     MiniR4.Buzzer.Tone(1500, 90);
 }
 
@@ -430,7 +430,7 @@ void OledUI::render(const SystemSnapshot& snap, uint32_t nowMs, bool force) {
         MiniR4.OLED.print(line4);
     }
 
-    const uint8_t flushErr = flushBufferChecked(MiniR4.OLED.getBuffer(), 128U * (32U / 8U));
+    const uint8_t flushErr = flushBufferChecked(MiniR4.OLED.getBuffer(), Config::kOledBufferBytes);
     if (flushErr == 0U) {
         lastDisplayHash_ = h;
         hasDisplayHash_  = true;
@@ -457,7 +457,7 @@ void scanBusAddrs(const char* label, TwoWire& bus) {
             }
             Serial.print(addr, HEX);
             found++;
-        } else if (addr == 0x3CU || addr == 0x3DU) {
+        } else if (addr == Config::kOledAddrPrimary || addr == Config::kOledAddrAlt) {
             const uint8_t txErr = probeSsd1306Cmd(bus, addr, 0xE3);
             if (txErr == 0U) {
                 Serial.print(F(" 0x"));
@@ -465,7 +465,7 @@ void scanBusAddrs(const char* label, TwoWire& bus) {
                 Serial.print(F("(w)"));
                 found++;
             }
-        } else if (addr == 0x70U) {
+        } else if (addr == Config::kI2cMuxAddr) {
             // Probe PCA9548A by disabling all channels (0x00) instead of writing SSD1306 commands.
             bus.beginTransmission(addr);
             bus.write(static_cast<uint8_t>(0x00U));
@@ -498,22 +498,22 @@ void OledUI::printI2cDiag() {
 
     scanBusAddrs("Wire1@cur", Wire1);
 
-    Wire1.setClock(100000UL);
+    Wire1.setClock(Config::kI2cSlowHz);
     Wire1.setWireTimeout(static_cast<unsigned int>(Config::kWireTimeoutUs), true);
     scanBusAddrs("Wire1@100k", Wire1);
 
     // Check PCA9548A channels 0..3 if 0x70 exists on Wire1
-    if (Wire1.requestFrom(static_cast<uint8_t>(0x70U), static_cast<size_t>(1)) == 1U) {
+    if (Wire1.requestFrom(static_cast<uint8_t>(Config::kI2cMuxAddr), static_cast<size_t>(1)) == 1U) {
         for (uint8_t ch = 0U; ch < 4U; ++ch) {
             WDT.refresh();
-            Wire1.beginTransmission(static_cast<uint8_t>(0x70U));
+            Wire1.beginTransmission(static_cast<uint8_t>(Config::kI2cMuxAddr));
             Wire1.write(static_cast<uint8_t>(1U << ch));
             Wire1.endTransmission();
             Serial.print(F("[I2C] mux ch="));
             Serial.print(ch);
             scanBusAddrs(" Wire1", Wire1);
         }
-        Wire1.beginTransmission(static_cast<uint8_t>(0x70U));
+        Wire1.beginTransmission(static_cast<uint8_t>(Config::kI2cMuxAddr));
         Wire1.write(static_cast<uint8_t>(0x00U));
         Wire1.endTransmission();
     }
@@ -523,9 +523,9 @@ void OledUI::printI2cDiag() {
     scanBusAddrs("Wire@100k", Wire);
 
     Serial.print(F("[OLED-DIAG] e3d="));
-    Serial.print(probeSsd1306Cmd(Wire1, static_cast<uint8_t>(0x3DU), 0xAF));
+    Serial.print(probeSsd1306Cmd(Wire1, static_cast<uint8_t>(Config::kOledAddrAlt), SSD1306_DISPLAYON));
     Serial.print(F(" e3c="));
-    Serial.println(probeSsd1306Cmd(Wire1, static_cast<uint8_t>(0x3CU), 0xAF));
+    Serial.println(probeSsd1306Cmd(Wire1, static_cast<uint8_t>(Config::kOledAddrPrimary), SSD1306_DISPLAYON));
 
-    Wire1.setClock(fastClockOk_ ? 400000UL : 100000UL);
+    Wire1.setClock(fastClockOk_ ? Config::kI2cFastHz : Config::kI2cSlowHz);
 }
