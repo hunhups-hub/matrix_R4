@@ -35,29 +35,14 @@ int16_t applyServoDirection(int16_t angleDeg, bool invertDir) {
     return static_cast<int16_t>(Config::kServoMinDeg + (Config::kServoMaxDeg - clamped));
 }
 
-void updateServoTargetsFromPs2(const Ps2Frame& frame,
-                               ServoTargets& targets,
-                               bool allowArmStep,
-                               FrontArmPushState* pushState,
-                               ArmPosePresetState* poseState,
-                               uint32_t nowMs) {
-    using Controls::held;
-    const bool armUp       = held(frame, Controls::kArmUp);
-    const bool armDown     = held(frame, Controls::kArmDown);
-    const bool armsDown    = held(frame, Controls::kFrontArmsDown);
-    const bool armsUp      = held(frame, Controls::kFrontArmsUp);
-    const bool push        = held(frame, Controls::kPushGround);
-    const bool gripOpen    = held(frame, Controls::kGripperOpen);
-    const bool gripClose   = held(frame, Controls::kGripperClose);
-    const bool gripZero    = held(frame, Controls::kGripperZero);
-    const bool posePreset  = held(frame, Controls::kPosePreset);
+namespace {
 
-    if (allowArmStep) {
-        targets.rc2Deg = computeArmStep(targets.rc2Deg, armUp, armDown);
-    }
-    if ((armUp != armDown) && poseState != nullptr) {
-        poseState->dropActive = false;
-    }
+// Front arms (RC3): L1/R1 jump to preset angles; Square toggles the push-ground pose.
+void updateFrontArms(const Ps2Frame& frame, ServoTargets& targets, FrontArmPushState* pushState) {
+    using Controls::held;
+    const bool armsDown = held(frame, Controls::kFrontArmsDown);
+    const bool armsUp   = held(frame, Controls::kFrontArmsUp);
+    const bool push     = held(frame, Controls::kPushGround);
 
     const bool squareRising = (pushState != nullptr) &&
                               push &&
@@ -89,13 +74,26 @@ void updateServoTargetsFromPs2(const Ps2Frame& frame,
     if (pushState != nullptr) {
         pushState->prevSquare = push;
     }
+}
+
+// Gripper (RC1): open/close/zero buttons, Circle drop pose with delayed RC1 release.
+void updateGripperAndDropPose(const Ps2Frame& frame,
+                              ServoTargets& targets,
+                              bool armStepHeld,
+                              ArmPosePresetState* poseState,
+                              uint32_t nowMs) {
+    using Controls::held;
+    const bool gripOpen   = held(frame, Controls::kGripperOpen);
+    const bool gripClose  = held(frame, Controls::kGripperClose);
+    const bool gripZero   = held(frame, Controls::kGripperZero);
+    const bool posePreset = held(frame, Controls::kPosePreset);
 
     const bool circleRising = (poseState != nullptr) &&
                               posePreset &&
                               !poseState->prevCircle &&
                               !gripOpen &&
                               !gripClose &&
-                              (armUp == armDown);
+                              !armStepHeld;
 
     if (gripOpen && !gripClose) {
         targets.rc1Deg = Config::kRc1L2Deg;
@@ -140,17 +138,43 @@ void updateServoTargetsFromPs2(const Ps2Frame& frame,
     if (poseState != nullptr) {
         poseState->prevCircle = posePreset;
     }
+}
 
-    const bool triangleHeld   = held(frame, Controls::kTrianglePose);
+// Triangle: one-shot jump to the combined RC1/RC2 pose.
+void updateTrianglePose(const Ps2Frame& frame, ServoTargets& targets, ArmPosePresetState* poseState) {
+    const bool triangleHeld   = Controls::held(frame, Controls::kTrianglePose);
     const bool triangleRising = (poseState != nullptr) && triangleHeld && !poseState->prevTriangle;
     if (triangleRising) {
-        targets.rc1Deg = Config::kRcTrianglePoseRc1Deg;
-        targets.rc2Deg = Config::kRcTrianglePoseRc2Deg;
+        targets.rc1Deg        = Config::kRcTrianglePoseRc1Deg;
+        targets.rc2Deg        = Config::kRcTrianglePoseRc2Deg;
         poseState->dropActive = false;
     }
     if (poseState != nullptr) {
         poseState->prevTriangle = triangleHeld;
     }
+}
+
+} // namespace
+
+void updateServoTargetsFromPs2(const Ps2Frame& frame,
+                               ServoTargets& targets,
+                               bool allowArmStep,
+                               FrontArmPushState* pushState,
+                               ArmPosePresetState* poseState,
+                               uint32_t nowMs) {
+    const bool armUp   = Controls::held(frame, Controls::kArmUp);
+    const bool armDown = Controls::held(frame, Controls::kArmDown);
+
+    if (allowArmStep) {
+        targets.rc2Deg = computeArmStep(targets.rc2Deg, armUp, armDown);
+    }
+    if ((armUp != armDown) && poseState != nullptr) {
+        poseState->dropActive = false;
+    }
+
+    updateFrontArms(frame, targets, pushState);
+    updateGripperAndDropPose(frame, targets, armUp != armDown, poseState, nowMs);
+    updateTrianglePose(frame, targets, poseState);
 
     targets = clampServoTargets(targets);
 }
