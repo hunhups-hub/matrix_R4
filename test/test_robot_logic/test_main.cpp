@@ -2382,6 +2382,53 @@ void test_auto_stall_tracker_idle_clears_and_unreadable_only_times_out(void) {
     TEST_ASSERT_TRUE(st.timedOut(Config::kAutoStallTimeoutMs * 2UL + 5UL));
 }
 
+// ============================================================================
+// 15. OLED / LED formatting helpers
+// ============================================================================
+void test_ui_format_hash_rgb_and_chars(void) {
+    TEST_ASSERT_EQUAL_UINT32(2166136261UL, RobotLogic::fnv1aHash("", 2166136261UL));
+    TEST_ASSERT_EQUAL_UINT32(0xE40C292CUL, RobotLogic::fnv1aHash("a", 2166136261UL)); // FNV-1a("a")
+    // Chaining equals hashing the concatenation.
+    const uint32_t chained = RobotLogic::fnv1aHash("bc", RobotLogic::fnv1aHash("a", 2166136261UL));
+    TEST_ASSERT_EQUAL_UINT32(RobotLogic::fnv1aHash("abc", 2166136261UL), chained);
+
+    TEST_ASSERT_EQUAL_UINT32(0x00B46E00UL, RobotLogic::packRgb(180U, 110U, 0U));
+    TEST_ASSERT_EQUAL_UINT32(0x00FFFFFFUL, RobotLogic::packRgb(255U, 255U, 255U));
+
+    TEST_ASSERT_EQUAL_CHAR(' ', RobotLogic::batteryTierChar(BatteryTier::Normal));
+    TEST_ASSERT_EQUAL_CHAR('L', RobotLogic::batteryTierChar(BatteryTier::Low));
+    TEST_ASSERT_EQUAL_CHAR('C', RobotLogic::batteryTierChar(BatteryTier::Critical));
+    TEST_ASSERT_EQUAL_CHAR('E', RobotLogic::batteryTierChar(BatteryTier::Emergency));
+    TEST_ASSERT_EQUAL_CHAR('+', RobotLogic::stabFlagChar(0U));
+    TEST_ASSERT_EQUAL_CHAR('~', RobotLogic::stabFlagChar(1U));
+    TEST_ASSERT_EQUAL_CHAR('!', RobotLogic::stabFlagChar(2U));
+}
+
+void test_ui_header_tag_priority(void) {
+    SystemSnapshot s{};
+    s.ps2Link      = LinkState::Operational;
+    s.activeSource = ControlSource::Ps2;
+    TEST_ASSERT_EQUAL_STRING("PS2 OK", RobotLogic::headerTag(s));
+
+    s.ps2Link = LinkState::Stabilizing;
+    TEST_ASSERT_EQUAL_STRING("PS2 SYNC", RobotLogic::headerTag(s));
+    s.ps2Link = LinkState::Failsafe;
+    TEST_ASSERT_EQUAL_STRING("FAILSAFE", RobotLogic::headerTag(s));
+
+    s.ps2Link      = LinkState::Disconnected;
+    s.activeSource = ControlSource::SerialCmd;
+    TEST_ASSERT_EQUAL_STRING("SER OK", RobotLogic::headerTag(s));
+    s.activeSource = ControlSource::None;
+    TEST_ASSERT_EQUAL_STRING("WAIT PS2", RobotLogic::headerTag(s));
+
+    s.activeSource = ControlSource::Auto;
+    TEST_ASSERT_EQUAL_STRING("AUTO RUN", RobotLogic::headerTag(s));
+    s.sysState = SystemState::Estop;
+    TEST_ASSERT_EQUAL_STRING("ESTOP!", RobotLogic::headerTag(s));
+    s.comboHolding = true;
+    TEST_ASSERT_EQUAL_STRING("HOLD+DN", RobotLogic::headerTag(s));
+}
+
 int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
@@ -2473,6 +2520,10 @@ int main(int argc, char** argv) {
     RUN_TEST(test_auto_stall_tracker_progress_resets_timer);
     RUN_TEST(test_auto_stall_tracker_degree_counter_counts_as_progress);
     RUN_TEST(test_auto_stall_tracker_idle_clears_and_unreadable_only_times_out);
+
+    // 15. OLED / LED formatting helpers
+    RUN_TEST(test_ui_format_hash_rgb_and_chars);
+    RUN_TEST(test_ui_header_tag_priority);
 
     return UNITY_END();
 }
