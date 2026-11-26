@@ -4,14 +4,6 @@ namespace RobotLogic {
 
 namespace {
 
-int32_t abs16To32(int16_t v) {
-    return (v < 0) ? -static_cast<int32_t>(v) : static_cast<int32_t>(v);
-}
-
-int32_t abs32(int32_t v) {
-    return (v < 0L) ? -v : v;
-}
-
 void desaturateAndClampDrive32(int32_t& left, int32_t& right, int16_t maxSpeed) {
     const int32_t limit = static_cast<int32_t>(clamp16(maxSpeed, 0, Config::kMotorMaxPower));
     if (limit == 0L) {
@@ -20,9 +12,7 @@ void desaturateAndClampDrive32(int32_t& left, int32_t& right, int16_t maxSpeed) 
         return;
     }
 
-    const int32_t absL = abs32(left);
-    const int32_t absR = abs32(right);
-    const int32_t peak = (absL > absR) ? absL : absR;
+    const int32_t peak = peakAbs(left, right);
     if (peak > limit) {
         left  = (left * limit) / peak;
         right = (right * limit) / peak;
@@ -44,7 +34,7 @@ int16_t scaleStickToLimit(int16_t val, int16_t limit) {
     if (val == 0 || limit <= 0) {
         return 0;
     }
-    const int32_t absVal = abs16To32(val);
+    const int32_t absVal = abs32(val);
     int32_t       scaled = (absVal * static_cast<int32_t>(limit) + 50L) / 100L;
     if (scaled < 1L) {
         scaled = 1L;
@@ -188,8 +178,8 @@ int16_t limitCentripetalTurn(int16_t linearVel, int16_t angularVel, int16_t maxL
         return 0;
     }
     const int16_t clampedW = clamp16(angularVel, Config::kMotorMinPower, Config::kMotorMaxPower);
-    const int32_t absV     = abs16To32(clamp16(linearVel, Config::kMotorMinPower, Config::kMotorMaxPower));
-    const int32_t absW     = abs16To32(clampedW);
+    const int32_t absV     = abs32(clamp16(linearVel, Config::kMotorMinPower, Config::kMotorMaxPower));
+    const int32_t absW     = abs32(clampedW);
     if (absV == 0L || absW == 0L) {
         return clampedW;
     }
@@ -262,7 +252,7 @@ int16_t applyCoulombStiction(int16_t cmdPower, int16_t stictionMin, int16_t maxP
         return clamp16(cmdPower, static_cast<int16_t>(-limit), limit);
     }
 
-    const int32_t absCmd = abs16To32(clamp16(cmdPower, static_cast<int16_t>(-limit), limit));
+    const int32_t absCmd = abs32(clamp16(cmdPower, static_cast<int16_t>(-limit), limit));
     const int32_t spanIn = static_cast<int32_t>(limit - 1);
     const int32_t spanOut = static_cast<int32_t>(limit - stictionMin);
     const int32_t mapped =
@@ -272,9 +262,9 @@ int16_t applyCoulombStiction(int16_t cmdPower, int16_t stictionMin, int16_t maxP
 }
 
 void applyCoulombStictionPair(int16_t& left, int16_t& right, int16_t stictionMin, int16_t maxPower) {
-    const int32_t absL = abs16To32(left);
-    const int32_t absR = abs16To32(right);
-    const int32_t peak = (absL > absR) ? absL : absR;
+    const int32_t absL = abs32(left);
+    const int32_t absR = abs32(right);
+    const int32_t peak = peakAbs(absL, absR);
     if (peak == 0L) {
         return;
     }
@@ -313,13 +303,13 @@ void applyMotorBalanceTrim(int16_t& left, int16_t& right, int8_t trimPct) {
         // Positive trim -> attenuate Right wheel by (100 - trim)% so robot steers slightly Right
         const int32_t scale = 100L - static_cast<int32_t>(clampedTrim);
         const int32_t signR = (right < 0) ? -1L : 1L;
-        const int32_t magR  = (abs16To32(right) * scale + 50L) / 100L;
+        const int32_t magR  = (abs32(right) * scale + 50L) / 100L;
         right               = static_cast<int16_t>(clampLong(signR * magR, -32767L, 32767L));
     } else {
         // Negative trim -> attenuate Left wheel by (100 - |trim|)% so robot steers slightly Left
         const int32_t scale = 100L + static_cast<int32_t>(clampedTrim);
         const int32_t signL = (left < 0) ? -1L : 1L;
-        const int32_t magL  = (abs16To32(left) * scale + 50L) / 100L;
+        const int32_t magL  = (abs32(left) * scale + 50L) / 100L;
         left                = static_cast<int16_t>(clampLong(signL * magL, -32767L, 32767L));
     }
 }
@@ -441,9 +431,7 @@ DriveOutput computeKinodynamicDrive(uint8_t lyRaw,
 
     // Enforce power envelope so rapid forward-to-pivot 2-DOF slew transitions never
     // overshoot Precision/Battery caps while still allowing smooth ramp-down if already above limit.
-    const int32_t curPeak  = (abs16To32(currentLeft) > abs16To32(currentRight))
-                                 ? abs16To32(currentLeft)
-                                 : abs16To32(currentRight);
+    const int32_t curPeak  = peakAbs(currentLeft, currentRight);
     const int16_t envLimit = static_cast<int16_t>(
         clampLong((curPeak > static_cast<int32_t>(limit)) ? curPeak : static_cast<int32_t>(limit),
                   0L,

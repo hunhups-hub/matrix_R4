@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "types.h"
 
+#include "logic_math.h"
 #include "logic_drive.h"
 #include "logic_persist.h"
 #include "logic_stall.h"

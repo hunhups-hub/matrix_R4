@@ -537,8 +537,7 @@ uint8_t samplePowerComp(bool force) {
     if (mmL.GetPowerInfo(v, perc) != MMLower::RESULT::OK) {
         return s_powerCompPct;
     }
-    const float    boundedV = (v < 0.0f) ? 0.0f : ((v > 25.5f) ? 25.5f : v);
-    const uint16_t mv       = static_cast<uint16_t>(boundedV * 1000.0f + 0.5f);
+    const uint16_t mv = RobotLogic::voltsToMv(v);
     s_powerCompMv  = mv;
     s_powerCompPct = RobotLogic::computeAutoPowerCompPct(
         mv, Config::kAutoVoltRefMv, Config::kAutoCompMinPct, Config::kAutoCompMaxPct);

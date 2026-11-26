@@ -26,9 +26,7 @@ bool ManualStallDetector::update(int16_t cmdLeft,
                                  int32_t encLeft,
                                  int32_t encRight,
                                  uint32_t nowMs) {
-    const int32_t absL = (cmdLeft < 0) ? -static_cast<int32_t>(cmdLeft) : cmdLeft;
-    const int32_t absR = (cmdRight < 0) ? -static_cast<int32_t>(cmdRight) : cmdRight;
-    const int32_t mag  = (absL > absR) ? absL : absR;
+    const int32_t mag = peakAbs(cmdLeft, cmdRight);
 
     if (mag <= Config::kManualStallRearmCmdPct) {
         reset();

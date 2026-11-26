@@ -485,8 +485,7 @@ bool MiniR4IO::verifyAndHealLowerMcu(uint32_t nowMs,
         return true;
     }
 
-    const float boundedV = (v < 0.0f) ? 0.0f : ((v > 25.5f) ? 25.5f : v);
-    outBattMv    = static_cast<uint16_t>(boundedV * 1000.0f + 0.5f);
+    outBattMv    = RobotLogic::voltsToMv(v);
     outVoltValid = true;
 
     const bool brownoutRecovered =

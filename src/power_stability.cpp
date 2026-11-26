@@ -347,7 +347,7 @@ int16_t applyAutoPowerComp(int16_t power, uint8_t compPct) {
         return power;
     }
     const bool    negative = (power < 0);
-    const int32_t mag      = negative ? -static_cast<int32_t>(power) : static_cast<int32_t>(power);
+    const int32_t mag      = abs32(power);
     int32_t       scaled   = (mag * static_cast<int32_t>(compPct) + 50L) / 100L;
     if (scaled < 1L) {
         scaled = 1L;
@@ -371,9 +371,7 @@ uint8_t computeDriveStabilityPenalty(uint8_t comScalePct,
     }
 
     // Motion intensity 0..100: peak commanded wheel power.
-    const int32_t absL   = (driveLeft < 0) ? -static_cast<int32_t>(driveLeft) : static_cast<int32_t>(driveLeft);
-    const int32_t absR   = (driveRight < 0) ? -static_cast<int32_t>(driveRight) : static_cast<int32_t>(driveRight);
-    const int32_t motion = clampLong((absL > absR) ? absL : absR, 0L, 100L);
+    const int32_t motion = clampLong(peakAbs(driveLeft, driveRight), 0L, 100L);
 
     const int32_t tipPen   = (armFactor * motion * static_cast<int32_t>(Config::kStabilityTipMaxPen) + 5000L) / 10000L;
     const int32_t stallPen = wheelStall ? static_cast<int32_t>(Config::kStabilityStallPen) : 0L;
