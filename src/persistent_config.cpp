@@ -4,6 +4,16 @@
 
 namespace RobotLogic {
 
+namespace {
+
+// EEPROM flag byte layout (byte 3). Bit 2 (precisionMode) is stored but ignored on load.
+constexpr uint8_t kFlagLeftReversed  = 0x01U;
+constexpr uint8_t kFlagRightReversed = 0x02U;
+constexpr uint8_t kFlagPrecisionMode = 0x04U;
+constexpr uint8_t kFlagRc2Smooth     = 0x08U;
+
+} // namespace
+
 uint16_t computeCrc16(const uint8_t* data, uint8_t len) {
     uint16_t crc = 0xFFFFU;
     if (data == nullptr) {
@@ -27,10 +37,10 @@ void packPersistentConfig(const PersistentConfig& cfg, uint8_t outBytes[8]) {
         return;
     }
     uint8_t flags = 0U;
-    if (cfg.leftReversed)     flags |= 0x01U;
-    if (cfg.rightReversed)    flags |= 0x02U;
-    if (cfg.precisionMode)    flags |= 0x04U;
-    if (cfg.rc2SmoothEnabled) flags |= 0x08U;
+    if (cfg.leftReversed)     flags |= kFlagLeftReversed;
+    if (cfg.rightReversed)    flags |= kFlagRightReversed;
+    if (cfg.precisionMode)    flags |= kFlagPrecisionMode;
+    if (cfg.rc2SmoothEnabled) flags |= kFlagRc2Smooth;
 
     const int8_t clampedTrim = stepMotorTrim(cfg.motorTrimPct, 0);
 
@@ -73,10 +83,10 @@ bool unpackPersistentConfig(const uint8_t inBytes[8], PersistentConfig& outCfg) 
         return false;
     }
 
-    outCfg.leftReversed     = (flags & 0x01U) != 0U;
-    outCfg.rightReversed    = (flags & 0x02U) != 0U;
-    outCfg.precisionMode    = (flags & 0x04U) != 0U;
-    outCfg.rc2SmoothEnabled = (flags & 0x08U) != 0U;
+    outCfg.leftReversed     = (flags & kFlagLeftReversed) != 0U;
+    outCfg.rightReversed    = (flags & kFlagRightReversed) != 0U;
+    outCfg.precisionMode    = (flags & kFlagPrecisionMode) != 0U;
+    outCfg.rc2SmoothEnabled = (flags & kFlagRc2Smooth) != 0U;
     outCfg.motorTrimPct     = rawTrim;
     return true;
 }
