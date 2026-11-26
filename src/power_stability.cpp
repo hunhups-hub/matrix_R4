@@ -410,12 +410,8 @@ void StabilityMonitor::reset() {
     drivePen_      = 0U;
 }
 
-uint8_t StabilityMonitor::update(const StabilityInput& in) {
-    if (in.ps2Link != LinkState::Disconnected) {
-        everConnected_ = true;
-    }
-
-    // 1. PS2 / control link penalty
+// 1. PS2 / control link penalty
+void StabilityMonitor::updateLinkPenalty(const StabilityInput& in) {
     switch (in.ps2Link) {
         case LinkState::Failsafe:
             linkPen_ = Config::kStabilityLinkMaxPen;
@@ -436,41 +432,25 @@ uint8_t StabilityMonitor::update(const StabilityInput& in) {
             break;
         case LinkState::Operational:
         default:
-            if (!in.frameValid) {
-                const uint16_t next =
-                    static_cast<uint16_t>(linkPen_) + Config::kStabilityGlitchStep;
-                linkPen_ = (next > Config::kStabilityLinkMaxPen)
-                               ? Config::kStabilityLinkMaxPen
-                               : static_cast<uint8_t>(next);
-            } else {
-                linkPen_ = (linkPen_ > Config::kStabilityRecoverStep)
-                               ? static_cast<uint8_t>(linkPen_ - Config::kStabilityRecoverStep)
-                               : 0U;
-            }
+            linkPen_ = in.frameValid
+                           ? satSub(linkPen_, Config::kStabilityRecoverStep)
+                           : satAddCap(linkPen_, Config::kStabilityGlitchStep, Config::kStabilityLinkMaxPen);
             break;
     }
+}
 
-    // 2. STM32 lower-MCU bus health + hardware fault penalty
-    if (!in.commHealthy) {
-        const uint16_t next = static_cast<uint16_t>(commBusPen_) + Config::kStabilityCommStepPen;
-        commBusPen_ = (next > Config::kStabilityCommBusMaxPen)
-                          ? Config::kStabilityCommBusMaxPen
-                          : static_cast<uint8_t>(next);
-    } else {
-        commBusPen_ = (commBusPen_ > Config::kStabilityRecoverStep)
-                          ? static_cast<uint8_t>(commBusPen_ - Config::kStabilityRecoverStep)
-                          : 0U;
-    }
-    const uint16_t rawCommPen = static_cast<uint16_t>(commBusPen_) +
-                                (in.hwFault ? Config::kStabilityHwFaultPen : 0U);
-    commPen_ = (rawCommPen > Config::kStabilityCommMaxPen)
-                   ? Config::kStabilityCommMaxPen
-                   : static_cast<uint8_t>(rawCommPen);
+// 2. STM32 lower-MCU bus health + hardware fault penalty
+void StabilityMonitor::updateCommPenalty(const StabilityInput& in) {
+    commBusPen_ = in.commHealthy
+                      ? satSub(commBusPen_, Config::kStabilityRecoverStep)
+                      : satAddCap(commBusPen_, Config::kStabilityCommStepPen, Config::kStabilityCommBusMaxPen);
+    commPen_ = satAddCap(commBusPen_,
+                         in.hwFault ? Config::kStabilityHwFaultPen : 0U,
+                         Config::kStabilityCommMaxPen);
+}
 
-    // 3. Battery % reserve + voltage sag penalty
-    powerPen_ = computePowerStabilityPenalty(in.extPower, in.battPct, in.batTier, in.compPct);
-
-    // 4. Control loop timing jitter penalty
+// 4. Control loop timing jitter penalty (peak-hold with slow decay)
+void StabilityMonitor::updateLoopPenalty(const StabilityInput& in) {
     const uint32_t targetMaxMs = Config::kControlPeriodMs + Config::kStabilityJitterSlackMs;
     const uint16_t overshoot   = (in.loopDtMs > targetMaxMs)
                                      ? static_cast<uint16_t>(
@@ -492,7 +472,18 @@ uint8_t StabilityMonitor::update(const StabilityInput& in) {
     loopPen_ = (rawLoopPen > Config::kStabilityLoopMaxPen)
                    ? Config::kStabilityLoopMaxPen
                    : static_cast<uint8_t>(rawLoopPen);
+}
 
+uint8_t StabilityMonitor::update(const StabilityInput& in) {
+    if (in.ps2Link != LinkState::Disconnected) {
+        everConnected_ = true;
+    }
+
+    updateLinkPenalty(in);
+    updateCommPenalty(in);
+    // 3. Battery % reserve + voltage sag penalty
+    powerPen_ = computePowerStabilityPenalty(in.extPower, in.battPct, in.batTier, in.compPct);
+    updateLoopPenalty(in);
     // 5. Drive risk: arm raised while driving hard (tip) + wheel stall
     drivePen_ = computeDriveStabilityPenalty(in.comScalePct, in.driveLeft, in.driveRight, in.wheelStall);
 

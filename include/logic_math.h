@@ -18,6 +18,17 @@ inline int32_t peakAbs(int32_t a, int32_t b) {
     return (absA > absB) ? absA : absB;
 }
 
+/** cur + add, saturated at cap (all in 16 bits, so a uint8_t counter never wraps). */
+inline uint8_t satAddCap(uint8_t cur, uint16_t add, uint8_t cap) {
+    const uint16_t next = static_cast<uint16_t>(cur + add);
+    return (next > cap) ? cap : static_cast<uint8_t>(next);
+}
+
+/** cur - sub, floored at 0. */
+inline uint8_t satSub(uint8_t cur, uint8_t sub) {
+    return (cur > sub) ? static_cast<uint8_t>(cur - sub) : 0U;
+}
+
 /** Battery volts -> millivolts, input clamped to 0..25.5 V, rounded to nearest. */
 inline uint16_t voltsToMv(float volts) {
     const float bounded = (volts < 0.0f) ? 0.0f : ((volts > 25.5f) ? 25.5f : volts);

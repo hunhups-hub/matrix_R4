@@ -80,6 +80,10 @@ public:
     uint8_t  drivePenalty() const { return drivePen_; }
 
 private:
+    void updateLinkPenalty(const StabilityInput& in);
+    void updateCommPenalty(const StabilityInput& in);
+    void updateLoopPenalty(const StabilityInput& in);
+
     bool     everConnected_ = false;
     uint8_t  scorePct_      = 100U;
     uint16_t jitterMs_      = 0U;
