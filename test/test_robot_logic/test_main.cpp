@@ -2186,6 +2186,139 @@ void test_logic_math_helpers(void) {
     TEST_ASSERT_EQUAL_UINT16(25500U, RobotLogic::voltsToMv(99.0f));
 }
 
+// ============================================================================
+// 13. BTN_UP / BTN_DOWN gestures
+// ============================================================================
+static ButtonEvents buttonStep(RobotLogic::ButtonGestureTracker& t, uint32_t now, bool up, bool down) {
+    ButtonEvents ev{};
+    t.feedUp(up, now);
+    t.feedDown(down, now);
+    t.evaluate(now, true, ev);
+    return ev;
+}
+
+void test_button_gesture_down_edge_and_short_release(void) {
+    RobotLogic::ButtonGestureTracker t;
+    t.seedInitial(false, false);
+    uint32_t now = 0UL;
+    (void)buttonStep(t, now, false, true); // raw change, not stable yet
+    now += Config::kButtonDebounceMs;
+    ButtonEvents ev = buttonStep(t, now, false, true);
+    TEST_ASSERT_TRUE(ev.downPressEdge);   // E-stop fires on press, not release
+    TEST_ASSERT_FALSE(ev.shortDown);
+    now += 10UL;
+    (void)buttonStep(t, now, false, false);
+    now += Config::kButtonDebounceMs;
+    ev = buttonStep(t, now, false, false);
+    TEST_ASSERT_FALSE(ev.downPressEdge);
+    TEST_ASSERT_FALSE(ev.shortDown);      // press was consumed by the edge event
+}
+
+void test_button_gesture_short_up_release(void) {
+    RobotLogic::ButtonGestureTracker t;
+    t.seedInitial(false, false);
+    uint32_t now = 0UL;
+    (void)buttonStep(t, now, true, false);
+    now += Config::kButtonDebounceMs;
+    ButtonEvents ev = buttonStep(t, now, true, false);
+    TEST_ASSERT_TRUE(ev.upPressed);
+    TEST_ASSERT_FALSE(ev.shortUp);
+    now += 50UL;
+    (void)buttonStep(t, now, false, false);
+    now += Config::kButtonDebounceMs;
+    ev = buttonStep(t, now, false, false);
+    TEST_ASSERT_TRUE(ev.shortUp);
+    TEST_ASSERT_FALSE(ev.upPressed);
+}
+
+void test_button_gesture_upload_combo_hold(void) {
+    RobotLogic::ButtonGestureTracker t;
+    t.seedInitial(false, false);
+    uint32_t now = 0UL;
+    (void)buttonStep(t, now, true, true);
+    now += Config::kButtonDebounceMs;
+    ButtonEvents ev = buttonStep(t, now, true, true);
+    TEST_ASSERT_TRUE(ev.comboHolding);
+    TEST_ASSERT_FALSE(ev.uploadRequested);
+
+    now += Config::kUploadComboHoldMs - 1UL;
+    ev = buttonStep(t, now, true, true);
+    TEST_ASSERT_FALSE(ev.uploadRequested);
+    TEST_ASSERT_TRUE(ev.uploadHoldRatio > 0.9f && ev.uploadHoldRatio < 1.0f);
+
+    now += 1UL;
+    ev = buttonStep(t, now, true, true);
+    TEST_ASSERT_TRUE(ev.uploadRequested);
+    TEST_ASSERT_EQUAL_FLOAT(1.0f, ev.uploadHoldRatio);
+
+    now += 25UL;
+    ev = buttonStep(t, now, true, true);
+    TEST_ASSERT_FALSE(ev.uploadRequested); // fires once per hold
+}
+
+void test_button_gesture_auto_hold_and_no_short_up_after_fire(void) {
+    RobotLogic::ButtonGestureTracker t;
+    t.seedInitial(false, false);
+    uint32_t now = 0UL;
+    (void)buttonStep(t, now, true, false);
+    now += Config::kButtonDebounceMs;
+    ButtonEvents ev = buttonStep(t, now, true, false);
+    const uint32_t holdStart = now;
+
+    now = holdStart + Config::kAutoStartBtnHoldMs - 1UL;
+    ev  = buttonStep(t, now, true, false);
+    TEST_ASSERT_FALSE(ev.autoStartRequested);
+    TEST_ASSERT_TRUE(ev.autoHolding);
+
+    now = holdStart + Config::kAutoStartBtnHoldMs;
+    ev  = buttonStep(t, now, true, false);
+    TEST_ASSERT_TRUE(ev.autoStartRequested);
+
+    now += 25UL;
+    (void)buttonStep(t, now, false, false);
+    now += Config::kButtonDebounceMs;
+    ev = buttonStep(t, now, false, false);
+    TEST_ASSERT_FALSE(ev.shortUp); // release after a long hold is not a short press
+}
+
+void test_button_gesture_boot_held_suppresses_until_released(void) {
+    RobotLogic::ButtonGestureTracker t;
+    t.seedInitial(true, true); // stuck at boot
+    uint32_t now = 0UL;
+    ButtonEvents ev = buttonStep(t, now, true, true);
+    TEST_ASSERT_FALSE(ev.comboHolding);
+    now += Config::kUploadComboHoldMs + 100UL;
+    ev = buttonStep(t, now, true, true);
+    TEST_ASSERT_FALSE(ev.uploadRequested);
+
+    now += 10UL;
+    (void)buttonStep(t, now, false, false);
+    now += Config::kButtonDebounceMs;
+    (void)buttonStep(t, now, false, false); // both released -> suppression clears
+    now += 10UL;
+    (void)buttonStep(t, now, true, true);
+    now += Config::kButtonDebounceMs;
+    ev = buttonStep(t, now, true, true);
+    TEST_ASSERT_TRUE(ev.comboHolding);
+}
+
+void test_button_gesture_read_failure_drops_held_state(void) {
+    RobotLogic::ButtonGestureTracker t;
+    t.seedInitial(false, false);
+    uint32_t now = 0UL;
+    (void)buttonStep(t, now, true, true);
+    now += Config::kButtonDebounceMs;
+    ButtonEvents ev = buttonStep(t, now, true, true);
+    TEST_ASSERT_TRUE(ev.comboHolding);
+
+    t.failUp();
+    ev = ButtonEvents{};
+    t.evaluate(now + 10UL, false, ev);
+    TEST_ASSERT_FALSE(ev.upPressed);
+    TEST_ASSERT_FALSE(ev.comboHolding);
+    TEST_ASSERT_FALSE(t.upHeld());
+}
+
 int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
@@ -2262,6 +2395,14 @@ int main(int argc, char** argv) {
     RUN_TEST(test_max_drive_speed_and_stab_penalty_class);
     RUN_TEST(test_control_tick_scheduler_period_and_resync);
     RUN_TEST(test_logic_math_helpers);
+
+    // 13. Button gestures
+    RUN_TEST(test_button_gesture_down_edge_and_short_release);
+    RUN_TEST(test_button_gesture_short_up_release);
+    RUN_TEST(test_button_gesture_upload_combo_hold);
+    RUN_TEST(test_button_gesture_auto_hold_and_no_short_up_after_fire);
+    RUN_TEST(test_button_gesture_boot_held_suppresses_until_released);
+    RUN_TEST(test_button_gesture_read_failure_drops_held_state);
 
     return UNITY_END();
 }

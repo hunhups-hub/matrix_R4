@@ -106,11 +106,7 @@ bool MiniR4IO::begin() {
         if (!btnDownOk) {
             downInit = false;
         }
-        btnUp_.rawState           = upInit;
-        btnUp_.stableState        = btnUp_.rawState;
-        btnDown_.rawState         = downInit;
-        btnDown_.stableState      = btnDown_.rawState;
-        suppressUploadUntilClear_ = btnUp_.stableState || btnDown_.stableState;
+        buttons_.seedInitial(upInit, downInit);
 
         if (!mInitOk || !cfgOk || !motorsSynced_ || !servosSynced_ || !btnUpOk || !btnDownOk) {
             (void)noteCommFailure();
@@ -123,9 +119,7 @@ bool MiniR4IO::begin() {
         motorsSynced_             = false;
         lastServos_               = RobotLogic::clampServoTargets(ServoTargets{});
         servosSynced_             = false;
-        btnUp_                    = DebouncedBtn{};
-        btnDown_                  = DebouncedBtn{};
-        suppressUploadUntilClear_ = false;
+        buttons_.clearAll();
         (void)noteCommFailure();
     }
 
@@ -306,43 +300,11 @@ void MiniR4IO::pollPs2(Ps2Frame& outFrame) {
     ps2_.poll(outFrame);
 }
 
-bool MiniR4IO::updateButtonDebounce(DebouncedBtn& btn,
-                                    bool sample,
-                                    uint32_t nowMs,
-                                    bool& outShortRelease,
-                                    bool& outPressEdge) {
-    outShortRelease = false;
-    outPressEdge    = false;
-    if (sample != btn.rawState) {
-        btn.rawState     = sample;
-        btn.lastChangeMs = nowMs;
-    }
-
-    if (static_cast<uint32_t>(nowMs - btn.lastChangeMs) >= Config::kButtonDebounceMs &&
-        btn.stableState != btn.rawState) {
-        btn.stableState = btn.rawState;
-        if (btn.stableState) {
-            btn.pressLatched = true;
-            outPressEdge     = true;
-        } else if (btn.pressLatched) {
-            btn.pressLatched = false;
-            outShortRelease  = true;
-        }
-        return true;
-    }
-    return false;
-}
-
 void MiniR4IO::pollButtons(uint32_t nowMs, ButtonEvents& outEvents) {
-    outEvents = ButtonEvents{};
-
     const uint32_t pollInterval = commHealthy_
                                       ? Config::kButtonPollPeriodMs
                                       : Config::kButtonUnhealthyPollPeriodMs;
-    bool pollRan   = false;
-    bool shortUp   = false;
-    bool shortDown = false;
-    bool downEdge  = false;
+    bool pollRan = false;
 
     // When comm is unhealthy, throttle button polling to prevent continuous 100 ms blocking UART timeouts.
     if (isElapsed(nowMs, lastButtonPollMs_, pollInterval) &&
@@ -354,110 +316,24 @@ void MiniR4IO::pollButtons(uint32_t nowMs, ButtonEvents& outEvents) {
         bool sample = false;
         if (pollUpTurn_) {
             if (mmL.GetButtonState(kBtnUpId, sample) == MMLower::RESULT::OK) {
-                bool upEdge = false;
-                updateButtonDebounce(btnUp_, sample, nowMs, shortUp, upEdge);
+                buttons_.feedUp(sample, nowMs);
             } else {
                 // Drop held state on comm failure so stale buttons never phantom-trigger Bootloader/Auto.
-                btnUp_            = DebouncedBtn{};
-                comboPrevActive_  = false;
-                comboFired_       = false;
-                upHoldPrevActive_ = false;
-                upHoldFired_      = false;
+                buttons_.failUp();
                 lastButtonPollMs_ = noteCommFailure();
             }
         } else {
             if (mmL.GetButtonState(kBtnDownId, sample) == MMLower::RESULT::OK) {
-                updateButtonDebounce(btnDown_, sample, nowMs, shortDown, downEdge);
+                buttons_.feedDown(sample, nowMs);
             } else {
-                btnDown_          = DebouncedBtn{};
-                comboPrevActive_  = false;
-                comboFired_       = false;
+                buttons_.failDown();
                 lastButtonPollMs_ = noteCommFailure();
             }
         }
         pollUpTurn_ = !pollUpTurn_;
     }
 
-    outEvents.upPressed = btnUp_.stableState;
-
-    // E-stop must fire the instant BTN_DOWN is pressed (never suppressed, never waits for release).
-    // The press is consumed here so releasing the button does not emit a second shortDown event.
-    if (downEdge) {
-        outEvents.downPressEdge = true;
-        btnDown_.pressLatched   = false;
-    }
-
-    if (suppressUploadUntilClear_) {
-        if (!btnUp_.stableState && !btnDown_.stableState) {
-            suppressUploadUntilClear_ = false;
-            btnUp_.pressLatched       = false;
-            btnDown_.pressLatched     = false;
-        }
-        return;
-    }
-
-    const bool bothHeld = btnUp_.stableState && btnDown_.stableState;
-    if (bothHeld) {
-        // Prevent single-button release actions after releasing an upload combo.
-        btnUp_.pressLatched   = false;
-        btnDown_.pressLatched = false;
-        upHoldPrevActive_     = false;
-        upHoldFired_          = false;
-
-        if (!comboPrevActive_) {
-            comboPrevActive_ = true;
-            comboFired_      = false;
-            comboStartMs_    = nowMs;
-        }
-
-        const uint32_t elapsed = static_cast<uint32_t>(nowMs - comboStartMs_);
-        outEvents.comboHolding = true;
-        float ratio            = static_cast<float>(elapsed) / static_cast<float>(Config::kUploadComboHoldMs);
-        if (ratio > 1.0f) {
-            ratio = 1.0f;
-        }
-        outEvents.uploadHoldRatio = ratio;
-
-        if (!comboFired_ && elapsed >= Config::kUploadComboHoldMs) {
-            comboFired_               = true;
-            outEvents.uploadRequested = true;
-        }
-        return;
-    }
-
-    comboPrevActive_ = false;
-    comboFired_      = false;
-
-    // Single BTN_UP hold (1.2s) triggers Auto mode without requiring PS2 controller
-    if (btnUp_.stableState && !btnDown_.stableState) {
-        if (!upHoldPrevActive_) {
-            upHoldPrevActive_ = true;
-            upHoldFired_      = false;
-            upHoldStartMs_    = nowMs;
-        }
-        const uint32_t elapsed = static_cast<uint32_t>(nowMs - upHoldStartMs_);
-        if (elapsed >= Config::kAutoHoldBarDelayMs) {
-            outEvents.autoHolding = true;
-            float ratio           = static_cast<float>(elapsed) / static_cast<float>(Config::kAutoStartBtnHoldMs);
-            if (ratio > 1.0f) {
-                ratio = 1.0f;
-            }
-            outEvents.autoHoldRatio = ratio;
-        }
-        if (!upHoldFired_ && elapsed >= Config::kAutoStartBtnHoldMs) {
-            upHoldFired_                 = true;
-            btnUp_.pressLatched          = false; // Suppress shortUp release action after hold fires
-            outEvents.autoStartRequested = true;
-        }
-    } else {
-        upHoldPrevActive_ = false;
-        upHoldFired_      = false;
-    }
-
-    if (pollRan) {
-        outEvents.shortUp   = shortUp;
-        outEvents.shortDown = shortDown;
-    }
+    buttons_.evaluate(nowMs, pollRan, outEvents);
 }
 
 bool MiniR4IO::verifyAndHealLowerMcu(uint32_t nowMs,

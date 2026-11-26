@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "logic_button.h"
 #include "ps2_driver.h"
 #include "types.h"
 
@@ -76,18 +77,6 @@ public:
     uint8_t servoRangeErr() const { return servoRangeErr_; }
 
 private:
-    struct DebouncedBtn {
-        bool     rawState      = false;
-        bool     stableState   = false;
-        uint32_t lastChangeMs  = 0;
-        bool     pressLatched  = false;
-    };
-
-    bool updateButtonDebounce(DebouncedBtn& btn,
-                              bool sample,
-                              uint32_t nowMs,
-                              bool& outShortRelease,
-                              bool& outPressEdge);
     bool applyLowerMcuConfig(bool zeroAuxMotors);
     bool     configureServoRanges();
     void     staggerBootServos();
@@ -98,17 +87,9 @@ private:
     Ps2Driver    ps2_{};
     bool         ps2Ready_                 = false;
 
-    DebouncedBtn btnUp_{};
-    DebouncedBtn btnDown_{};
+    RobotLogic::ButtonGestureTracker buttons_{};
     bool         pollUpTurn_               = true;
     uint32_t     lastButtonPollMs_         = 0;
-    bool         suppressUploadUntilClear_ = true;
-    bool         comboPrevActive_          = false;
-    bool         comboFired_               = false;
-    uint32_t     comboStartMs_             = 0;
-    bool         upHoldPrevActive_         = false;
-    bool         upHoldFired_              = false;
-    uint32_t     upHoldStartMs_            = 0;
 
     bool         leftReverse_              = Config::kMotorLeftReverseInit;
     bool         rightReverse_             = Config::kMotorRightReverseInit;

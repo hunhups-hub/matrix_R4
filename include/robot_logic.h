@@ -13,3 +13,4 @@
 #include "logic_link.h"
 #include "logic_power.h"
 #include "logic_policy.h"
+#include "logic_button.h"
