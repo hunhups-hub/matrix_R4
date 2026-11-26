@@ -12,3 +12,4 @@
 #include "logic_servo.h"
 #include "logic_link.h"
 #include "logic_power.h"
+#include "logic_policy.h"

@@ -125,11 +125,8 @@ void applyDriveToMotors(uint32_t nowMs) {
     g_io.applyMotors(g_snap.drive.left, g_snap.drive.right, Config::kEnableSmartHoldBrake, nowMs);
 }
 
-/** Effective max drive power = min(mode cap [precision/normal], battery power cap). */
 int16_t computeMaxDriveSpeed(const MotorPowerProfile& profile) {
-    const int16_t modeCap =
-        g_snap.precisionMode ? Config::kPrecisionMaxPower : Config::kNormalMaxPower;
-    return (modeCap < profile.maxPowerCap) ? modeCap : profile.maxPowerCap;
+    return RobotLogic::computeMaxDriveSpeed(g_snap.precisionMode, profile.maxPowerCap);
 }
 
 /** Drops any latched Serial drive request and stops the Serial motion timer. */
@@ -394,13 +391,6 @@ bool sampleLowerMcu(uint32_t nowMs, bool isMoving, bool force) {
     return true;
 }
 
-uint8_t classifyStabPenalty(uint8_t pen) {
-    if (pen == 0U) {
-        return 0U;
-    }
-    return (pen <= 10U) ? 1U : 2U;
-}
-
 void updateStabilityMetrics(bool frameValid, uint8_t compPercent, uint32_t loopDtMs) {
     RobotLogic::StabilityInput in{};
     in.ps2Link      = g_snap.ps2Link;
@@ -420,11 +410,11 @@ void updateStabilityMetrics(bool frameValid, uint8_t compPercent, uint32_t loopD
 
     g_snap.stabilityPct   = g_stabMon.update(in);
     g_snap.loopJitterMs   = g_stabMon.jitterMs();
-    g_snap.linkStabState  = classifyStabPenalty(g_stabMon.linkPenalty());
-    g_snap.powerStabState = classifyStabPenalty(g_stabMon.powerPenalty());
-    g_snap.commStabState  = classifyStabPenalty(g_stabMon.commPenalty());
-    g_snap.loopStabState  = classifyStabPenalty(g_stabMon.loopPenalty());
-    g_snap.driveStabState = classifyStabPenalty(g_stabMon.drivePenalty());
+    g_snap.linkStabState  = RobotLogic::classifyStabPenalty(g_stabMon.linkPenalty());
+    g_snap.powerStabState = RobotLogic::classifyStabPenalty(g_stabMon.powerPenalty());
+    g_snap.commStabState  = RobotLogic::classifyStabPenalty(g_stabMon.commPenalty());
+    g_snap.loopStabState  = RobotLogic::classifyStabPenalty(g_stabMon.loopPenalty());
+    g_snap.driveStabState = RobotLogic::classifyStabPenalty(g_stabMon.drivePenalty());
 }
 
 // ============================================================================
@@ -845,18 +835,33 @@ void driveCoastToStop(uint32_t nowMs, const MotorPowerProfile& pwr) {
  */
 bool arbitrateDrive(uint32_t nowMs, LinkState prevLink, bool valid, const MotorPowerProfile& pwr) {
     bool ps2ServosUpdated = false;
-    if (g_snap.sysState == SystemState::Estop) {
-        driveEstop(nowMs);
-    } else if (g_linkSm.isFailsafe()) {
-        driveFailsafe(nowMs, prevLink != LinkState::Failsafe);
-    } else if (g_linkSm.isOperational() && valid && Controls::held(g_lastPs2Frame, Controls::kBrakeOrExit)) {
-        driveCrossBrake(nowMs);
-    } else if (g_serialDrive.latched) {
-        driveFromSerial(nowMs, pwr);
-    } else if (g_linkSm.isOperational()) {
-        ps2ServosUpdated = driveFromPs2(nowMs, prevLink, valid, pwr);
-    } else {
-        driveCoastToStop(nowMs, pwr);
+    const RobotLogic::DriveSource source = RobotLogic::selectDriveSource(
+        g_snap.sysState == SystemState::Estop,
+        g_linkSm.isFailsafe(),
+        g_linkSm.isOperational(),
+        valid,
+        Controls::held(g_lastPs2Frame, Controls::kBrakeOrExit),
+        g_serialDrive.latched);
+    switch (source) {
+        case RobotLogic::DriveSource::Estop:
+            driveEstop(nowMs);
+            break;
+        case RobotLogic::DriveSource::Failsafe:
+            driveFailsafe(nowMs, prevLink != LinkState::Failsafe);
+            break;
+        case RobotLogic::DriveSource::CrossBrake:
+            driveCrossBrake(nowMs);
+            break;
+        case RobotLogic::DriveSource::Serial:
+            driveFromSerial(nowMs, pwr);
+            break;
+        case RobotLogic::DriveSource::Ps2:
+            ps2ServosUpdated = driveFromPs2(nowMs, prevLink, valid, pwr);
+            break;
+        case RobotLogic::DriveSource::Coast:
+        default:
+            driveCoastToStop(nowMs, pwr);
+            break;
     }
     g_snap.holdBrakeActive = g_io.isBrakeEngaged();
     return ps2ServosUpdated;
@@ -1101,14 +1106,9 @@ void loop() {
     g_serial.poll(nowMs, g_snap.serialSpeedPct, serialAct);
     applySerialImmediateActions(serialAct, nowMs);
 
-    const uint32_t dtMs = static_cast<uint32_t>(nowMs - g_lastControlMs);
-    if (dtMs >= Config::kControlPeriodMs) {
-        if (dtMs >= (Config::kControlPeriodMs * 2UL)) {
-            // Resync cleanly after stalls/UART timeouts instead of burst catch-up ticks.
-            g_lastControlMs = nowMs;
-        } else {
-            g_lastControlMs += Config::kControlPeriodMs;
-        }
+    // Resyncs cleanly after stalls/UART timeouts instead of burst catch-up ticks.
+    uint32_t dtMs = 0UL;
+    if (RobotLogic::advanceControlTick(nowMs, g_lastControlMs, dtMs)) {
         runControlTick(nowMs, dtMs);
     }
 }

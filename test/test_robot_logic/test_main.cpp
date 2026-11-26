@@ -2102,6 +2102,90 @@ void test_manual_stall_detector_progress_low_cmd_and_invalid_sample(void) {
 // Main Unity Test Runner
 // ============================================================================
 
+// ============================================================================
+// 12. Control policy (drive source priority, speed cap, stability class, scheduler, math helpers)
+// ============================================================================
+void test_select_drive_source_priority_order(void) {
+    using RobotLogic::DriveSource;
+    using RobotLogic::selectDriveSource;
+    // estop, failsafe, operational, frameValid, crossHeld, serialLatched
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(DriveSource::Estop),
+                            static_cast<uint8_t>(selectDriveSource(true, true, true, true, true, true)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(DriveSource::Failsafe),
+                            static_cast<uint8_t>(selectDriveSource(false, true, true, true, true, true)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(DriveSource::CrossBrake),
+                            static_cast<uint8_t>(selectDriveSource(false, false, true, true, true, true)));
+    // Cross needs Operational + valid frame; otherwise latched Serial wins.
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(DriveSource::Serial),
+                            static_cast<uint8_t>(selectDriveSource(false, false, true, false, true, true)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(DriveSource::Serial),
+                            static_cast<uint8_t>(selectDriveSource(false, false, false, true, true, true)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(DriveSource::Ps2),
+                            static_cast<uint8_t>(selectDriveSource(false, false, true, true, false, false)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(DriveSource::Coast),
+                            static_cast<uint8_t>(selectDriveSource(false, false, false, false, false, false)));
+}
+
+void test_max_drive_speed_and_stab_penalty_class(void) {
+    TEST_ASSERT_EQUAL_INT16(Config::kNormalMaxPower,
+                            RobotLogic::computeMaxDriveSpeed(false, Config::kMotorMaxPower));
+    TEST_ASSERT_EQUAL_INT16(Config::kPrecisionMaxPower,
+                            RobotLogic::computeMaxDriveSpeed(true, Config::kMotorMaxPower));
+    TEST_ASSERT_EQUAL_INT16(30, RobotLogic::computeMaxDriveSpeed(false, 30));
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::computeMaxDriveSpeed(true, 0));
+
+    TEST_ASSERT_EQUAL_UINT8(0U, RobotLogic::classifyStabPenalty(0U));
+    TEST_ASSERT_EQUAL_UINT8(1U, RobotLogic::classifyStabPenalty(1U));
+    TEST_ASSERT_EQUAL_UINT8(1U, RobotLogic::classifyStabPenalty(10U));
+    TEST_ASSERT_EQUAL_UINT8(2U, RobotLogic::classifyStabPenalty(11U));
+    TEST_ASSERT_EQUAL_UINT8(2U, RobotLogic::classifyStabPenalty(255U));
+}
+
+void test_control_tick_scheduler_period_and_resync(void) {
+    uint32_t last = 1000UL;
+    uint32_t dt   = 0UL;
+    TEST_ASSERT_FALSE(RobotLogic::advanceControlTick(1000UL + Config::kControlPeriodMs - 1UL, last, dt));
+    TEST_ASSERT_EQUAL_UINT32(1000UL, last);
+
+    // Exactly one period late: tick, last advances by one period (no drift).
+    TEST_ASSERT_TRUE(RobotLogic::advanceControlTick(1000UL + Config::kControlPeriodMs, last, dt));
+    TEST_ASSERT_EQUAL_UINT32(Config::kControlPeriodMs, dt);
+    TEST_ASSERT_EQUAL_UINT32(1000UL + Config::kControlPeriodMs, last);
+
+    // Slightly late (< 2 periods): still advances by exactly one period.
+    const uint32_t now1 = last + Config::kControlPeriodMs + 10UL;
+    TEST_ASSERT_TRUE(RobotLogic::advanceControlTick(now1, last, dt));
+    TEST_ASSERT_EQUAL_UINT32(Config::kControlPeriodMs + 10UL, dt);
+
+    // Stalled >= 2 periods: resync to now, no burst catch-up.
+    const uint32_t now2 = last + Config::kControlPeriodMs * 3UL;
+    TEST_ASSERT_TRUE(RobotLogic::advanceControlTick(now2, last, dt));
+    TEST_ASSERT_EQUAL_UINT32(now2, last);
+
+    // millis() wraparound.
+    last = 0xFFFFFFF0UL;
+    TEST_ASSERT_TRUE(RobotLogic::advanceControlTick(0x00000010UL, last, dt));
+    TEST_ASSERT_EQUAL_UINT32(0x20UL, dt);
+}
+
+void test_logic_math_helpers(void) {
+    TEST_ASSERT_EQUAL_INT32(0, RobotLogic::abs32(0));
+    TEST_ASSERT_EQUAL_INT32(32768, RobotLogic::abs32(-32768));
+    TEST_ASSERT_EQUAL_INT32(100, RobotLogic::peakAbs(-100, 40));
+    TEST_ASSERT_EQUAL_INT32(100, RobotLogic::peakAbs(40, -100));
+    TEST_ASSERT_EQUAL_INT32(0, RobotLogic::peakAbs(0, 0));
+
+    TEST_ASSERT_EQUAL_UINT8(255U, RobotLogic::satAddCap(250U, 100U, 255U));
+    TEST_ASSERT_EQUAL_UINT8(20U, RobotLogic::satAddCap(10U, 10U, 30U));
+    TEST_ASSERT_EQUAL_UINT8(30U, RobotLogic::satAddCap(25U, 10U, 30U));
+    TEST_ASSERT_EQUAL_UINT8(0U, RobotLogic::satSub(3U, 5U));
+    TEST_ASSERT_EQUAL_UINT8(7U, RobotLogic::satSub(12U, 5U));
+
+    TEST_ASSERT_EQUAL_UINT16(0U, RobotLogic::voltsToMv(-1.0f));
+    TEST_ASSERT_EQUAL_UINT16(7400U, RobotLogic::voltsToMv(7.4f));
+    TEST_ASSERT_EQUAL_UINT16(25500U, RobotLogic::voltsToMv(99.0f));
+}
+
 int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
@@ -2172,6 +2256,12 @@ int main(int argc, char** argv) {
     // 11. Manual stall cut-off
     RUN_TEST(test_manual_stall_detector_trip_rearm_and_fail_open);
     RUN_TEST(test_manual_stall_detector_progress_low_cmd_and_invalid_sample);
+
+    // 12. Control policy
+    RUN_TEST(test_select_drive_source_priority_order);
+    RUN_TEST(test_max_drive_speed_and_stab_penalty_class);
+    RUN_TEST(test_control_tick_scheduler_period_and_resync);
+    RUN_TEST(test_logic_math_helpers);
 
     return UNITY_END();
 }
