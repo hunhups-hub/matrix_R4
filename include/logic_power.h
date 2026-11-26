@@ -26,6 +26,8 @@ public:
 
 private:
     void computeThresholds(uint16_t& lowEnter, uint16_t& critEnter, uint16_t& emergEnter) const;
+    void ingestSample(uint16_t boundedRaw, uint32_t nowMs);
+    void tryRecoverTier(uint16_t currentEnter, uint32_t nowMs);
 
     BatteryTier tier_                = BatteryTier::Normal;
     uint16_t    filteredMv_          = 0U;

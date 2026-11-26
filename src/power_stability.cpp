@@ -39,35 +39,25 @@ void BatteryStabilizer::computeThresholds(uint16_t& lowEnter,
     }
 }
 
-BatteryTier BatteryStabilizer::update(uint16_t rawMv, bool valid, uint32_t nowMs) {
-    if (!valid) {
-        if (badStreak_ < 255U) {
-            badStreak_++;
-        }
-        if (badStreak_ >= Config::kBattInvalidFallbackCnt) {
-            const uint8_t savedBad = badStreak_;
-            reset();
-            badStreak_ = savedBad;
-        }
-        return tier_;
+namespace {
+
+BatteryTier tierForVoltage(uint16_t mv, uint16_t lowEnter, uint16_t critEnter, uint16_t emergEnter) {
+    if (mv <= emergEnter) {
+        return BatteryTier::Emergency;
     }
-
-    badStreak_ = 0U;
-
-    if (rawMv < Config::kExtPowerPresentMv) {
-        if (offStreak_ < 255U) {
-            offStreak_++;
-        }
-        if (!extPower_ || offStreak_ >= Config::kBattOffDebounceTicks) {
-            reset();
-        }
-        return tier_;
+    if (mv <= critEnter) {
+        return BatteryTier::Critical;
     }
+    if (mv <= lowEnter) {
+        return BatteryTier::Low;
+    }
+    return BatteryTier::Normal;
+}
 
-    offStreak_ = 0U;
-    extPower_  = true;
+} // namespace
 
-    const uint16_t boundedRaw = (rawMv > 25500U) ? 25500U : rawMv;
+// Seeds or updates the asymmetric EMA filter and the guarded idle baseline from one valid sample.
+void BatteryStabilizer::ingestSample(uint16_t boundedRaw, uint32_t nowMs) {
     if (!hasBaseline_) {
         initBaselineMv_      = boundedRaw;
         baselineMv_          = boundedRaw;
@@ -116,6 +106,64 @@ BatteryTier BatteryStabilizer::update(uint16_t rawMv, bool valid, uint32_t nowMs
             baselineRiseActive_ = false;
         }
     }
+}
+
+// Steps one tier up after the filtered voltage stayed above the hysteresis exit for the hold time.
+void BatteryStabilizer::tryRecoverTier(uint16_t currentEnter, uint32_t nowMs) {
+    const uint16_t exitThreshold = static_cast<uint16_t>(currentEnter + Config::kBattHysteresisMv);
+
+    if (filteredMv_ < exitThreshold) {
+        recoveryActive_ = false;
+        return;
+    }
+    if (!recoveryActive_) {
+        recoveryActive_  = true;
+        recoveryStartMs_ = nowMs;
+        return;
+    }
+    if (static_cast<uint32_t>(nowMs - recoveryStartMs_) >= Config::kBattRecoveryHoldMs) {
+        // Step up one tier at a time so brief voltage rebound never triggers a full spike
+        if (tier_ == BatteryTier::Emergency) {
+            tier_ = BatteryTier::Critical;
+        } else if (tier_ == BatteryTier::Critical) {
+            tier_ = BatteryTier::Low;
+        } else {
+            tier_ = BatteryTier::Normal;
+        }
+        recoveryActive_ = false;
+    }
+}
+
+BatteryTier BatteryStabilizer::update(uint16_t rawMv, bool valid, uint32_t nowMs) {
+    if (!valid) {
+        if (badStreak_ < 255U) {
+            badStreak_++;
+        }
+        if (badStreak_ >= Config::kBattInvalidFallbackCnt) {
+            const uint8_t savedBad = badStreak_;
+            reset();
+            badStreak_ = savedBad;
+        }
+        return tier_;
+    }
+
+    badStreak_ = 0U;
+
+    if (rawMv < Config::kExtPowerPresentMv) {
+        if (offStreak_ < 255U) {
+            offStreak_++;
+        }
+        if (!extPower_ || offStreak_ >= Config::kBattOffDebounceTicks) {
+            reset();
+        }
+        return tier_;
+    }
+
+    offStreak_ = 0U;
+    extPower_  = true;
+
+    const uint16_t boundedRaw = (rawMv > 25500U) ? 25500U : rawMv;
+    ingestSample(boundedRaw, nowMs);
 
     uint16_t lowEnter   = 0U;
     uint16_t critEnter  = 0U;
@@ -123,15 +171,7 @@ BatteryTier BatteryStabilizer::update(uint16_t rawMv, bool valid, uint32_t nowMs
     computeThresholds(lowEnter, critEnter, emergEnter);
 
     // Instant escalation to protect brownout-sensitive motors/STM32/PS2 receiver
-    BatteryTier downTier = BatteryTier::Normal;
-    if (filteredMv_ <= emergEnter) {
-        downTier = BatteryTier::Emergency;
-    } else if (filteredMv_ <= critEnter) {
-        downTier = BatteryTier::Critical;
-    } else if (filteredMv_ <= lowEnter) {
-        downTier = BatteryTier::Low;
-    }
-
+    const BatteryTier downTier = tierForVoltage(filteredMv_, lowEnter, critEnter, emergEnter);
     if (static_cast<uint8_t>(downTier) > static_cast<uint8_t>(tier_)) {
         tier_           = downTier;
         recoveryActive_ = false;
@@ -149,27 +189,7 @@ BatteryTier BatteryStabilizer::update(uint16_t rawMv, bool valid, uint32_t nowMs
     } else if (tier_ == BatteryTier::Critical) {
         currentEnter = critEnter;
     }
-    const uint16_t exitThreshold = static_cast<uint16_t>(currentEnter + Config::kBattHysteresisMv);
-
-    if (filteredMv_ >= exitThreshold) {
-        if (!recoveryActive_) {
-            recoveryActive_  = true;
-            recoveryStartMs_ = nowMs;
-        } else if (static_cast<uint32_t>(nowMs - recoveryStartMs_) >= Config::kBattRecoveryHoldMs) {
-            // Step up one tier at a time so brief voltage rebound never triggers a full spike
-            if (tier_ == BatteryTier::Emergency) {
-                tier_ = BatteryTier::Critical;
-            } else if (tier_ == BatteryTier::Critical) {
-                tier_ = BatteryTier::Low;
-            } else {
-                tier_ = BatteryTier::Normal;
-            }
-            recoveryActive_ = false;
-        }
-    } else {
-        recoveryActive_ = false;
-    }
-
+    tryRecoverTier(currentEnter, nowMs);
     return tier_;
 }
 
