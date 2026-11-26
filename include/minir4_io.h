@@ -80,6 +80,9 @@ private:
     bool applyLowerMcuConfig(bool zeroAuxMotors);
     bool     configureServoRanges();
     void     staggerBootServos();
+    uint32_t retryIntervalMs() const;
+    /** True when an unsynced actuator must wait for its retry interval, or comm is in backoff. */
+    bool     shouldSkipCommAttempt(uint32_t nowMs, bool synced, uint32_t lastAttemptMs) const;
     uint32_t noteCommFailure();
     bool     isCommBackoffActive(uint32_t nowMs, uint32_t backoffMs) const;
     static bool isElapsed(uint32_t nowMs, uint32_t sinceMs, uint32_t periodMs);

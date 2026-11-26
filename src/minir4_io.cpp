@@ -394,15 +394,21 @@ void MiniR4IO::invalidateActuatorCaches() {
     servosSynced_ = false;
 }
 
+uint32_t MiniR4IO::retryIntervalMs() const {
+    return commHealthy_ ? Config::kCommRetryIntervalMs : Config::kCommUnhealthyRetryIntervalMs;
+}
+
+bool MiniR4IO::shouldSkipCommAttempt(uint32_t nowMs, bool synced, uint32_t lastAttemptMs) const {
+    return (!synced && !isElapsed(nowMs, lastAttemptMs, retryIntervalMs())) ||
+           isCommBackoffActive(nowMs, Config::kCommUnhealthyRetryIntervalMs);
+}
+
 bool MiniR4IO::shouldRefreshStoppedMotors(uint32_t nowMs) const {
     if (!motorsSynced_ || lastLeftPower_ != 0 || lastRightPower_ != 0) {
-        const uint32_t retryInterval = commHealthy_
-                                           ? Config::kCommRetryIntervalMs
-                                           : Config::kCommUnhealthyRetryIntervalMs;
         if (isCommBackoffActive(nowMs, Config::kCommUnhealthyRetryIntervalMs)) {
             return false;
         }
-        return isElapsed(nowMs, lastMotorAttemptMs_, retryInterval);
+        return isElapsed(nowMs, lastMotorAttemptMs_, retryIntervalMs());
     }
     return isElapsed(nowMs, lastStopRefreshMs_, Config::kFailsafeRefreshMs);
 }
@@ -424,11 +430,7 @@ void MiniR4IO::applyMotors(int16_t leftPower, int16_t rightPower, bool forceBrak
         return;
     }
 
-    const uint32_t retryInterval = commHealthy_
-                                       ? Config::kCommRetryIntervalMs
-                                       : Config::kCommUnhealthyRetryIntervalMs;
-    if ((!motorsSynced_ && !isElapsed(nowMs, lastMotorAttemptMs_, retryInterval)) ||
-        isCommBackoffActive(nowMs, Config::kCommUnhealthyRetryIntervalMs)) {
+    if (shouldSkipCommAttempt(nowMs, motorsSynced_, lastMotorAttemptMs_)) {
         return;
     }
     lastMotorAttemptMs_ = nowMs;
@@ -570,11 +572,7 @@ void MiniR4IO::applyServos(const ServoTargets& targets, uint32_t nowMs) {
         return;
     }
 
-    const uint32_t retryInterval = commHealthy_
-                                       ? Config::kCommRetryIntervalMs
-                                       : Config::kCommUnhealthyRetryIntervalMs;
-    if ((!servosSynced_ && !isElapsed(nowMs, lastServoAttemptMs_, retryInterval)) ||
-        isCommBackoffActive(nowMs, Config::kCommUnhealthyRetryIntervalMs)) {
+    if (shouldSkipCommAttempt(nowMs, servosSynced_, lastServoAttemptMs_)) {
         return;
     }
     lastServoAttemptMs_ = nowMs;

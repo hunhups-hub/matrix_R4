@@ -17,6 +17,13 @@ using RobotLogic::stabFlagChar;
 
 namespace {
 
+// Default text style used by every OLED screen (no wrap, 6x8 font, white).
+void setupTextStyle() {
+    MiniR4.OLED.setTextWrap(false);
+    MiniR4.OLED.setTextSize(1);
+    MiniR4.OLED.setTextColor(SSD1306_WHITE);
+}
+
 // Send a real 2-byte SSD1306 command (Co=0, D/C=0, cmd) because Renesas RA4M1
 // R_IIC_MASTER_Write rejects 0-byte writes with FSP_ERR_ASSERTION.
 uint8_t probeSsd1306Cmd(TwoWire& bus, uint8_t addr, uint8_t cmd) {
@@ -94,9 +101,7 @@ bool OledUI::begin() {
     if (lastI2cErr_ == 0U) {
         MiniR4.OLED.ssd1306_command(SSD1306_DISPLAYON);
     }
-    MiniR4.OLED.setTextWrap(false);
-    MiniR4.OLED.setTextSize(1);
-    MiniR4.OLED.setTextColor(SSD1306_WHITE);
+    setupTextStyle();
 
     fastClockOk_ = (lastI2cErr_ == 0U);
     if (fastClockOk_) {
@@ -190,9 +195,7 @@ void OledUI::showBootloaderScreen() {
     MiniR4.LED.setColor(1, 0, 120, 180);
     MiniR4.LED.setColor(2, 0, 120, 180);
     MiniR4.OLED.clearDisplay();
-    MiniR4.OLED.setTextWrap(false);
-    MiniR4.OLED.setTextSize(1);
-    MiniR4.OLED.setTextColor(SSD1306_WHITE);
+    setupTextStyle();
     MiniR4.OLED.setCursor(10, 6);
     MiniR4.OLED.print(F("UPLOAD BOOTLOADER"));
     MiniR4.OLED.setCursor(16, 19);
@@ -353,9 +356,7 @@ void OledUI::render(const SystemSnapshot& snap, uint32_t nowMs, bool force) {
     lastOledMs_ = nowMs;
 
     MiniR4.OLED.clearDisplay();
-    MiniR4.OLED.setTextWrap(false);
-    MiniR4.OLED.setTextSize(1);
-    MiniR4.OLED.setTextColor(SSD1306_WHITE);
+    setupTextStyle();
     MiniR4.OLED.setCursor(0, 0);
     MiniR4.OLED.print(line1);
     MiniR4.OLED.setCursor(0, 8);
