@@ -31,14 +31,7 @@ volatile AutoExitReason s_exitReason             = AutoExitReason::None;
 uint32_t                s_lastPollMs             = 0UL;
 uint32_t                s_autoStartMs            = 0UL;
 uint32_t                s_lastOledAutoMs         = 0UL;
-uint32_t                s_cmdStartMs             = 0UL;
-uint32_t                s_lastStallCheckMs       = 0UL;
-uint32_t                s_lastWheelMoveMs        = 0UL;
-int32_t                 s_prevEncL               = 0;
-int32_t                 s_prevEncR               = 0;
-int32_t                 s_prevDriveDeg           = 0;
-bool                    s_hasEncBaseline         = false;
-bool                    s_hasDegBaseline         = false;
+RobotLogic::AutoStallTracker s_stall{};
 uint8_t                 s_driveEncIdxL           = Config::kMotorLeftId - 1U;
 uint8_t                 s_driveEncIdxR           = Config::kMotorRightId - 1U;
 bool                    s_driveTaskActive        = false;
@@ -135,99 +128,41 @@ bool probeAndRunLoopIteration() {
 }
 
 void resetStallTracker(uint32_t nowMs) {
-    s_cmdStartMs       = nowMs;
-    s_lastStallCheckMs = nowMs;
-    s_lastWheelMoveMs  = nowMs;
-    s_prevEncL         = 0;
-    s_prevEncR         = 0;
-    s_prevDriveDeg     = 0;
-    s_hasEncBaseline   = false;
-    s_hasDegBaseline   = false;
+    s_stall.reset(nowMs);
 }
 
 void checkDriveStall(uint32_t nowMs) {
-    if (!s_inYieldContext ||
-        static_cast<uint32_t>(nowMs - s_cmdStartMs) < Config::kAutoStallGraceMs ||
-        static_cast<uint32_t>(nowMs - s_lastStallCheckMs) < Config::kAutoStallPollMs) {
+    if (!s_inYieldContext || !s_stall.checkDue(nowMs)) {
         return;
     }
-    s_lastStallCheckMs = nowMs;
 
     bool taskStats[2] = {false, false};
     const bool taskDoneOk =
         (mmL.Get_Drive_isTaskDone(1U, taskStats) == MMLower::Drive_RESULT::OK);
     if ((taskDoneOk && !taskStats[0]) || (!taskDoneOk && !s_driveTaskActive)) {
         // No blocking DriveDC task is active (e.g. inside regular delay()).
-        s_hasEncBaseline  = false;
-        s_hasDegBaseline  = false;
-        s_lastWheelMoveMs = nowMs;
+        s_stall.markIdle(nowMs);
         return;
     }
 
     if (!taskDoneOk) {
         // STM32 UART timed out during a blocking DriveDC wait: abort if unrecovered.
-        if (static_cast<uint32_t>(nowMs - s_lastWheelMoveMs) >= Config::kAutoStallTimeoutMs) {
+        if (s_stall.timedOut(nowMs)) {
             abortAuto(AutoExitReason::StallTimeout);
         }
         return;
     }
 
     if (!s_expectWheelMotion) {
-        s_hasEncBaseline  = false;
-        s_hasDegBaseline  = false;
-        s_lastWheelMoveMs = nowMs;
+        s_stall.markIdle(nowMs);
         return;
     }
 
-    int32_t enc[4]      = {0, 0, 0, 0};
-    int32_t driveDeg    = 0;
-    const bool encOk    = (mmL.GetAllEncoderCounter(enc) == MMLower::RESULT::OK);
-    const bool degOk    = (mmL.Get_Drive_Degrees(1U, driveDeg) == MMLower::Drive_RESULT::OK);
-    if (!encOk && !degOk) {
-        if (static_cast<uint32_t>(nowMs - s_lastWheelMoveMs) >= Config::kAutoStallTimeoutMs) {
-            abortAuto(AutoExitReason::StallTimeout);
-        }
-        return;
-    }
-
-    const int32_t curEncL        = enc[s_driveEncIdxL];
-    const int32_t curEncR        = enc[s_driveEncIdxR];
-    const bool    hadAnyBaseline = s_hasEncBaseline || s_hasDegBaseline;
-    bool          moved          = false;
-
-    if (encOk) {
-        if (!s_hasEncBaseline) {
-            s_prevEncL       = curEncL;
-            s_prevEncR       = curEncR;
-            s_hasEncBaseline = true;
-        } else if (RobotLogic::hasEncoderProgressed(s_prevEncL, curEncL, Config::kAutoStallMinDeltaDeg) ||
-                   RobotLogic::hasEncoderProgressed(s_prevEncR, curEncR, Config::kAutoStallMinDeltaDeg)) {
-            moved = true;
-        }
-    }
-
-    if (degOk) {
-        if (!s_hasDegBaseline) {
-            s_prevDriveDeg   = driveDeg;
-            s_hasDegBaseline = true;
-        } else if (RobotLogic::hasEncoderProgressed(s_prevDriveDeg, driveDeg, Config::kAutoStallMinDeltaDeg)) {
-            moved = true;
-        }
-    }
-
-    if (moved) {
-        if (encOk) {
-            s_prevEncL = curEncL;
-            s_prevEncR = curEncR;
-        }
-        if (degOk) {
-            s_prevDriveDeg = driveDeg;
-        }
-        s_lastWheelMoveMs = nowMs;
-    } else if (!hadAnyBaseline) {
-        // First baseline sample captured: start the stall timeout window from now.
-        s_lastWheelMoveMs = nowMs;
-    } else if (static_cast<uint32_t>(nowMs - s_lastWheelMoveMs) >= Config::kAutoStallTimeoutMs) {
+    int32_t enc[4]   = {0, 0, 0, 0};
+    int32_t driveDeg = 0;
+    const bool encOk = (mmL.GetAllEncoderCounter(enc) == MMLower::RESULT::OK);
+    const bool degOk = (mmL.Get_Drive_Degrees(1U, driveDeg) == MMLower::Drive_RESULT::OK);
+    if (s_stall.update(nowMs, encOk, enc[s_driveEncIdxL], enc[s_driveEncIdxR], degOk, driveDeg)) {
         abortAuto(AutoExitReason::StallTimeout);
     }
 }
@@ -510,8 +445,7 @@ void beginBlockingDriveTask(bool expectWheelMotion) {
 void endBlockingDriveTask() {
     s_driveTaskActive   = false;
     s_expectWheelMotion = false;
-    s_hasEncBaseline    = false;
-    s_hasDegBaseline    = false;
+    s_stall.clearBaselines();
 }
 
 void noteUserLoopActivity() {

@@ -80,4 +80,90 @@ void resolveAutoDrivePolarity(uint8_t leftMotorID,
     ioRightReverse        = (ioRightReverse != rightDelta);
 }
 
+void AutoStallTracker::reset(uint32_t nowMs) {
+    cmdStartMs_      = nowMs;
+    lastCheckMs_     = nowMs;
+    lastWheelMoveMs_ = nowMs;
+    prevEncL_        = 0;
+    prevEncR_        = 0;
+    prevDriveDeg_    = 0;
+    hasEncBaseline_  = false;
+    hasDegBaseline_  = false;
+}
+
+void AutoStallTracker::clearBaselines() {
+    hasEncBaseline_ = false;
+    hasDegBaseline_ = false;
+}
+
+bool AutoStallTracker::checkDue(uint32_t nowMs) {
+    if (static_cast<uint32_t>(nowMs - cmdStartMs_) < Config::kAutoStallGraceMs ||
+        static_cast<uint32_t>(nowMs - lastCheckMs_) < Config::kAutoStallPollMs) {
+        return false;
+    }
+    lastCheckMs_ = nowMs;
+    return true;
+}
+
+void AutoStallTracker::markIdle(uint32_t nowMs) {
+    clearBaselines();
+    lastWheelMoveMs_ = nowMs;
+}
+
+bool AutoStallTracker::timedOut(uint32_t nowMs) const {
+    return static_cast<uint32_t>(nowMs - lastWheelMoveMs_) >= Config::kAutoStallTimeoutMs;
+}
+
+bool AutoStallTracker::update(uint32_t nowMs,
+                              bool encOk,
+                              int32_t encLeft,
+                              int32_t encRight,
+                              bool degOk,
+                              int32_t driveDeg) {
+    if (!encOk && !degOk) {
+        return timedOut(nowMs);
+    }
+
+    const bool hadAnyBaseline = hasEncBaseline_ || hasDegBaseline_;
+    bool       moved          = false;
+
+    if (encOk) {
+        if (!hasEncBaseline_) {
+            prevEncL_       = encLeft;
+            prevEncR_       = encRight;
+            hasEncBaseline_ = true;
+        } else if (hasEncoderProgressed(prevEncL_, encLeft, Config::kAutoStallMinDeltaDeg) ||
+                   hasEncoderProgressed(prevEncR_, encRight, Config::kAutoStallMinDeltaDeg)) {
+            moved = true;
+        }
+    }
+
+    if (degOk) {
+        if (!hasDegBaseline_) {
+            prevDriveDeg_   = driveDeg;
+            hasDegBaseline_ = true;
+        } else if (hasEncoderProgressed(prevDriveDeg_, driveDeg, Config::kAutoStallMinDeltaDeg)) {
+            moved = true;
+        }
+    }
+
+    if (moved) {
+        if (encOk) {
+            prevEncL_ = encLeft;
+            prevEncR_ = encRight;
+        }
+        if (degOk) {
+            prevDriveDeg_ = driveDeg;
+        }
+        lastWheelMoveMs_ = nowMs;
+        return false;
+    }
+    if (!hadAnyBaseline) {
+        // First baseline sample captured: start the stall timeout window from now.
+        lastWheelMoveMs_ = nowMs;
+        return false;
+    }
+    return timedOut(nowMs);
+}
+
 } // namespace RobotLogic

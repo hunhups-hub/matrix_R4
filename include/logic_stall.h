@@ -52,4 +52,48 @@ private:
     uint32_t lastMoveMs_ = 0UL;
 };
 
+/**
+ * Auto-mode wheel stall tracker (decision logic only; the caller does the STM32 reads and aborts).
+ * Stalled = a blocking DriveDC task is running, wheel motion is expected, and neither the encoders
+ * nor the drive degree counter moved by kAutoStallMinDeltaDeg for kAutoStallTimeoutMs.
+ */
+class AutoStallTracker {
+public:
+    /** Starts a fresh command window at nowMs (grace period restarts, baselines cleared). */
+    void reset(uint32_t nowMs);
+
+    /** Drops encoder/degree baselines (a drive task just ended or was never active). */
+    void clearBaselines();
+
+    /** True when a check is due (grace period over and poll interval elapsed); records the check time. */
+    bool checkDue(uint32_t nowMs);
+
+    /** No wheel motion expected right now: clear baselines and restart the no-progress timer. */
+    void markIdle(uint32_t nowMs);
+
+    /** True when no wheel progress was seen for kAutoStallTimeoutMs. */
+    bool timedOut(uint32_t nowMs) const;
+
+    /**
+     * Feeds one sample. Returns true when the wheels are stalled (abort Auto).
+     * With neither reading valid it only reports the no-progress timeout.
+     */
+    bool update(uint32_t nowMs,
+                bool encOk,
+                int32_t encLeft,
+                int32_t encRight,
+                bool degOk,
+                int32_t driveDeg);
+
+private:
+    uint32_t cmdStartMs_       = 0UL;
+    uint32_t lastCheckMs_      = 0UL;
+    uint32_t lastWheelMoveMs_  = 0UL;
+    int32_t  prevEncL_         = 0;
+    int32_t  prevEncR_         = 0;
+    int32_t  prevDriveDeg_     = 0;
+    bool     hasEncBaseline_   = false;
+    bool     hasDegBaseline_   = false;
+};
+
 } // namespace RobotLogic

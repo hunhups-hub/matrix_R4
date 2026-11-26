@@ -2319,6 +2319,69 @@ void test_button_gesture_read_failure_drops_held_state(void) {
     TEST_ASSERT_FALSE(t.upHeld());
 }
 
+// ============================================================================
+// 14. Auto wheel stall tracker
+// ============================================================================
+void test_auto_stall_tracker_grace_and_poll_gating(void) {
+    RobotLogic::AutoStallTracker st;
+    st.reset(1000UL);
+    TEST_ASSERT_FALSE(st.checkDue(1000UL + Config::kAutoStallGraceMs - 1UL));
+    const uint32_t t0 = 1000UL + Config::kAutoStallGraceMs;
+    TEST_ASSERT_TRUE(st.checkDue(t0));
+    TEST_ASSERT_FALSE(st.checkDue(t0 + Config::kAutoStallPollMs - 1UL)); // poll interval not elapsed
+    TEST_ASSERT_TRUE(st.checkDue(t0 + Config::kAutoStallPollMs));
+}
+
+void test_auto_stall_tracker_trips_only_after_timeout_without_progress(void) {
+    RobotLogic::AutoStallTracker st;
+    st.reset(0UL);
+    uint32_t now = 100UL;
+    // First sample only sets the baseline and restarts the timeout window.
+    TEST_ASSERT_FALSE(st.update(now, true, 0, 0, true, 0));
+    // Frozen encoders: not stalled until kAutoStallTimeoutMs after the baseline.
+    TEST_ASSERT_FALSE(st.update(now + Config::kAutoStallTimeoutMs - 1UL, true, 0, 0, true, 0));
+    TEST_ASSERT_TRUE(st.update(now + Config::kAutoStallTimeoutMs, true, 0, 0, true, 0));
+}
+
+void test_auto_stall_tracker_progress_resets_timer(void) {
+    RobotLogic::AutoStallTracker st;
+    st.reset(0UL);
+    uint32_t now = 100UL;
+    TEST_ASSERT_FALSE(st.update(now, true, 0, 0, false, 0));
+    now += Config::kAutoStallTimeoutMs - 10UL;
+    // Left wheel moved by the minimum delta: timer restarts.
+    TEST_ASSERT_FALSE(st.update(now, true, Config::kAutoStallMinDeltaDeg, 0, false, 0));
+    now += Config::kAutoStallTimeoutMs - 10UL;
+    TEST_ASSERT_FALSE(st.update(now, true, Config::kAutoStallMinDeltaDeg, 0, false, 0));
+    now += 20UL;
+    TEST_ASSERT_TRUE(st.update(now, true, Config::kAutoStallMinDeltaDeg, 0, false, 0));
+}
+
+void test_auto_stall_tracker_degree_counter_counts_as_progress(void) {
+    RobotLogic::AutoStallTracker st;
+    st.reset(0UL);
+    uint32_t now = 100UL;
+    TEST_ASSERT_FALSE(st.update(now, false, 0, 0, true, 0));
+    now += Config::kAutoStallTimeoutMs - 10UL;
+    TEST_ASSERT_FALSE(st.update(now, false, 0, 0, true, Config::kAutoStallMinDeltaDeg));
+    now += Config::kAutoStallTimeoutMs - 10UL;
+    TEST_ASSERT_FALSE(st.update(now, false, 0, 0, true, Config::kAutoStallMinDeltaDeg));
+}
+
+void test_auto_stall_tracker_idle_clears_and_unreadable_only_times_out(void) {
+    RobotLogic::AutoStallTracker st;
+    st.reset(0UL);
+    // Neither reading valid: only the no-progress timeout can trip it.
+    TEST_ASSERT_FALSE(st.update(Config::kAutoStallTimeoutMs - 1UL, false, 0, 0, false, 0));
+    TEST_ASSERT_TRUE(st.update(Config::kAutoStallTimeoutMs, false, 0, 0, false, 0));
+
+    // markIdle restarts the timer and drops baselines.
+    st.markIdle(Config::kAutoStallTimeoutMs);
+    TEST_ASSERT_FALSE(st.timedOut(Config::kAutoStallTimeoutMs + 1UL));
+    TEST_ASSERT_FALSE(st.update(Config::kAutoStallTimeoutMs + 5UL, true, 7, 7, true, 7)); // new baseline
+    TEST_ASSERT_TRUE(st.timedOut(Config::kAutoStallTimeoutMs * 2UL + 5UL));
+}
+
 int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
@@ -2403,6 +2466,13 @@ int main(int argc, char** argv) {
     RUN_TEST(test_button_gesture_auto_hold_and_no_short_up_after_fire);
     RUN_TEST(test_button_gesture_boot_held_suppresses_until_released);
     RUN_TEST(test_button_gesture_read_failure_drops_held_state);
+
+    // 14. Auto wheel stall tracker
+    RUN_TEST(test_auto_stall_tracker_grace_and_poll_gating);
+    RUN_TEST(test_auto_stall_tracker_trips_only_after_timeout_without_progress);
+    RUN_TEST(test_auto_stall_tracker_progress_resets_timer);
+    RUN_TEST(test_auto_stall_tracker_degree_counter_counts_as_progress);
+    RUN_TEST(test_auto_stall_tracker_idle_clears_and_unreadable_only_times_out);
 
     return UNITY_END();
 }
