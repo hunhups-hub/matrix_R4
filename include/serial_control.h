@@ -61,6 +61,12 @@ private:
 
     void printHelp();
     void parseLineCommand(uint32_t nowMs, SerialActions& outActions);
+    void resetLine();
+    void collectLineChar(char ch, uint32_t nowMs, SerialActions& outActions);
+    void startMotion(MotionMode mode, uint32_t nowMs);
+    /** Handles one single-key command. Returns true when polling must stop at once (upload key). */
+    bool handleKey(char ch, uint32_t nowMs, int16_t& workingSpeedPct, SerialActions& outActions);
+    void buildDriveCommand(int16_t spd, SerialActions& outActions) const;
 
     static constexpr uint8_t kLineBufSize = 40;
     char       lineBuf_[kLineBufSize]{};

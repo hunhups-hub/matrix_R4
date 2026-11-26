@@ -317,6 +317,50 @@ void SerialControl::printSnapshot(const SystemSnapshot& snap) {
     Serial.println(')');
 }
 
+namespace {
+
+bool isSepChar(char c) {
+    return (c == ' ' || c == '\t' || c == ',');
+}
+
+const char* skipArgSep(const char* s) {
+    while (*s == ' ' || *s == '\t') {
+        ++s;
+    }
+    if (*s == ',') {
+        ++s;
+        while (*s == ' ' || *s == '\t') {
+            ++s;
+        }
+    }
+    return s;
+}
+
+/** Parses "<cmd><sep>A<sep>B" (cmd char already at args[-1]); both A and B must be full integers. */
+bool parseTwoInts(const char* args, long& outA, long& outB) {
+    const char* p1     = skipArgSep(args);
+    char*       endPtr = nullptr;
+    outA               = strtol(p1, &endPtr, 10);
+    if (endPtr == nullptr || endPtr == p1 || !isSepChar(*endPtr)) {
+        return false;
+    }
+    const char* p2      = skipArgSep(endPtr);
+    char*       endPtr2 = nullptr;
+    outB                = strtol(p2, &endPtr2, 10);
+    return *p2 != '\0' && endPtr2 != nullptr && endPtr2 != p2 && *endPtr2 == '\0';
+}
+
+char toLowerAscii(char c) {
+    return (c >= 'A' && c <= 'Z') ? static_cast<char>(c + ('a' - 'A')) : c;
+}
+
+} // namespace
+
+void SerialControl::resetLine() {
+    collectingLine_ = false;
+    lineLen_        = 0U;
+}
+
 void SerialControl::parseLineCommand(uint32_t nowMs, SerialActions& outActions) {
     while (lineLen_ > 0U && (lineBuf_[lineLen_ - 1U] == ' ' || lineBuf_[lineLen_ - 1U] == '\t')) {
         lineLen_--;
@@ -327,28 +371,12 @@ void SerialControl::parseLineCommand(uint32_t nowMs, SerialActions& outActions) 
     }
 
     for (uint8_t i = 0U; i < lineLen_; ++i) {
-        if (lineBuf_[i] >= 'A' && lineBuf_[i] <= 'Z') {
-            lineBuf_[i] = static_cast<char>(lineBuf_[i] + ('a' - 'A'));
-        }
+        lineBuf_[i] = toLowerAscii(lineBuf_[i]);
     }
 
-    auto isSepChar = [](char c) -> bool {
-        return (c == ' ' || c == '\t' || c == ',');
-    };
-    auto skipArgSep = [](const char* s) -> const char* {
-        while (*s == ' ' || *s == '\t') {
-            ++s;
-        }
-        if (*s == ',') {
-            ++s;
-            while (*s == ' ' || *s == '\t') {
-                ++s;
-            }
-        }
-        return s;
-    };
-
     bool handled = false;
+    long a       = 0L;
+    long b       = 0L;
     if (strcmp(lineBuf_, "f1") == 0) {
         outActions.toggleLeftReverse = true;
         handled                      = true;
@@ -356,35 +384,19 @@ void SerialControl::parseLineCommand(uint32_t nowMs, SerialActions& outActions) 
         outActions.toggleRightReverse = true;
         handled                       = true;
     } else if (lineBuf_[0] == 'm' && isSepChar(lineBuf_[1])) {
-        const char* p1     = skipArgSep(lineBuf_ + 1);
-        char*       endPtr = nullptr;
-        const long  l      = strtol(p1, &endPtr, 10);
-        if (endPtr != nullptr && endPtr != p1 && isSepChar(*endPtr)) {
-            const char* p2      = skipArgSep(endPtr);
-            char*       endPtr2 = nullptr;
-            const long  r       = strtol(p2, &endPtr2, 10);
-            if (*p2 != '\0' && endPtr2 != nullptr && endPtr2 != p2 && *endPtr2 == '\0') {
-                directLeft_     = static_cast<int16_t>(RobotLogic::clampLong(l, -100L, 100L));
-                directRight_    = static_cast<int16_t>(RobotLogic::clampLong(r, -100L, 100L));
-                activeMotion_   = MotionMode::Direct;
-                motionExpireMs_ = nowMs + Config::kSerialDirectHoldMs;
-                handled         = true;
-            }
+        if (parseTwoInts(lineBuf_ + 1, a, b)) {
+            directLeft_     = static_cast<int16_t>(RobotLogic::clampLong(a, -100L, 100L));
+            directRight_    = static_cast<int16_t>(RobotLogic::clampLong(b, -100L, 100L));
+            activeMotion_   = MotionMode::Direct;
+            motionExpireMs_ = nowMs + Config::kSerialDirectHoldMs;
+            handled         = true;
         }
     } else if (lineBuf_[0] == 'c' && isSepChar(lineBuf_[1])) {
-        const char* p1     = skipArgSep(lineBuf_ + 1);
-        char*       endPtr = nullptr;
-        const long  ch     = strtol(p1, &endPtr, 10);
-        if (endPtr != nullptr && endPtr != p1 && ch >= 1L && ch <= 3L && isSepChar(*endPtr)) {
-            const char* p2      = skipArgSep(endPtr);
-            char*       endPtr2 = nullptr;
-            const long  deg     = strtol(p2, &endPtr2, 10);
-            if (*p2 != '\0' && endPtr2 != nullptr && endPtr2 != p2 && *endPtr2 == '\0') {
-                outActions.hasDirectServo = true;
-                outActions.directServoCh  = static_cast<uint8_t>(ch);
-                outActions.directServoDeg = static_cast<int16_t>(RobotLogic::clampLong(deg, 0L, 180L));
-                handled                   = true;
-            }
+        if (parseTwoInts(lineBuf_ + 1, a, b) && a >= 1L && a <= 3L) {
+            outActions.hasDirectServo = true;
+            outActions.directServoCh  = static_cast<uint8_t>(a);
+            outActions.directServoDeg = static_cast<int16_t>(RobotLogic::clampLong(b, 0L, 180L));
+            handled                   = true;
         }
     }
 
@@ -394,237 +406,171 @@ void SerialControl::parseLineCommand(uint32_t nowMs, SerialActions& outActions) 
     }
 }
 
+void SerialControl::collectLineChar(char ch, uint32_t nowMs, SerialActions& outActions) {
+    if (ch == '\n' || ch == '\r') {
+        collectingLine_ = false;
+        parseLineCommand(nowMs, outActions);
+        lineLen_ = 0U;
+        return;
+    }
+    if (ch == ' ') {
+        // Space stops motion at once; a bare pending "f " is dropped, but spaces stay legal inside m/c lines and before a trailing f1.
+        activeMotion_ = MotionMode::Stop;
+        if (lineBuf_[0] == 'f' && lineLen_ == 1U) {
+            resetLine();
+            return;
+        }
+    }
+    if (lineLen_ + 1U < kLineBufSize) {
+        lineBuf_[lineLen_++] = ch;
+    } else {
+        // Overflow: abandon the line.
+        resetLine();
+    }
+}
+
+void SerialControl::startMotion(MotionMode mode, uint32_t nowMs) {
+    activeMotion_   = mode;
+    motionExpireMs_ = nowMs + Config::kSerialKeyHoldMs;
+}
+
+bool SerialControl::handleKey(char ch,
+                              uint32_t nowMs,
+                              int16_t& workingSpeedPct,
+                              SerialActions& outActions) {
+    switch (toLowerAscii(ch)) {
+        case 'w': startMotion(MotionMode::Forward, nowMs); break;
+        case 's': startMotion(MotionMode::Backward, nowMs); break;
+        case 'a': startMotion(MotionMode::TurnLeft, nowMs); break;
+        case 'd': startMotion(MotionMode::TurnRight, nowMs); break;
+        case ' ': activeMotion_ = MotionMode::Stop; break;
+        case 'r': outActions.resumeRequested = true; break;
+        case 'i': outActions.armUpStep = true; break;
+        case 'k': outActions.armDownStep = true; break;
+        case 'j': outActions.gripOpen = true; break;
+        case 'l': outActions.gripClose = true; break;
+        case 'o': outActions.auxExtend = true; break;
+        case 'p': outActions.auxRetract = true; break;
+        case 'q': outActions.togglePosePreset = true; break;
+        case 'g':
+            activeMotion_                 = MotionMode::Stop;
+            outActions.autoStartRequested = true;
+            break;
+        case 'z': outActions.togglePrecision = true; break;
+        case 'b': outActions.toggleReverseDrive = true; break;
+        case 'y': outActions.toggleRc2Smooth = true; break;
+        case ',':
+        case '<':
+            outActions.trimLeftStep = true;
+            break;
+        case '.':
+        case '>':
+            outActions.trimRightStep = true;
+            break;
+        case '0': outActions.trimReset = true; break;
+        case '[':
+        case ']': {
+            const int16_t delta = (ch == '[') ? static_cast<int16_t>(-Config::kSerialSpeedStep)
+                                              : static_cast<int16_t>(Config::kSerialSpeedStep);
+            workingSpeedPct = RobotLogic::clamp16(static_cast<int16_t>(workingSpeedPct + delta),
+                                                  Config::kSerialMinSpeed,
+                                                  Config::kMotorMaxPower);
+            outActions.speedPctChanged = true;
+            outActions.newSpeedPct     = workingSpeedPct;
+            break;
+        }
+        case 't':
+            streamEnabled_ = !streamEnabled_;
+            Serial.print(F("[SER] Telemetry stream: "));
+            Serial.println(streamEnabled_ ? F("ON") : F("OFF"));
+            break;
+        case 'v': outActions.i2cScanRequested = true; break;
+        case 'u':
+            activeMotion_              = MotionMode::Stop;
+            outActions.uploadRequested = true;
+            return true;
+        case '?':
+        case 'h':
+            printHelp();
+            break;
+        default:
+            break;
+    }
+    return false;
+}
+
+void SerialControl::buildDriveCommand(int16_t spd, SerialActions& outActions) const {
+    outActions.driveCmd = SerialDriveCommand{};
+    int16_t left        = 0;
+    int16_t right       = 0;
+    switch (activeMotion_) {
+        case MotionMode::Forward:   left = spd;                          right = spd;                          break;
+        case MotionMode::Backward:  left = static_cast<int16_t>(-spd);   right = static_cast<int16_t>(-spd);   break;
+        case MotionMode::TurnLeft:  left = static_cast<int16_t>(-spd);   right = spd;                          break;
+        case MotionMode::TurnRight: left = spd;                          right = static_cast<int16_t>(-spd);   break;
+        case MotionMode::Direct:    left = directLeft_;                  right = directRight_;                 break;
+        case MotionMode::Stop:
+        default:
+            return;
+    }
+    outActions.driveCmd.active      = true;
+    outActions.driveCmd.targetLeft  = left;
+    outActions.driveCmd.targetRight = right;
+}
+
 void SerialControl::poll(uint32_t nowMs, int16_t currentSpeedPct, SerialActions& outActions) {
     outActions = SerialActions{};
     int16_t workingSpeedPct = currentSpeedPct;
 
-    // ยกเลิกบัฟเฟอร์บรรทัดที่ค้างหรือถูกทิ้งไว้
+    // Drop a stale half-typed line.
     if (collectingLine_ &&
         static_cast<uint32_t>(nowMs - lineStartTimeMs_) >= Config::kLineTimeoutMs) {
-        collectingLine_ = false;
-        lineLen_        = 0U;
+        resetLine();
     }
 
     while (Serial.available() > 0) {
         const char ch = static_cast<char>(Serial.read());
 
-        // ดักคำสั่งฉุกเฉิน: ทำงานทันทีเสมอ แม้ระหว่างกำลังสะสมบรรทัด!
+        // Emergency keys act at once, even in the middle of a line.
         if (ch == '!') {
-            collectingLine_           = false;
-            lineLen_                  = 0U;
+            resetLine();
             activeMotion_             = MotionMode::Stop;
             outActions.estopRequested = true;
             continue;
         }
-
         if (ch == 'x' || ch == 'X') {
-            collectingLine_ = false;
-            lineLen_        = 0U;
-            activeMotion_   = MotionMode::Stop;
+            resetLine();
+            activeMotion_ = MotionMode::Stop;
             continue;
         }
 
         if (collectingLine_) {
-            if (ch == '\n' || ch == '\r') {
-                collectingLine_ = false;
-                parseLineCommand(nowMs, outActions);
-                lineLen_ = 0U;
-            } else if (ch == ' ') {
-                // เว้นวรรคหยุดการเคลื่อนที่ทันที; ยกเลิก "f " ที่ค้างอยู่อย่างเรียบร้อย แต่ยังอนุญาตเว้นวรรคภายในคำสั่ง m/c และ f1 ท้ายบรรทัด
-                activeMotion_ = MotionMode::Stop;
-                if (lineBuf_[0] == 'f' && lineLen_ == 1U) {
-                    collectingLine_ = false;
-                    lineLen_        = 0U;
-                } else if (lineLen_ + 1U < kLineBufSize) {
-                    lineBuf_[lineLen_++] = ch;
-                } else {
-                    // กันบัฟเฟอร์ล้น
-                    collectingLine_ = false;
-                    lineLen_        = 0U;
-                }
-            } else if (lineLen_ + 1U < kLineBufSize) {
-                lineBuf_[lineLen_++] = ch;
-            } else {
-                // กันบัฟเฟอร์ล้น: ยกเลิกการสะสมบรรทัดเมื่อล้น
-                collectingLine_ = false;
-                lineLen_        = 0U;
-            }
+            collectLineChar(ch, nowMs, outActions);
             continue;
         }
 
-        // เริ่มคำสั่งหลายอาร์กิวเมนต์แบบบัฟเฟอร์บรรทัดเมื่อพบ m/M, c/C หรือ f/F
-        if (ch == 'm' || ch == 'M' || ch == 'c' || ch == 'C' || ch == 'f' || ch == 'F') {
+        // m/c/f start a multi-argument line command.
+        const char lower = toLowerAscii(ch);
+        if (lower == 'm' || lower == 'c' || lower == 'f') {
             collectingLine_  = true;
             lineStartTimeMs_ = nowMs;
             lineLen_         = 1U;
-            lineBuf_[0]      = (ch >= 'A' && ch <= 'Z') ? static_cast<char>(ch + ('a' - 'A')) : ch;
+            lineBuf_[0]      = lower;
             continue;
         }
 
-        switch (ch) {
-            case 'w':
-            case 'W':
-                activeMotion_   = MotionMode::Forward;
-                motionExpireMs_ = nowMs + Config::kSerialKeyHoldMs;
-                break;
-            case 's':
-            case 'S':
-                activeMotion_   = MotionMode::Backward;
-                motionExpireMs_ = nowMs + Config::kSerialKeyHoldMs;
-                break;
-            case 'a':
-            case 'A':
-                activeMotion_   = MotionMode::TurnLeft;
-                motionExpireMs_ = nowMs + Config::kSerialKeyHoldMs;
-                break;
-            case 'd':
-            case 'D':
-                activeMotion_   = MotionMode::TurnRight;
-                motionExpireMs_ = nowMs + Config::kSerialKeyHoldMs;
-                break;
-            case ' ':
-                activeMotion_ = MotionMode::Stop;
-                break;
-            case 'r':
-            case 'R':
-                outActions.resumeRequested = true;
-                break;
-            case 'i':
-            case 'I':
-                outActions.armUpStep = true;
-                break;
-            case 'k':
-            case 'K':
-                outActions.armDownStep = true;
-                break;
-            case 'j':
-            case 'J':
-                outActions.gripOpen = true;
-                break;
-            case 'l':
-            case 'L':
-                outActions.gripClose = true;
-                break;
-            case 'o':
-            case 'O':
-                outActions.auxExtend = true;
-                break;
-            case 'p':
-            case 'P':
-                outActions.auxRetract = true;
-                break;
-            case 'q':
-            case 'Q':
-                outActions.togglePosePreset = true;
-                break;
-            case 'g':
-            case 'G':
-                activeMotion_                 = MotionMode::Stop;
-                outActions.autoStartRequested = true;
-                break;
-            case 'z':
-            case 'Z':
-                outActions.togglePrecision = true;
-                break;
-            case 'b':
-            case 'B':
-                outActions.toggleReverseDrive = true;
-                break;
-            case 'y':
-            case 'Y':
-                outActions.toggleRc2Smooth = true;
-                break;
-            case ',':
-            case '<':
-                outActions.trimLeftStep = true;
-                break;
-            case '.':
-            case '>':
-                outActions.trimRightStep = true;
-                break;
-            case '0':
-                outActions.trimReset = true;
-                break;
-            case '[':
-                workingSpeedPct = RobotLogic::clamp16(
-                    static_cast<int16_t>(workingSpeedPct - Config::kSerialSpeedStep),
-                    Config::kSerialMinSpeed,
-                    Config::kMotorMaxPower);
-                outActions.speedPctChanged = true;
-                outActions.newSpeedPct     = workingSpeedPct;
-                break;
-            case ']':
-                workingSpeedPct = RobotLogic::clamp16(
-                    static_cast<int16_t>(workingSpeedPct + Config::kSerialSpeedStep),
-                    Config::kSerialMinSpeed,
-                    Config::kMotorMaxPower);
-                outActions.speedPctChanged = true;
-                outActions.newSpeedPct     = workingSpeedPct;
-                break;
-            case 't':
-            case 'T':
-                streamEnabled_ = !streamEnabled_;
-                Serial.print(F("[SER] Telemetry stream: "));
-                Serial.println(streamEnabled_ ? F("ON") : F("OFF"));
-                break;
-            case 'v':
-            case 'V':
-                outActions.i2cScanRequested = true;
-                break;
-            case 'u':
-            case 'U':
-                activeMotion_              = MotionMode::Stop;
-                outActions.uploadRequested = true;
-                return;
-            case '?':
-            case 'h':
-            case 'H':
-                printHelp();
-                break;
-            default:
-                break;
+        if (handleKey(ch, nowMs, workingSpeedPct, outActions)) {
+            return;
         }
     }
 
     if (outActions.estopRequested) {
         activeMotion_ = MotionMode::Stop;
     }
-
     if (activeMotion_ != MotionMode::Stop &&
         static_cast<int32_t>(motionExpireMs_ - nowMs) <= 0) {
         activeMotion_ = MotionMode::Stop;
     }
 
-    const int16_t spd   = outActions.speedPctChanged ? outActions.newSpeedPct : currentSpeedPct;
-    outActions.driveCmd = SerialDriveCommand{};
-    switch (activeMotion_) {
-        case MotionMode::Forward:
-            outActions.driveCmd.active      = true;
-            outActions.driveCmd.targetLeft  = spd;
-            outActions.driveCmd.targetRight = spd;
-            break;
-        case MotionMode::Backward:
-            outActions.driveCmd.active      = true;
-            outActions.driveCmd.targetLeft  = static_cast<int16_t>(-spd);
-            outActions.driveCmd.targetRight = static_cast<int16_t>(-spd);
-            break;
-        case MotionMode::TurnLeft:
-            outActions.driveCmd.active      = true;
-            outActions.driveCmd.targetLeft  = static_cast<int16_t>(-spd);
-            outActions.driveCmd.targetRight = spd;
-            break;
-        case MotionMode::TurnRight:
-            outActions.driveCmd.active      = true;
-            outActions.driveCmd.targetLeft  = spd;
-            outActions.driveCmd.targetRight = static_cast<int16_t>(-spd);
-            break;
-        case MotionMode::Direct:
-            outActions.driveCmd.active      = true;
-            outActions.driveCmd.targetLeft  = directLeft_;
-            outActions.driveCmd.targetRight = directRight_;
-            break;
-        case MotionMode::Stop:
-        default:
-            break;
-    }
+    buildDriveCommand(outActions.speedPctChanged ? outActions.newSpeedPct : currentSpeedPct, outActions);
 }
