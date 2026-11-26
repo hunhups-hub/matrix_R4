@@ -328,6 +328,81 @@ int16_t slewServoAngle(int16_t currentDeg, int16_t targetDeg, int16_t maxStepDeg
     return (next < tgt) ? tgt : static_cast<int16_t>(next);
 }
 
+namespace {
+
+/** Rounded v * pct / 100 in 32 bits (pct is a 0..100 style percentage). */
+int16_t scaleByPct(int32_t v, uint8_t pct) {
+    return static_cast<int16_t>((v * static_cast<int32_t>(pct) + 50L) / 100L);
+}
+
+/** Scales a slew step by pct but never lets a positive step round down to 0. */
+int16_t scaleStepByPct(int16_t step, uint8_t pct) {
+    const int16_t scaled = scaleByPct(step, pct);
+    return (step > 0 && scaled < 1) ? static_cast<int16_t>(1) : scaled;
+}
+
+struct ShapedSticks {
+    int16_t throttle  = 0;
+    int16_t turn      = 0;
+    bool    microTurn = false;
+};
+
+// Stage 1: deadzone, reverse-front orientation, cubic expo, Precision scaling, D-Pad micro-turn.
+ShapedSticks shapeSticks(uint8_t lyRaw,
+                         uint8_t rxRaw,
+                         bool    reverseDrive,
+                         bool    dpadLeft,
+                         bool    dpadRight,
+                         bool    precisionMode,
+                         int16_t limit) {
+    const int16_t rawThrottle  = computeAxisWithDeadzone(lyRaw, Config::kStickDeadzoneRaw, !reverseDrive);
+    const int16_t rawTurn      = computeAxisWithDeadzone(rxRaw, Config::kStickDeadzoneRaw, false);
+    const uint8_t throttleExpo = precisionMode ? Config::kPrecisionThrottleExpoPct : Config::kThrottleExpoPct;
+    const uint8_t turnExpo     = precisionMode ? Config::kPrecisionTurnExpoPct : Config::kTurnExpoPct;
+
+    ShapedSticks s;
+    s.throttle  = applyCubicExpo(rawThrottle, throttleExpo);
+    s.turn      = applyCubicExpo(rawTurn, turnExpo);
+    s.microTurn = (s.throttle == 0 && s.turn == 0 && (dpadLeft != dpadRight));
+    if (s.microTurn) {
+        const int16_t microPower =
+            precisionMode ? Config::kPrecisionMicroTurnPower : Config::kMicroTurnPower;
+        s.turn = dpadRight ? microPower : static_cast<int16_t>(-microPower);
+        return s;
+    }
+    if (precisionMode) {
+        s.throttle = scaleStickToLimit(s.throttle, limit);
+        s.turn     = scaleStickToLimit(s.turn, limit);
+    }
+    if (s.throttle != 0) {
+        s.turn = static_cast<int16_t>((static_cast<int32_t>(s.turn) * Config::kTurnMaxRatioPct) / 100L);
+    }
+    return s;
+}
+
+// Stage 3: unicycle inverse kinematics, voltage-sag compensation, desaturation and motor trim.
+void mixWheelTargets(int16_t throttle,
+                     int16_t safeTurn,
+                     uint8_t compPercent,
+                     int16_t limit,
+                     int8_t  motorTrimPct,
+                     int16_t& outLeft,
+                     int16_t& outRight) {
+    const int16_t cappedComp = clamp16(static_cast<int16_t>(compPercent),
+                                       100,
+                                       static_cast<int16_t>(Config::kBattCompMaxPct));
+    outLeft  = static_cast<int16_t>(throttle + safeTurn);
+    outRight = static_cast<int16_t>(throttle - safeTurn);
+    if (cappedComp > 100) {
+        outLeft  = static_cast<int16_t>((static_cast<int32_t>(outLeft) * cappedComp) / 100L);
+        outRight = static_cast<int16_t>((static_cast<int32_t>(outRight) * cappedComp) / 100L);
+    }
+    desaturateAndClampDrive(outLeft, outRight, limit);
+    applyMotorBalanceTrim(outLeft, outRight, motorTrimPct);
+}
+
+} // namespace
+
 DriveOutput computeKinodynamicDrive(uint8_t lyRaw,
                                     uint8_t rxRaw,
                                     int16_t currentLeft,
@@ -349,18 +424,12 @@ DriveOutput computeKinodynamicDrive(uint8_t lyRaw,
             : requestedLimit;
     const uint8_t comScale = computeCoMDynamicScale(rc2Deg);
 
-    int16_t linAccel = static_cast<int16_t>((static_cast<int32_t>(accelSlewStep) * comScale + 50L) / 100L);
-    int16_t linDecel = static_cast<int16_t>((static_cast<int32_t>(decelSlewStep) * comScale + 50L) / 100L);
-    if (accelSlewStep > 0 && linAccel < 1) linAccel = 1;
-    if (decelSlewStep > 0 && linDecel < 1) linDecel = 1;
-
-    // Rotational slew is CoM-scaled too, so a pivot with the arm raised is not harsher than a straight run.
-    int16_t angAccel =
-        static_cast<int16_t>((static_cast<int32_t>(Config::kAngularAccelSlewStep) * comScale + 50L) / 100L);
-    int16_t angDecel =
-        static_cast<int16_t>((static_cast<int32_t>(Config::kAngularDecelSlewStep) * comScale + 50L) / 100L);
-    if (Config::kAngularAccelSlewStep > 0 && angAccel < 1) angAccel = 1;
-    if (Config::kAngularDecelSlewStep > 0 && angDecel < 1) angDecel = 1;
+    // CoM-scaled slew steps; rotational steps are scaled too so a pivot with the arm raised is not
+    // harsher than a straight run.
+    const int16_t linAccel = scaleStepByPct(accelSlewStep, comScale);
+    const int16_t linDecel = scaleStepByPct(decelSlewStep, comScale);
+    const int16_t angAccel = scaleStepByPct(Config::kAngularAccelSlewStep, comScale);
+    const int16_t angDecel = scaleStepByPct(Config::kAngularDecelSlewStep, comScale);
 
     if (limit == 0) {
         return apply2DofKinodynamicSlew(0,
@@ -373,49 +442,21 @@ DriveOutput computeKinodynamicDrive(uint8_t lyRaw,
                                         angDecel);
     }
 
-    // 1. Deadzone & reverse-front orientation + cubic jerk-reducing input shaping
-    const int16_t rawThrottle  = computeAxisWithDeadzone(lyRaw, Config::kStickDeadzoneRaw, !reverseDrive);
-    const int16_t rawTurn      = computeAxisWithDeadzone(rxRaw, Config::kStickDeadzoneRaw, false);
-    const uint8_t throttleExpo = precisionMode ? Config::kPrecisionThrottleExpoPct : Config::kThrottleExpoPct;
-    const uint8_t turnExpo     = precisionMode ? Config::kPrecisionTurnExpoPct : Config::kTurnExpoPct;
-    int16_t       throttle     = applyCubicExpo(rawThrottle, throttleExpo);
-    int16_t       turn         = applyCubicExpo(rawTurn, turnExpo);
-
-    const bool isMicroTurn = (throttle == 0 && turn == 0 && (dpadLeft != dpadRight));
-    if (isMicroTurn) {
-        const int16_t microPower =
-            precisionMode ? Config::kPrecisionMicroTurnPower : Config::kMicroTurnPower;
-        turn = dpadRight ? microPower : static_cast<int16_t>(-microPower);
-    } else {
-        if (precisionMode) {
-            throttle = scaleStickToLimit(throttle, limit);
-            turn     = scaleStickToLimit(turn, limit);
-        }
-        if (throttle != 0) {
-            turn = static_cast<int16_t>((static_cast<int32_t>(turn) * Config::kTurnMaxRatioPct) / 100L);
-        }
-    }
+    // 1. Deadzone, reverse-front orientation, cubic input shaping, micro-turn
+    const ShapedSticks sticks =
+        shapeSticks(lyRaw, rxRaw, reverseDrive, dpadLeft, dpadRight, precisionMode, limit);
 
     // 2. CoM-scaled centripetal traction circle limiter (|v * w| / 100 <= maxLatAccel)
-    const int16_t maxLatAccel = static_cast<int16_t>(
-        (static_cast<int32_t>(Config::kMaxCentripetalLatAccel) * comScale + 50L) / 100L);
-    const int16_t safeTurn = limitCentripetalTurn(throttle, turn, maxLatAccel);
+    const int16_t maxLatAccel = scaleByPct(Config::kMaxCentripetalLatAccel, comScale);
+    const int16_t safeTurn    = limitCentripetalTurn(sticks.throttle, sticks.turn, maxLatAccel);
 
-    // 3. Unicycle inverse kinematics + Back-EMF / internal resistance voltage sag compensation
-    const int16_t cappedComp = clamp16(static_cast<int16_t>(compPercent),
-                                       100,
-                                       static_cast<int16_t>(Config::kBattCompMaxPct));
-    int16_t scaledL = static_cast<int16_t>(throttle + safeTurn);
-    int16_t scaledR = static_cast<int16_t>(throttle - safeTurn);
-    if (cappedComp > 100) {
-        scaledL = static_cast<int16_t>((static_cast<int32_t>(scaledL) * cappedComp) / 100L);
-        scaledR = static_cast<int16_t>((static_cast<int32_t>(scaledR) * cappedComp) / 100L);
-    }
-    desaturateAndClampDrive(scaledL, scaledR, limit);
-    applyMotorBalanceTrim(scaledL, scaledR, motorTrimPct);
+    // 3. Inverse kinematics + sag compensation + desaturation + motor trim
+    int16_t scaledL = 0;
+    int16_t scaledR = 0;
+    mixWheelTargets(sticks.throttle, safeTurn, compPercent, limit, motorTrimPct, scaledL, scaledR);
 
     // 4. Coulomb static friction feedforward on proportional stick commands (exact power for Micro-Turn)
-    if (!isMicroTurn) {
+    if (!sticks.microTurn) {
         applyCoulombStictionPair(scaledL, scaledR, Config::kMotorStictionMinPower, limit);
     }
 
