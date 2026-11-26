@@ -816,8 +816,8 @@ bool driveFromPs2(uint32_t nowMs, LinkState prevLink, bool valid, const MotorPow
                                                                 pwr.compPercent,
                                                                 g_snap.servos.rc2Deg,
                                                                 g_snap.reverseDrive,
-                                                                false,
-                                                                false,
+                                                                false, // dpadLeft micro-turn: unbound in firmware
+                                                                false, // dpadRight micro-turn: unbound in firmware
                                                                 g_snap.motorTrimPct,
                                                                 g_snap.precisionMode);
     applyDriveToMotors(nowMs);

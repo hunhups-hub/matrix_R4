@@ -596,7 +596,7 @@ void test_battery_stabilizer_multiprofile_baselines(void) {
     TEST_ASSERT_EQUAL_UINT16(6600U, batt.filteredMv());
     TEST_ASSERT_EQUAL_UINT8(0U, batt.batteryPercent());
 
-    // 3. 9V DC Adapter profile (baseline <= 10400 mV: 7.0V empty, baseline full)
+    // 3. 9V DC Adapter profile (baseline 8701..9599 mV: 7.0V empty, baseline full)
     batt.reset();
     batt.update(9000U, true, 0UL);
     TEST_ASSERT_TRUE(batt.isExternalPower());

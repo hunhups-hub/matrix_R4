@@ -408,13 +408,6 @@ void SerialControl::poll(uint32_t nowMs, int16_t currentSpeedPct, SerialActions&
     while (Serial.available() > 0) {
         const char ch = static_cast<char>(Serial.read());
 
-        // ยกเลิกบัฟเฟอร์บรรทัดที่ค้าง ถ้าหมดเวลาระหว่างกำลังรับตัวอักษร
-        if (collectingLine_ &&
-            static_cast<uint32_t>(nowMs - lineStartTimeMs_) >= Config::kLineTimeoutMs) {
-            collectingLine_ = false;
-            lineLen_        = 0U;
-        }
-
         // ดักคำสั่งฉุกเฉิน: ทำงานทันทีเสมอ แม้ระหว่างกำลังสะสมบรรทัด!
         if (ch == '!') {
             collectingLine_           = false;
@@ -587,9 +580,6 @@ void SerialControl::poll(uint32_t nowMs, int16_t currentSpeedPct, SerialActions&
             case 'h':
             case 'H':
                 printHelp();
-                break;
-            case '\r':
-            case '\n':
                 break;
             default:
                 break;

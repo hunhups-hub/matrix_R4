@@ -117,9 +117,9 @@ BatteryTier BatteryStabilizer::update(uint16_t rawMv, bool valid, uint32_t nowMs
         }
     }
 
-    uint16_t lowEnter   = Config::kLowVoltWarnMv;
-    uint16_t critEnter  = Config::kBattCritVoltMv;
-    uint16_t emergEnter = Config::kBattEmergVoltMv;
+    uint16_t lowEnter   = 0U;
+    uint16_t critEnter  = 0U;
+    uint16_t emergEnter = 0U;
     computeThresholds(lowEnter, critEnter, emergEnter);
 
     // Instant escalation to protect brownout-sensitive motors/STM32/PS2 receiver
@@ -215,8 +215,8 @@ MotorPowerProfile BatteryStabilizer::motorProfile() const {
         profile.maxPowerCap   = Config::kMotorMaxPower;
         profile.accelSlewStep = Config::kMotorAccelSlewStep;
         profile.decelSlewStep = Config::kMotorDecelSlewStep;
-        // Keep torque compensation active in every tier, Emergency included: the weaker the
-        // battery, the more the competition robot needs it to hold full wheel strength.
+        // Sag throttle off or tier Normal: full torque compensation. With throttle enabled,
+        // Low scales comp to 110% and Critical/Emergency pin it to 100% (see the switch below).
         profile.compPercent   = computeComp(Config::kBattCompMaxPct);
         profile.slewLimited   = false;
         return profile;
