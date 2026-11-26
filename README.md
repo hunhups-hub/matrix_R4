@@ -21,7 +21,7 @@
    - การเปิดโปรเจกต์และการโหลด Toolchain อัตโนมัติ
    - การเรียกใช้งาน PlatformIO ผ่าน Terminal และ CLI
 5. [คู่มือการคอมไพล์ ทดสอบ และอัปโหลดโปรแกรม (Build, Test & Upload Step-by-Step)](#5-คู่มือการคอมไพล์-ทดสอบ-และอัปโหลดโปรแกรม-build-test--upload-step-by-step)
-   - 5.1 การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์ (`pio test -e native` — ครบ 44 รายการ 11 หมวดหมู่)
+   - 5.1 การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์ (`pio test -e native` — ครบ 61 รายการ 15 หมวดหมู่)
    - 5.2 การคอมไพล์โค้ดสำหรับฮาร์ดแวร์ (`pio run -e uno_r4_wifi`)
    - 5.3 การอัปโหลดเฟิร์มแวร์ลงบอร์ด (`pio run -e uno_r4_wifi --target upload`)
    - 5.4 ทางลัดเข้าสู่โหมดอัปโหลด Bootloader (Upload Bootloader Mode Shortcut)
@@ -36,7 +36,7 @@
    - 6.6 ระบบบันทึกการตั้งค่าถาวรลงหน่วยความจำ EEPROM (CRC-16-CCITT Persistent Config)
 7. [สถาปัตยกรรมโค้ด แบบจำลองฟิสิกส์ และการทำงานภายใน (Code Architecture & Engineering Details)](#7-สถาปัตยกรรมโค้ด-แบบจำลองฟิสิกส์-และการทำงานภายใน-code-architecture--engineering-details)
    - 7.1 [แผนผังรอบการทำงานลูปควบคุมหลัก 40 Hz (25 ms Cycle Diagram)](#71-แผนผังรอบการทำงานลูปควบคุมหลัก-40-hz-25-ms-cycle-diagram)
-   - 7.2 [คำอธิบายโครงสร้างและหน้าที่ของทุกไฟล์ในโปรเจกต์อย่างละเอียด (Exhaustive File-by-File Breakdown - 36 ไฟล์)](#72-คำอธิบายโครงสร้างและหน้าที่ของทุกไฟล์ในโปรเจกต์อย่างละเอียด-exhaustive-file-by-file-breakdown---36-ไฟล์)
+   - 7.2 [คำอธิบายโครงสร้างและหน้าที่ของทุกไฟล์ในโปรเจกต์อย่างละเอียด (Exhaustive File-by-File Breakdown - 57 ไฟล์)](#72-คำอธิบายโครงสร้างและหน้าที่ของทุกไฟล์ในโปรเจกต์อย่างละเอียด-exhaustive-file-by-file-breakdown---57-ไฟล์)
      - [กลุ่มที่ 1: ไฟล์ระดับรากของโปรเจกต์ (Project Root Files - 4 ไฟล์)](#กลุ่มที่-1-ไฟล์ระดับรากของโปรเจกต์-project-root-files---4-ไฟล์)
      - [กลุ่มที่ 2: โฟลเดอร์การตั้งค่า Visual Studio Code (.vscode/ - 4 ไฟล์)](#กลุ่มที่-2-โฟลเดอร์การตั้งค่า-visual-studio-code-vscode---4-ไฟล์)
      - [กลุ่มที่ 3: ไฟล์ส่วนหัวและการประกาศฟังก์ชัน (include/ - 9 ไฟล์)](#กลุ่มที่-3-ไฟล์ส่วนหัวและการประกาศฟังก์ชัน-include---9-ไฟล์)
@@ -324,16 +324,16 @@
 ```
 *(หรือพิมพ์ `pio test -e native` หากตั้งค่า Environment Path แล้ว)*
 
-**ผลลัพธ์ที่คาดหวัง**: ระบบจะรันชุดทดสอบ Unity Unit Tests ครบทั้ง **44 รายการ (11 หมวดหมู่)** โดยจะผ่านทั้งหมด (`[PASSED]`) 100% ภายในเวลาไม่กี่วินาที:
+**ผลลัพธ์ที่คาดหวัง**: ระบบจะรันชุดทดสอบ Unity Unit Tests ครบทั้ง **61 รายการ (15 หมวดหมู่)** โดยจะผ่านทั้งหมด (`[PASSED]`) 100% ภายในเวลาไม่กี่วินาที:
 ```text
 =================================== SUMMARY ===================================
 Environment    Test              Status    Duration
 -------------  ----------------  --------  ------------
 native         test_robot_logic  PASSED    00:00:02.729
-================= 44 test cases: 44 succeeded in 00:00:02.729 =================
+================= 61 test cases: 61 succeeded in 00:00:02.729 =================
 ```
 
-**คำอธิบายชุดทดสอบทั้ง 44 รายการ (11 หมวดหมู่หลัก)** ใน [test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp):
+**คำอธิบายชุดทดสอบทั้ง 61 รายการ (15 หมวดหมู่หลัก)** ใน [test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp):
 1. **การคำนวณจลนศาสตร์ล้อและการตัด Deadzone (Differential Drive Kinematics - 4 รายการ)**:
    - `test_axis_deadzone_and_extremes`: ตรวจสอบว่าช่วง Deadband ตรงกลางของจอยสติ๊ก (`109..146`) ตัดเป็น `0` อย่างสมบูรณ์ และเมื่อโยกสุดจะได้ `±100%` แน่นอน
    - `test_differential_drive_zero_speed_boundary`: ตรวจสอบว่าเมื่อขีดจำกัดความเร็วเป็น `0` หรือติดลบ มอเตอร์จะไม่ขยับหรือค่อยๆ ลดความเร็วสู่ `0`
@@ -366,7 +366,7 @@ native         test_robot_logic  PASSED    00:00:02.729
    - `test_serial_servo_commands_and_flip_exact_match`: ตรวจสอบคำสั่งเซอร์โว `c <1..4> <deg>` และการตรงตามรูปคำสั่งเป๊ะๆ ของ `f1`/`f2` (ปฏิเสธ `f1foo` และยกเลิกด้วย `f `)
    - `test_serial_speed_batching_timeout_and_estop_interrupt`: ตรวจสอบการกด `[`/`]` สะสมหลายครั้งในรอบเดียว (`]]`), การหมดเวลา Line Buffer ที่ `1500 ms`, และการใช้ `'!'` ตัดจังหวะ ESTOP ทันทีกลางบรรทัด
 8. **การเข้าและออกจากโหมดอัตโนมัติ (Auto Mode Trigger & Abort Logic - 1 รายการ)**:
-   - `test_auto_mode_triangle_start_and_cross_exit`: ตรวจสอบการเริ่มโหมด Auto ด้วยปุ่มสามเหลี่ยม (Rising Edge, จอยพร้อมใช้งาน, ไม่ติด ESTOP, ไม่กด X ค้าง), การออกจาก Auto ด้วยปุ่ม X ที่ผ่านการคัดกรองเฟรม, และการถอดรหัสแพ็กเก็ต PS2 จริงของปุ่ม Triangle/Cross (`0xEF`, `0xBF`, `0xAF`)
+   - `test_auto_mode_start_edge_and_cross_exit`: ตรวจสอบการเริ่มโหมด Auto ด้วยปุ่ม Start (`Controls::kAutoStart`) (Rising Edge, จอยพร้อมใช้งาน, ไม่ติด ESTOP, ไม่กด X ค้าง), การออกจาก Auto ด้วยปุ่ม X ที่ผ่านการคัดกรองเฟรม, และการถอดรหัสแพ็กเก็ต PS2 จริงของปุ่ม Triangle/Cross (`0xEF`, `0xBF`, `0xAF`)
 9. **แบบจำลองฟิสิกส์จลนพลศาสตร์และทางลัดการแข่งขัน (Physics Kinodynamic Models & Competition Controls - 7 รายการ)**:
    - `test_cubic_expo_shaping_symmetry_and_bounds`: ตรวจสอบความสมมาตรและภาวะทางเดียว (Monotonicity) ของสมการพหุนามกำลังสาม `applyCubicExpo()`
    - `test_centripetal_traction_limiter_and_pivot_authority`: ตรวจสอบการจำกัดความเร่งหนีศูนย์กลาง `limitCentripetalTurn()` ขณะเลี้ยวความเร็วสูงโดยไม่ลดกำลังหมุนตัวอยู่กับที่
@@ -389,6 +389,22 @@ native         test_robot_logic  PASSED    00:00:02.729
     - `test_manual_stall_detector_trip_rearm_and_fail_open`: ตรวจสอบ `ManualStallDetector` ตัดกำลังหลัง `kManualStallTimeoutMs`, ค้างสถานะจนปล่อยก้านโยก (re-arm) และไม่ตัดซ้ำทันที
     - `test_manual_stall_detector_progress_low_cmd_and_invalid_sample`: ตรวจสอบว่าล้อหมุนอยู่, คำสั่งต่ำกว่า `kManualStallMinCmdPct`, หรืออ่าน Encoder ไม่สำเร็จ จะไม่ตัดกำลัง (Fail-open)
 
+12. **นโยบายควบคุมและตัวช่วยคณิต (Control Policy & Math Helpers - 4 รายการ)**:
+    - `test_select_drive_source_priority_order`: ตรวจสอบลำดับความสำคัญของแหล่งสั่งขับ `selectDriveSource()` (E-stop > Failsafe > Cross Brake > Serial > PS2 > Coast) และเงื่อนไขของ Cross Brake (ต้อง Operational และเฟรมถูกต้อง)
+    - `test_max_drive_speed_and_stab_penalty_class`: ตรวจสอบ `computeMaxDriveSpeed()` (ค่าต่ำสุดของเพดานโหมดและเพดานแบต) และ `classifyStabPenalty()` (`0`, `<=10`, `>10`)
+    - `test_control_tick_scheduler_period_and_resync`: ตรวจสอบ `advanceControlTick()` ทั้งคาบ 25 ms, การเลื่อนทีละ 1 คาบ, การ Resync เมื่อช้าเกิน 2 คาบ และ `millis()` wraparound
+    - `test_logic_math_helpers`: ตรวจสอบ `abs32`, `peakAbs`, `satAddCap`, `satSub` และ `voltsToMv` (clamp `0..25.5 V`)
+13. **ท่าทางปุ่มบนบอร์ด BTN_UP/BTN_DOWN (`ButtonGestureTracker` - 6 รายการ)**:
+    - `test_button_gesture_down_edge_and_short_release`, `test_button_gesture_short_up_release`: ตรวจสอบ Debounce, E-stop ทันทีที่กด BTN_DOWN และ Short-release ของ BTN_UP
+    - `test_button_gesture_upload_combo_hold`: ตรวจสอบคอมโบ UP+DOWN ค้าง `kUploadComboHoldMs` ยิง `uploadRequested` ครั้งเดียวพร้อม Hold Ratio
+    - `test_button_gesture_auto_hold_and_no_short_up_after_fire`: ตรวจสอบการกด UP ค้างเพื่อเริ่ม Auto และไม่เกิด Short-release หลังยิงแล้ว
+    - `test_button_gesture_boot_held_suppresses_until_released`: ตรวจสอบว่าปุ่มค้างตอนบูตจะไม่ยิงท่าทางใดจนกว่าปล่อยทั้งสองปุ่ม
+    - `test_button_gesture_read_failure_drops_held_state`: ตรวจสอบว่าอ่านปุ่มล้มเหลวจะทิ้งสถานะค้าง ไม่ให้เกิดท่าทางผี
+14. **ตัวตรวจล้อติดขัดของโหมด Auto (`AutoStallTracker` - 5 รายการ)**:
+    - `test_auto_stall_tracker_*`: ตรวจสอบช่วง Grace/Poll, การตัดเมื่อไม่มีความก้าวหน้าครบ `kAutoStallTimeoutMs`, การรีเซ็ตตัวจับเวลาเมื่อ Encoder หรือ Drive Degree ขยับ, การรีเซ็ตเมื่อไม่ได้คาดหวังการเคลื่อนที่ และกรณีอ่านค่าไม่ได้ซึ่งตัดได้เฉพาะเมื่อหมดเวลา
+15. **ตัวช่วยจัดรูปแบบ OLED/LED (`ui_format` - 2 รายการ)**:
+    - `test_ui_format_hash_rgb_and_chars`, `test_ui_header_tag_priority`: ตรวจสอบ FNV-1a, `packRgb`, อักขระ Tier แบต/ธงเสถียรภาพ และลำดับความสำคัญของป้ายหัวจอ (`HOLD+DN` > `ESTOP!` > `AUTO RUN` > `PS2 OK` ...)
+
 ---
 
 ### 5.2 การคอมไพล์โค้ดสำหรับฮาร์ดแวร์ (`pio run -e uno_r4_wifi`)
@@ -401,7 +417,7 @@ native         test_robot_logic  PASSED    00:00:02.729
 **ผลลัพธ์ที่คาดหวัง**: โค้ดจะถูกคอมไพล์ด้วยออปชัน `-Wall -Wextra -Werror` ผ่านโดยสมบูรณ์ ไม่มี Error และไม่มี Warning:
 ```text
 RAM:   [====      ]  43.9% (used 14396 bytes from 32768 bytes)
-Flash: [====      ]  41.5% (used 108820 bytes from 262144 bytes)
+Flash: [====      ]  41.7% (used 109432 bytes from 262144 bytes)
 ========================= [SUCCESS] Took 14.86 seconds =========================
 ```
 
@@ -828,9 +844,9 @@ Flash: [====      ]  41.5% (used 108820 bytes from 262144 bytes)
 
 ---
 
-### 7.2 คำอธิบายโครงสร้างและหน้าที่ของทุกไฟล์ในโปรเจกต์อย่างละเอียด (Exhaustive File-by-File Breakdown - 36 ไฟล์)
+### 7.2 คำอธิบายโครงสร้างและหน้าที่ของทุกไฟล์ในโปรเจกต์อย่างละเอียด (Exhaustive File-by-File Breakdown - 57 ไฟล์)
 
-เพื่อให้ผู้เริ่มต้นและนักพัฒนาเข้าใจการทำงานของระบบอย่างถ่องแท้ แผนภาพด้านล่างแสดงโครงสร้างโฟลเดอร์และไฟล์ทั้งหมดในโปรเจกต์ (**ครบถ้วนทั้ง 36 ไฟล์** ไม่รวมโฟลเดอร์ชั่วคราว `.pio` และ `.git`):
+เพื่อให้ผู้เริ่มต้นและนักพัฒนาเข้าใจการทำงานของระบบอย่างถ่องแท้ แผนภาพด้านล่างแสดงโครงสร้างโฟลเดอร์และไฟล์ทั้งหมดในโปรเจกต์ (**ครบถ้วนทั้ง 57 ไฟล์** ไม่รวมโฟลเดอร์ชั่วคราว `.pio` และ `.git`):
 
 ```text
 matrix_R4/
@@ -844,47 +860,66 @@ matrix_R4/
 │   ├── extensions.json                         # [7] แนะนำ Extension ที่จำเป็นสำหรับโปรเจกต์ (PlatformIO IDE)
 │   ├── launch.json                             # [8] การกำหนดค่า Debugger สำหรับ Hardware Probes (CMSIS-DAP, SVD)
 │   └── tasks.json                              # [9] คำสั่งอัตโนมัติของ VS Code สำหรับ Build, Upload, Monitor และ Test
-├── include/                                    # ส่วนหัวโปรแกรม ประกาศ Interface, โครงสร้างข้อมูล และค่าที่ปรับได้ (11 ไฟล์)
+├── include/                                    # ส่วนหัวโปรแกรม ประกาศ Interface, โครงสร้างข้อมูล และค่าที่ปรับได้ (22 ไฟล์)
 │   ├── README                                  # [10] คำอธิบายมาตรฐานของ PlatformIO สำหรับการใช้งาน Header Files
 │   ├── config.h                                # [11] พิน คาบเวลา และขีดจำกัดฮาร์ดแวร์ (แก้ไม่บ่อย)
 │   ├── user_settings.h                         # [12] ค่าที่ผู้ขับปรับได้: ความเร็ว expo slew มุมเซอร์โว นโยบายแบต เวลา Auto และสวิตช์ฟีเจอร์ stall
 │   ├── controls.h                              # [13] แผนที่ปุ่ม PS2 -> ฟังก์ชัน (Controls::kXxx) และ Controls::held()
 │   ├── types.h                                 # [14] นิยามโครงสร้างข้อมูล (Enums, Structs) และสถานะระบบที่ใช้ร่วมกัน
-│   ├── robot_logic.h                           # [15] ประกาศฟังก์ชันอัลกอริทึมทั้งหมดของ RobotLogic (Pure C++11) อิมพลีเมนต์แยกใน 6 ไฟล์
-│   ├── serial_control.h                        # [16] ประกาศคลาสประมวลผลคำสั่ง Serial CLI และจัดรูปแบบ Telemetry
-│   ├── minir4_io.h                             # [17] ประกาศคลาส Hardware Abstraction สำหรับ MATRIX Mini R4, STM32 และ EEPROM
-│   ├── ps2_driver.h                            # [18] ประกาศคลาสไดรเวอร์ Bit-bang SPI และการเข้าถึงรีจิสเตอร์พอร์ต RA4M1
-│   ├── oled_ui.h                               # [19] ประกาศคลาสควบคุมจอแสดงผล OLED SSD1306, ไฟ RGB LED และ Piezo Buzzer
-│   └── auto_mode.h                             # [20] ประกาศอินเทอร์เฟซโหมดอัตโนมัติ (AutoMode), AutoExitReason และฟังก์ชันช่วย
-├── src/                                        # ซอร์สโค้ดการทำงานหลัก (Implementation Files - 13 ไฟล์)
-│   ├── main.cpp                                # [21] จุดเริ่มต้นโปรแกรม (setup/loop), 40 Hz Scheduler, Auto และ Bootloader
-│   ├── robot_logic.cpp                         # [22] [Pure] จลนพลศาสตร์การขับ, Slew, Sag และการคำนวณมอเตอร์
-│   ├── persistent_config.cpp                   # [23] [Pure] CRC-16 และแพ็ก/ถอดรหัส EEPROM
-│   ├── stall_detect.cpp                        # [24] [Pure] ManualStallDetector และซิงก์ทิศมอเตอร์ Auto
-│   ├── servo_logic.cpp                         # [25] [Pure] เป้าหมายเซอร์โว, พรีเซ็ต, ท่ากลับทิศ
-│   ├── link_failsafe.cpp                       # [26] [Pure] ถอดรหัสแพ็กเก็ต PS2 และ FailsafeStateMachine
-│   ├── power_stability.cpp                     # [27] [Pure] BatteryStabilizer และ StabilityMonitor
-│   ├── serial_control.cpp                      # [28] [Pure] การแยกคำสั่ง CLI, คีย์ลัดแข่งขัน, Timeout 1500 ms และ FakeSerialPort
-│   ├── minir4_io.cpp                           # [29] การติดต่อ STM32 UART, Smart Hold-Brake, RC2 Smooth Slew และ EEPROM
-│   ├── ps2_driver.cpp                          # [30] โพรโทคอล Bit-bang SPI ความเร็วสูงผ่านรีจิสเตอร์ POSR/PORR/PIDR
-│   ├── oled_ui.cpp                             # [31] การเรนเดอร์ UI 4 บรรทัด, กู้คืนบัส I2C, แอนิเมชัน RGB และเสียงเตือน
-│   ├── auto_mode.cpp                           # [32] เอนจินรันโหมด Auto, ดักจับ yield()/ปุ่ม X และตรวจจับล้อติดขัด (Stall)
-│   └── auto_block_code.cpp                     # [33] พื้นที่วางโค้ด Auto จาก MATRIXblock R4 พร้อมชั้น Proxy ความปลอดภัยครบวงจร
+│   ├── robot_logic.h                           # [15] Umbrella Header: include ส่วนหัวลอจิกบริสุทธิ์ทั้งหมดด้านล่าง
+│   ├── logic_math.h                            # [16] [Pure] ตัวช่วยคณิต inline: abs32, peakAbs, satAddCap, satSub, voltsToMv
+│   ├── logic_drive.h                           # [17] [Pure] ไปป์ไลน์ขับ: expo, slew, แบบจำลอง Kinodynamic, Motor Trim
+│   ├── logic_persist.h                         # [18] [Pure] CRC-16 และแพ็ก/ถอดรหัส PersistentConfig
+│   ├── logic_stall.h                           # [19] [Pure] hasEncoderProgressed, ManualStallDetector, AutoStallTracker
+│   ├── logic_servo.h                           # [20] [Pure] ก้าวแขน, ขอบเขตเซอร์โว และการอัปเดตเป้าหมายจาก PS2
+│   ├── logic_link.h                            # [21] [Pure] ถอดรหัส/ตรวจแพ็กเก็ต PS2, เงื่อนไข Auto และ FailsafeStateMachine
+│   ├── logic_power.h                           # [22] [Pure] BatteryStabilizer, StabilityMonitor, จำแนกแพ็กแบต, Auto power comp
+│   ├── logic_policy.h                          # [23] [Pure] selectDriveSource, computeMaxDriveSpeed, classifyStabPenalty, advanceControlTick
+│   ├── logic_button.h                          # [24] [Pure] ButtonGestureTracker (debounce, คอมโบอัปโหลด, กดค้างเริ่ม Auto)
+│   ├── logic_ui.h                              # [25] [Pure] ตัวช่วย OLED/LED: fnv1aHash, packRgb, headerTag, ตัวอักษร Tier/Stability
+│   ├── serial_control.h                        # [26] ประกาศคลาสประมวลผลคำสั่ง Serial CLI และจัดรูปแบบ Telemetry
+│   ├── minir4_io.h                             # [27] ประกาศคลาส Hardware Abstraction สำหรับ MATRIX Mini R4, STM32 และ EEPROM
+│   ├── ps2_driver.h                            # [28] ประกาศคลาสไดรเวอร์ Bit-bang SPI และการเข้าถึงรีจิสเตอร์พอร์ต RA4M1
+│   ├── oled_ui.h                               # [29] ประกาศคลาสควบคุมจอแสดงผล OLED SSD1306, ไฟ RGB LED และ Piezo Buzzer
+│   ├── auto_mode.h                             # [30] ประกาศอินเทอร์เฟซโหมดอัตโนมัติ (AutoMode), AutoExitReason และฟังก์ชันช่วย
+│   └── app_state.h                             # [31] สถานะร่วมของแอป (namespace App) และ API ข้ามโมดูลของ main
+├── src/                                        # ซอร์สโค้ดการทำงานหลัก (Implementation Files - 23 ไฟล์)
+│   ├── main.cpp                                # [32] จุดเริ่มต้นโปรแกรม (setup/loop), 40 Hz Scheduler และ runControlTick
+│   ├── app_state.cpp                           # [33] นิยามตัวแปรสถานะร่วมของแอป (namespace App)
+│   ├── drive_arbiter.cpp                       # [34] เลือกแหล่งสั่งขับ, ตัดกำลังเมื่อล้อติด และ E-stop
+│   ├── pose_control.cpp                        # [35] ท่าพรีเซ็ตเซอร์โว (Circle/Triangle/Grip) ที่ใช้ร่วมกันระหว่าง PS2 และ Serial
+│   ├── health_telemetry.cpp                    # [36] แบตเตอรี่, สุขภาพ STM32, ดัชนีเสถียรภาพ และบันทึกการเปลี่ยนสถานะลิงก์
+│   ├── serial_dispatch.cpp                     # [37] ปฏิบัติการจากคำสั่ง Serial และสวิตช์ตั้งค่าที่ใช้ร่วมกับ PS2
+│   ├── auto_session.cpp                        # [38] เข้า/ออกโหมด Auto รอบ AutoMode::execute()
+│   ├── boot_report.cpp                         # [39] เข้า Bootloader, โหลด EEPROM, เริ่ม PS2 ตอนบูต และรายงานบูต
+│   ├── robot_logic.cpp                         # [40] [Pure] จลนพลศาสตร์การขับ, Slew, Sag และการคำนวณมอเตอร์
+│   ├── persistent_config.cpp                   # [41] [Pure] CRC-16 และแพ็ก/ถอดรหัส EEPROM
+│   ├── stall_detect.cpp                        # [42] [Pure] ManualStallDetector, AutoStallTracker และซิงก์ทิศมอเตอร์ Auto
+│   ├── servo_logic.cpp                         # [43] [Pure] เป้าหมายเซอร์โว, พรีเซ็ต, ท่ากลับทิศ
+│   ├── link_failsafe.cpp                       # [44] [Pure] ถอดรหัสแพ็กเก็ต PS2 และ FailsafeStateMachine
+│   ├── power_stability.cpp                     # [45] [Pure] BatteryStabilizer และ StabilityMonitor
+│   ├── control_policy.cpp                      # [46] [Pure] นโยบายเลือกแหล่งสั่งขับ, เพดานความเร็ว และตัวจัดจังหวะ 25 ms
+│   ├── button_gesture.cpp                      # [47] [Pure] ButtonGestureTracker
+│   ├── ui_format.cpp                           # [48] [Pure] ตัวช่วยจัดรูปแบบ OLED/LED
+│   ├── serial_control.cpp                      # [49] [Pure] การแยกคำสั่ง CLI, คีย์ลัดแข่งขัน, Timeout 1500 ms และ FakeSerialPort
+│   ├── minir4_io.cpp                           # [50] การติดต่อ STM32 UART, Smart Hold-Brake, RC2 Smooth Slew และ EEPROM
+│   ├── ps2_driver.cpp                          # [51] โพรโทคอล Bit-bang SPI ความเร็วสูงผ่านรีจิสเตอร์ POSR/PORR/PIDR
+│   ├── oled_ui.cpp                             # [52] การเรนเดอร์ UI 4 บรรทัด, กู้คืนบัส I2C, แอนิเมชัน RGB และเสียงเตือน
+│   ├── auto_mode.cpp                           # [53] เอนจินรันโหมด Auto, ดักจับ yield()/ปุ่ม X และตรวจจับล้อติดขัด (Stall)
+│   └── auto_block_code.cpp                     # [54] พื้นที่วางโค้ด Auto จาก MATRIXblock R4 พร้อมชั้น Proxy ความปลอดภัยครบวงจร
 ├── lib/                                        # โฟลเดอร์สำหรับ Private Project Libraries (1 ไฟล์)
-│   └── README                                  # [34] คำแนะนำมาตรฐานของ PlatformIO ในการสร้างและติดตั้งไลบรารีส่วนตัว
+│   └── README                                  # [55] คำแนะนำมาตรฐานของ PlatformIO ในการสร้างและติดตั้งไลบรารีส่วนตัว
 └── test/                                       # ส่วนการทดสอบซอฟต์แวร์อัตโนมัติ (Automated Unit Tests - 2 ไฟล์)
-    ├── README                                  # [35] คำแนะนำมาตรฐานของ PlatformIO สำหรับ Test Runner และ Unit Testing
+    ├── README                                  # [56] คำแนะนำมาตรฐานของ PlatformIO สำหรับ Test Runner และ Unit Testing
     └── test_robot_logic/
-        └── test_main.cpp                       # [36] ชุดแบบทดสอบอัตโนมัติ 44 รายการ บน Native Host ด้วย Unity
+        └── test_main.cpp                       # [57] ชุดแบบทดสอบอัตโนมัติ 61 รายการ บน Native Host ด้วย Unity
 ```
 
-> **อัปเดตโครงสร้าง**: `src/robot_logic.cpp` ถูกแยกเป็น 6 ไฟล์ลอจิกบริสุทธิ์ (Pure C++11, คอมไพล์ใน `env:native` ทั้งหมด) โดย `robot_logic.h` ยังเป็นอินเทอร์เฟซเดียวเหมือนเดิม:
-> - `robot_logic.cpp` — จลนพลศาสตร์การขับและ Slew
-> - `persistent_config.cpp` — CRC-16 และแพ็ก/ถอดรหัส EEPROM
-> - `stall_detect.cpp` — `ManualStallDetector`, ซิงก์ทิศมอเตอร์ Auto
-> - `servo_logic.cpp` — เป้าหมายเซอร์โว, พรีเซ็ต, ท่ากลับทิศ
-> - `link_failsafe.cpp` — ถอดรหัสแพ็กเก็ต PS2 และ `FailsafeStateMachine`
-> - `power_stability.cpp` — `BatteryStabilizer` และ `StabilityMonitor`
+> **อัปเดตโครงสร้าง (Refactor)**:
+> - `robot_logic.h` เป็น Umbrella Header ที่ include ส่วนหัวลอจิกบริสุทธิ์ 10 ไฟล์ (`logic_*.h`) ทำให้ `#include "robot_logic.h"` เดิมยังใช้ได้
+> - ลอจิกบริสุทธิ์ (Pure C++11, คอมไพล์ใน `env:native` ทั้งหมด) แยกเป็น 10 ไฟล์ `.cpp`: `robot_logic`, `persistent_config`, `stall_detect`, `servo_logic`, `link_failsafe`, `power_stability`, `control_policy`, `button_gesture`, `ui_format` และ `serial_control`
+> - `main.cpp` เหลือเฉพาะ `setup()`/`loop()`/`runControlTick()`; ตัวแปรสถานะอยู่ใน `app_state.cpp` (namespace `App`) และฟังก์ชันแยกตามหน้าที่ใน `drive_arbiter`, `pose_control`, `health_telemetry`, `serial_dispatch`, `auto_session`, `boot_report` (ประกาศรวมที่ `app_state.h`)
+> - ตัวตรวจล้อติดขัดของโหมด Auto (`AutoStallTracker`) และตัวตรวจท่าทางปุ่มบนบอร์ด (`ButtonGestureTracker`) ถูกย้ายจากไฟล์ฮาร์ดแวร์มาเป็น Pure Logic เพื่อทดสอบบนโฮสต์ได้
 
 ---
 
@@ -901,10 +936,10 @@ matrix_R4/
 2. **`[env:native]` (Target จำลองบนคอมพิวเตอร์โฮสต์)**:
    - `platform = native`, `platform_packages = platformio/toolchain-gccmingw32@^1.40900.0`
    - `build_flags = -std=c++11 -Wall -Wextra -Werror -Iinclude`
-   - `build_src_filter` รวม 7 ไฟล์ (`robot_logic`, `persistent_config`, `stall_detect`, `servo_logic`, `link_failsafe`, `power_stability`, `serial_control`) และ `test_build_src = yes`: ดึงโมดูลลอจิกบริสุทธิ์และตัวแยกคำสั่ง Serial มาคอมไพล์รันชุดทดสอบทั้ง 44 ข้อบนคอมพิวเตอร์ได้โดยตรงโดยไม่ต้องต่อบอร์ดจริง
+   - `build_src_filter` รวม 10 ไฟล์ (`robot_logic`, `persistent_config`, `stall_detect`, `servo_logic`, `link_failsafe`, `power_stability`, `control_policy`, `button_gesture`, `ui_format`, `serial_control`) และ `test_build_src = yes`: ดึงโมดูลลอจิกบริสุทธิ์และตัวแยกคำสั่ง Serial มาคอมไพล์รันชุดทดสอบทั้ง 61 ข้อบนคอมพิวเตอร์ได้โดยตรงโดยไม่ต้องต่อบอร์ดจริง
 
 ##### 7.2.2 [README.md](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/README.md) — คู่มือการใช้งานและเอกสารวิศวกรรมฉบับสมบูรณ์ภาษาไทย
-ไฟล์เอกสารคู่มือฉบับสมบูรณ์ที่คุณกำลังอ่านอยู่นี้ ครอบคลุมตั้งแต่สถาปัตยกรรมระบบ, ผังพิน, การติดตั้ง PlatformIO, คู่มือการบังคับด้วยจอยสติ๊กและคีย์บอร์ด, การวางโค้ดโหมดอัตโนมัติจาก MATRIXblock R4, แบบจำลองฟิสิกส์จลนพลศาสตร์ 5 ขั้นตอน, คำอธิบายโค้ดครบทั้ง 36 ไฟล์ ไปจนถึงการแก้ไขปัญหาหน้างาน
+ไฟล์เอกสารคู่มือฉบับสมบูรณ์ที่คุณกำลังอ่านอยู่นี้ ครอบคลุมตั้งแต่สถาปัตยกรรมระบบ, ผังพิน, การติดตั้ง PlatformIO, คู่มือการบังคับด้วยจอยสติ๊กและคีย์บอร์ด, การวางโค้ดโหมดอัตโนมัติจาก MATRIXblock R4, แบบจำลองฟิสิกส์จลนพลศาสตร์ 5 ขั้นตอน, คำอธิบายโค้ดครบทั้ง 57 ไฟล์ ไปจนถึงการแก้ไขปัญหาหน้างาน
 
 ##### 7.2.3 [.gitignore](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/.gitignore) — กฎการคัดออกไฟล์ชั่วคราวและ Build Artifacts จาก Git
 กำหนดกฎสำหรับ Git เพื่อไม่ให้ติดตามไฟล์ชั่วคราวและไฟล์ที่สร้างขึ้นเฉพาะเครื่อง ได้แก่ `.pio`, `.vscode/.browse.c_cpp.db*`, `.vscode/c_cpp_properties.json`, `.vscode/launch.json`, และ `.vscode/ipch`
@@ -1067,8 +1102,8 @@ matrix_R4/
 ##### 7.2.27 [test/README](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/README) — คู่มือมาตรฐาน PlatformIO สำหรับระบบรันการทดสอบ Unit Testing
 เอกสารคำแนะนำมาตรฐานของ PlatformIO สำหรับการสร้างและรันชุดแบบทดสอบ Unit Testing
 
-##### 7.2.28 [test/test_robot_logic/test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp) — ตัวรันชุดแบบทดสอบ Unity Unit Tests ครบทั้ง 44 รายการ (11 หมวดหมู่) บน Native Host
-ไฟล์ชุดแบบทดสอบอัตโนมัติขนาดกว่า 1,900 บรรทัดที่ใช้เฟรมเวิร์ก Unity Test Framework ตรวจสอบความถูกต้องของอัลกอริทึมทุกส่วนในโปรเจกต์ครบทั้ง 44 รายการ (ดูรายละเอียดทั้ง 44 รายการได้ในหัวข้อ [5.1](#51-การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์-pio-test--e-native))
+##### 7.2.28 [test/test_robot_logic/test_main.cpp](file:///c:/Users/MB523W/OneDrive/Documents/PlatformIO/Projects/matrix_R4/test/test_robot_logic/test_main.cpp) — ตัวรันชุดแบบทดสอบ Unity Unit Tests ครบทั้ง 61 รายการ (15 หมวดหมู่) บน Native Host
+ไฟล์ชุดแบบทดสอบอัตโนมัติขนาดกว่า 1,900 บรรทัดที่ใช้เฟรมเวิร์ก Unity Test Framework ตรวจสอบความถูกต้องของอัลกอริทึมทุกส่วนในโปรเจกต์ครบทั้ง 61 รายการ (ดูรายละเอียดทั้ง 61 รายการได้ในหัวข้อ [5.1](#51-การรันแบบทดสอบอัตโนมัติบนเครื่องโฮสต์-pio-test--e-native))
 
 ---
 
@@ -1120,6 +1155,13 @@ flowchart TD
 | `kOledRefreshPeriodMs` | `180` | ms | คาบเวลาการรีเฟรชหน้าจอ OLED |
 | `kWireTimeoutUs` | `60000` | µs | เวลา Timeout สูงสุดของบัส I2C `Wire1` (60 ms) |
 | `kWdtTimeoutMs` | `3000` | ms | เวลาฮาร์ดแวร์ Watchdog Timer รีเซ็ตระบบหากค้าง (3 วินาที) |
+| `kLedPin` / `kBuzzerPin` | `7` / `6` | pin | พินของ RGB LED (WS2812B) และบัซเซอร์ในตัวบนบอร์ด (ตายตัวตามฮาร์ดแวร์) |
+| `kBootloaderFlushDelayMs` | `120` | ms | หน่วงรอให้ Serial/จอแสดงผลเสร็จก่อนกระโดดเข้า Bootloader |
+| `kBootPs2FrameGapMs` | `4` | ms | ช่วงห่างระหว่างเฟรม PS2 ตอนบูตขณะรอให้ลิงก์เสถียร |
+| `kOledWidth` / `kOledHeight` / `kOledBufferBytes` | `128` / `32` / `512` | px / ไบต์ | ขนาดจอ SSD1306 และขนาดเฟรมบัฟเฟอร์ |
+| `kOledAddrPrimary` / `kOledAddrAlt` | `0x3C` / `0x3D` | I2C | ที่อยู่ SSD1306 หลัก (ลองก่อน) และสำรอง |
+| `kI2cMuxAddr` | `0x70` | I2C | ที่อยู่ PCA9548A บน `Wire1` |
+| `kI2cFastHz` / `kI2cSlowHz` | `400000` / `100000` | Hz | ความเร็วบัส I2C ปกติและโหมดสำรองเมื่อมี error |
 | `kMotorLeftReverseInit` | `false` | bool | ค่าเริ่มต้นการกลับทิศมอเตอร์ล้อซ้าย `M1` |
 | `kMotorRightReverseInit` | `true` | bool | ค่าเริ่มต้นการกลับทิศมอเตอร์ล้อขวา `M2` |
 | `kNormalMaxPower` | `100` | % | เพดานกำลังสูงสุดเมื่อโยกก้านสุดในโหมดปกติ (ต้องไม่เกิน `kMotorMaxPower = 100`) |
@@ -1272,7 +1314,7 @@ flowchart TD
 
 ## 9. สรุปการยกระดับความปลอดภัยและความเสถียรล่าสุด (Security & Stability Hardening Summary)
 
-รายการปรับปรุงสำคัญจากการตรวจสอบโค้ดและฮาร์ดแวร์ครบทั้ง 36 ไฟล์ (ผ่าน `pio run -e uno_r4_wifi`, `pio test -e native` 44/44 เคส, และ `pio check` `0 HIGH, 0 MEDIUM` ใน `src/`):
+รายการปรับปรุงสำคัญจากการตรวจสอบโค้ดและฮาร์ดแวร์ครบทั้ง 57 ไฟล์ (ผ่าน `pio run -e uno_r4_wifi`, `pio test -e native` 61/61 เคส, และ `pio check` `0 HIGH, 0 MEDIUM` ใน `src/`):
 
 | หมวดงาน | ไฟล์หลักที่ปรับปรุง | สิ่งที่แก้ไขและพัฒนา |
 | :--- | :--- | :--- |

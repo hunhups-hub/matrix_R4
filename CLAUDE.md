@@ -21,7 +21,7 @@ carrier, using the `matrix-robotics/MatrixMiniR4@^1.2.6` library.
 
 ```powershell
 $pio = "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe"
-& $pio test -e native                          # Unity host tests, expect 44/44 pass
+& $pio test -e native                          # Unity host tests, expect 61/61 pass
 & $pio test -e native -f test_robot_logic      # the only test suite
 & $pio run -e uno_r4_wifi                      # firmware build, -Werror on src/
 & $pio run -e uno_r4_wifi --target upload      # flash board
@@ -35,17 +35,21 @@ Bootloader entry if upload cannot find the port: hold BTN_UP + BTN_DOWN for
 
 ## Architecture
 
-- **Host-testable pure C++11**: `src/serial_control.cpp` and the six `RobotLogic` files
+- **Host-testable pure C++11**: `src/serial_control.cpp` and the pure `RobotLogic` files
   (`robot_logic`, `persistent_config`, `stall_detect`, `servo_logic`, `link_failsafe`,
-  `power_stability`), all declared in `include/robot_logic.h`. These are the only sources in
-  the `native` `build_src_filter` (add new pure files there). Keep them free of Arduino
-  and hardware headers.
+  `power_stability`, `control_policy`, `button_gesture`, `ui_format`). Their declarations live in
+  per-concern headers (`include/logic_*.h`) pulled together by the umbrella `include/robot_logic.h`.
+  These are the only sources in the `native` `build_src_filter` (add new pure files there). Keep
+  them free of Arduino and hardware headers.
 - **Hardware layer**:
   - `minir4_io`: STM32 UART link, motors, servos, smart hold-brake, EEPROM.
   - `ps2_driver`: register-level bit-bang SPI (POSR/PORR/PIDR).
   - `oled_ui`: SSD1306 OLED, RGB LEDs, buzzer, I2C bus recovery.
-  - `auto_mode`: autonomous run engine, X/serial abort, wheel-stall detection.
-  - `main.cpp`: `setup()`/`loop()`, scheduler, bootloader shortcut.
+  - `auto_mode`: autonomous run engine, X/serial abort (stall decision is `AutoStallTracker`).
+  - `main.cpp`: `setup()`/`loop()`/`runControlTick()` only. Shared state is `App::g_*` in
+    `app_state.cpp`; the rest of the old main lives in `drive_arbiter`, `pose_control`,
+    `health_telemetry`, `serial_dispatch`, `auto_session`, `boot_report`, all declared in
+    `include/app_state.h`.
 - **Where to edit what**:
   - `include/user_settings.h`: values a driver tunes (speeds, expo, slew, servo angles and
     inversion, motor reverse, battery policy, Auto timing, stall-cut flag).
@@ -85,5 +89,5 @@ Bootloader entry if upload cannot find the port: hold BTN_UP + BTN_DOWN for
   goes below the diagnostic pragmas, inside `namespace AutoBlockUser`. Proxy
   classes there wrap `MiniR4` and `Serial`. Do not remove the pragmas or proxies.
 - `src/` must build warning-free (`-Wall -Wextra -Werror`).
-- The README states the test count (44), the file count (28), and the
+- The README states the test count (61), the file count (57), and the
   `config.h` parameter table. Update the README when any of these change.
