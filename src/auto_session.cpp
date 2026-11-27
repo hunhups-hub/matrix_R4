@@ -90,7 +90,7 @@ void runAutoSession(uint32_t nowMs) {
         g_posePresetState.dropActive     = false;
         g_posePresetState.releasePending = false;
     }
-    if (g_snap.servos.rc3Deg != preAuto.rc3Deg) {
+    if (g_snap.servos.rc3Deg != preAuto.rc3Deg || g_snap.servos.rc4Deg != preAuto.rc4Deg) {
         g_armPushState.active = false;
     }
 

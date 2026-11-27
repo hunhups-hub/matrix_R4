@@ -45,7 +45,7 @@ constexpr uint8_t  kTurnMaxRatioPct        = 100U;    // สัดส่วน�
 constexpr int16_t  kSerialDefaultSpeed     = 100;     // ความเร็วเริ่มต้นผ่าน Serial เต็ม 100% (ช่วง 20..100%)
 
 // ============================================================================
-// --- 2) เซอร์โว RC1..RC3  มุมต่างๆ / กลับทิศ / ช่วงพัลส์ (ปุ่มที่สั่ง ดู controls.h) ---
+// --- 2) เซอร์โว RC1..RC4  มุมต่างๆ / กลับทิศ / ช่วงพัลส์ (ปุ่มที่สั่ง ดู controls.h) ---
 //  มุมทุกตัว ช่วง 0..180 องศา
 // ============================================================================
 
@@ -82,12 +82,17 @@ constexpr int16_t  kRc2SmoothStepDeg       = 6;       // ขั้น slew ข�
                                                        // ช่วง 1..90 | เพิ่ม = แขนกวาดเร็วขึ้นในโหมดนุ่ม
 constexpr bool     kRc2SmoothDefault       = true;    // เปิดการเคลื่อนที่นุ่มนวลเป็นค่าเริ่มต้น เฉพาะ RC2
 
-// --- 2.3) RC3 แขนหน้า  (ปุ่ม kFrontArmsDown / kFrontArmsUp / kPushGround) ---
-constexpr int16_t  kRc3InitDeg             = 0;      // มุมเริ่มต้นแขนหน้าซ้าย (คู่กับ RC4; จำกัด 0..180)
-constexpr int16_t  kRc3L1Deg               = 0;      // L1 กดลง (15 องศา; มุมน้อย = ลึกกว่า/กดแรงกว่า; ต่ำสุด 0)
-constexpr int16_t  kRc3R1Deg               = 50;     // R1 ยกขึ้น / เก็บกลาง (140 องศา)
+// --- 2.3) RC3 + RC4 แขนหน้าซ้าย/ขวา  (ปุ่ม kFrontArmsDown / kFrontArmsUp / kPushGround) ---
+constexpr int16_t  kRc3InitDeg             = 90;      // มุมเริ่มต้นแขนหน้าซ้าย (คู่กับ RC4; จำกัด 0..180)
+constexpr int16_t  kRc3L1Deg               = 90;      // L1 กดลง (15 องศา; มุมน้อย = ลึกกว่า/กดแรงกว่า; ต่ำสุด 0)
+constexpr int16_t  kRc3R1Deg               = 160;     // R1 ยกขึ้น / เก็บกลาง (140 องศา)
 constexpr int16_t  kRc3SquareDeg           = 180;      // Square สลับกดพื้น (180 องศา)
 constexpr bool     kRc3InvertDir           = false;   // กลับมุมที่ส่งออกฮาร์ดแวร์ของ RC3 (องศา -> 180 - องศา)
+constexpr int16_t  kRc4InitDeg             = 90;       // มุมเริ่มต้นแขนหน้าขวา (คู่กับ RC3)
+constexpr int16_t  kRc4L1Deg               = 90;       // L1 กดลง (คู่กับ RC3)
+constexpr int16_t  kRc4R1Deg               = 160;      // R1 ยกขึ้น / เก็บกลาง (คู่กับ RC3)
+constexpr int16_t  kRc4SquareDeg           = 180;     // Square สลับกดพื้น (คู่กับ RC3)
+constexpr bool     kRc4InvertDir           = true;    // กลับมุมที่ส่งออกฮาร์ดแวร์ของ RC4 (องศา -> 180 - องศา)
 
 // ============================================================================
 // --- 3) ความรู้สึกการขับ (Drive feel, ขั้นสูง)  ค่าความนุ่ม/การกลับทิศมอเตอร์ ---

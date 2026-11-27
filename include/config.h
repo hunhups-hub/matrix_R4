@@ -9,7 +9,7 @@
 // ============================================================================
 // การจับคู่ฮาร์ดแวร์ (ตายตัวตามบอร์ดแคริเออร์ MATRIX Mini R4):
 //   M1 / M2      : มอเตอร์ DC ขับเคลื่อน (STM32 โคโปรเซสเซอร์ ผ่าน UART D8/D9 @ 57600)
-//   RC1..RC3     : เซอร์โว (RC1=เสริม, RC2=แขนสำรอง D-Pad, RC3=แขนหน้า)
+//   RC1..RC4     : เซอร์โว (RC1=เสริม, RC2=แขนสำรอง D-Pad, RC3=หน้าซ้าย, RC4=หน้าขวา)
 //   BTN_UP/DOWN  : ปุ่มบนบอร์ดเหนือจอ OLED (STM32)
 //   OLED (0x3D)  : จอ OLED I2C 128x32 ในตัว (Wire1)
 //   LED (D7)     : RGB LED WS2812B ในตัว 2 ดวง
@@ -88,7 +88,7 @@ constexpr uint8_t  kPs2PacketGapUs         = 50U;     // ช่วง CS สู�
 constexpr uint8_t  kPs2AttSettleUs         = 12U;     // เวลาตั้ง CS ต่ำก่อนสัญญาณนาฬิกาแรก
 constexpr uint32_t kPs2InitRetryGapMs      = 12U;     // หน่วงระหว่างการลองเริ่มต้นแบบ burst
 
-// --- เซอร์โว (RC1..RC3; RC3 ที่ L1=ลง, R1=ขึ้น, Square=ดันพื้น) ---
+// --- เซอร์โว (RC1..RC4; RC3+RC4 จับคู่ที่ L1=ลง, R1=ขึ้น, Square=ดันพื้น) ---
 constexpr int16_t  kServoMinDeg            = 0;
 constexpr int16_t  kServoMaxDeg            = 180;
 // kRc2MinDeg / kRc2MaxDeg (มุมสิ้นสุดแขน RC2) ย้ายไปอยู่ใน user_settings.h
@@ -206,6 +206,9 @@ static_assert(rc2DegOk(kCoMLowArmDeg),
 static_assert(servoDegOk(kRc3InitDeg) && servoDegOk(kRc3L1Deg) && servoDegOk(kRc3R1Deg) &&
                   servoDegOk(kRc3SquareDeg),
               "user_settings.h: มุม RC3 (kRc3...Deg) ต้องอยู่ในช่วง 0..180");
+static_assert(servoDegOk(kRc4InitDeg) && servoDegOk(kRc4L1Deg) && servoDegOk(kRc4R1Deg) &&
+                  servoDegOk(kRc4SquareDeg),
+              "user_settings.h: มุม RC4 (kRc4...Deg) ต้องอยู่ในช่วง 0..180");
 static_assert(inRange(kRc2StepDeg, 1, 90),
               "user_settings.h: kRc2StepDeg ต้องอยู่ในช่วง 1..90");
 static_assert(inRange(kRc2SmoothStepDeg, 1, 90),

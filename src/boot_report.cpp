@@ -102,12 +102,18 @@ void printServoBootLine() {
         Serial.println(g_io.servoRangeErr());
         return;
     }
-    Serial.print(F("[CFG] RC1..RC3 range 0..180deg OK | L1(RC3)=("));
+    Serial.print(F("[CFG] RC1..RC4 range 0..180deg OK | L1(RC3,RC4)=("));
     Serial.print(Config::kRc3L1Deg);
+    Serial.print(',');
+    Serial.print(Config::kRc4L1Deg);
     Serial.print(F(") | Sq=("));
     Serial.print(Config::kRc3SquareDeg);
-    Serial.print(F(") | inv3=("));
+    Serial.print(',');
+    Serial.print(Config::kRc4SquareDeg);
+    Serial.print(F(") | inv3/4=("));
     Serial.print(Config::kRc3InvertDir ? 1 : 0);
+    Serial.print(',');
+    Serial.print(Config::kRc4InvertDir ? 1 : 0);
     Serial.println(')');
 }
 

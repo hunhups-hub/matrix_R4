@@ -219,8 +219,8 @@ void SerialControl::printHelp() {
     Serial.println(F("  Space / x : Instant STOP motors   | ! : ESTOP | r : Resume | g : Run AUTO"));
     Serial.println(F("  z / b     : Toggle Precision(55% session) / Reverse-Front | [ / ] : Speed -/+ 15%"));
     Serial.println(F("  , / . / 0 : Motor Balance Trim L(-1%)/R(+1%)/Reset(0%) (saved to EEPROM)"));
-    Serial.println(F("  i / k / y : RC2 Up(-10)/Dn(+10)/Toggle Smooth RC2 | j / l : Front RC3"));
-    Serial.println(F("  o / p     : Aux RC1 180 / 0 deg | q : Toggle Hold/Drop | c <1..3> <deg>"));
+    Serial.println(F("  i / k / y : RC2 Up(-10)/Dn(+10)/Toggle Smooth RC2 | j / l : Front RC3+RC4"));
+    Serial.println(F("  o / p     : Aux RC1 180 / 0 deg | q : Toggle Hold/Drop | c <1..4> <deg>"));
     Serial.println(F("  m <L> <R> : Direct M1/M2 (-100..100 for 2.5s) | f1 / f2 : Flip M1/M2 dir"));
     Serial.println(F("  t / v     : Toggle status stream / I2C diag | u : Bootloader | ? : Help\n"));
 }
@@ -228,7 +228,7 @@ void SerialControl::printHelp() {
 void SerialControl::printBanner() {
     Serial.println(F("\n================================================"));
     Serial.println(F("  MATRIX Mini R4 Robot Firmware Ready"));
-    Serial.println(F("  Drive: M1(L) + M2(R) | Servos: RC1..RC3"));
+    Serial.println(F("  Drive: M1(L) + M2(R) | Servos: RC1..RC4"));
     Serial.println(F("  PS2/MJ2: D2(4p) + D3(2p) | Auto: START btn=Run, X=Exit"));
     Serial.println(F("  Upload: BTN UP+DOWN 2.5s or 'u'"));
     Serial.println(F("================================================"));
@@ -302,6 +302,8 @@ void SerialControl::printSnapshot(const SystemSnapshot& snap) {
     Serial.print(snap.servos.rc2Deg);
     Serial.print(',');
     Serial.print(snap.servos.rc3Deg);
+    Serial.print(',');
+    Serial.print(snap.servos.rc4Deg);
     Serial.print(F(") spd="));
     Serial.print(snap.serialSpeedPct);
     Serial.print(F("% rngErr="));
@@ -392,7 +394,7 @@ void SerialControl::parseLineCommand(uint32_t nowMs, SerialActions& outActions) 
             handled         = true;
         }
     } else if (lineBuf_[0] == 'c' && isSepChar(lineBuf_[1])) {
-        if (parseTwoInts(lineBuf_ + 1, a, b) && a >= 1L && a <= 3L) {
+        if (parseTwoInts(lineBuf_ + 1, a, b) && a >= 1L && a <= 4L) {
             outActions.hasDirectServo = true;
             outActions.directServoCh  = static_cast<uint8_t>(a);
             outActions.directServoDeg = static_cast<int16_t>(RobotLogic::clampLong(b, 0L, 180L));

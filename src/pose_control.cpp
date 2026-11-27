@@ -11,7 +11,7 @@ void setPoseServo(int16_t& targetDeg, int16_t deg) {
     g_posePresetState.dropActive = false;
 }
 
-/** Manual RC3 moves cancel the Square push-ground hold. */
+/** Manual RC3/RC4 moves cancel the Square push-ground hold. */
 void setGripServo(int16_t& targetDeg, int16_t deg) {
     targetDeg             = deg;
     g_armPushState.active = false;

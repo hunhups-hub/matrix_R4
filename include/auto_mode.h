@@ -46,7 +46,7 @@ AutoExitReason execute(MiniR4IO& io,
 /** Services WDT, Serial emergency keys, buttons, and PS2 Cross (X) during Auto. */
 void service();
 
-/** Syncs latest RC1..RC3 angle written by Auto so Manual keeps that pose on exit. */
+/** Syncs latest RC1..RC4 angle written by Auto so Manual keeps that pose on exit. */
 void recordServoAngle(uint8_t channel, uint16_t angleDeg);
 
 /** Returns true while Autonomous block mode is executing. */

@@ -334,10 +334,11 @@ void OledUI::render(const SystemSnapshot& snap, uint32_t nowMs, bool force) {
                snap.activeSource == ControlSource::None) {
         snprintf(line4, sizeof(line4), "D2+D3:PS2 | USB:WASD");
     } else {
-        snprintf(line4, sizeof(line4), "RC:%d/%d/%d",
+        snprintf(line4, sizeof(line4), "RC:%d/%d/%d/%d",
                  static_cast<int>(snap.servos.rc1Deg),
                  static_cast<int>(snap.servos.rc2Deg),
-                 static_cast<int>(snap.servos.rc3Deg));
+                 static_cast<int>(snap.servos.rc3Deg),
+                 static_cast<int>(snap.servos.rc4Deg));
     }
 
     uint32_t h = fnv1aHash(line1, 2166136261UL);

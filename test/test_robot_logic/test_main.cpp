@@ -437,10 +437,12 @@ void test_servo_bounds_and_ps2_presets(void) {
     bad.rc1Deg = -20;
     bad.rc2Deg = 220;
     bad.rc3Deg = -100;
+    bad.rc4Deg = 300;
     const ServoTargets clamped = RobotLogic::clampServoTargets(bad);
     TEST_ASSERT_EQUAL_INT16(0, clamped.rc1Deg);
     TEST_ASSERT_EQUAL_INT16(Config::kRc2MaxDeg, clamped.rc2Deg);
     TEST_ASSERT_EQUAL_INT16(0, clamped.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(180, clamped.rc4Deg);
 
     ServoTargets servos{};
     Ps2Frame frame = makeValidFrame();
@@ -449,6 +451,7 @@ void test_servo_bounds_and_ps2_presets(void) {
     frame.up = true;
     RobotLogic::updateServoTargetsFromPs2(frame, servos, true);
     TEST_ASSERT_EQUAL_INT16(Config::kRc3L1Deg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4L1Deg, servos.rc4Deg);
     TEST_ASSERT_EQUAL_INT16(Config::kRc1L2Deg, servos.rc1Deg);
     const int16_t expectedUpDeg = Config::kRc2InvertDir
                                       ? static_cast<int16_t>(Config::kRc2InitDeg - Config::kRc2StepDeg)
@@ -477,8 +480,11 @@ void test_servo_bounds_and_ps2_presets(void) {
 
 void test_square_push_ground_toggle_and_l1_r1_override(void) {
     TEST_ASSERT_EQUAL_INT16(180, Config::kRc3SquareDeg);
+    TEST_ASSERT_EQUAL_INT16(180, Config::kRc4SquareDeg);
     TEST_ASSERT_GREATER_OR_EQUAL_INT16(Config::kServoMinDeg, Config::kRc3SquareDeg);
     TEST_ASSERT_LESS_OR_EQUAL_INT16(Config::kServoMaxDeg, Config::kRc3SquareDeg);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT16(Config::kServoMinDeg, Config::kRc4SquareDeg);
+    TEST_ASSERT_LESS_OR_EQUAL_INT16(Config::kServoMaxDeg, Config::kRc4SquareDeg);
 
     ServoTargets      servos{};
     FrontArmPushState push{};
@@ -497,24 +503,29 @@ void test_square_push_ground_toggle_and_l1_r1_override(void) {
     TEST_ASSERT_TRUE(push.active);
     TEST_ASSERT_TRUE(push.prevSquare);
     TEST_ASSERT_EQUAL_INT16(Config::kRc3InitDeg, push.savedRc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4InitDeg, push.savedRc4Deg);
     TEST_ASSERT_EQUAL_INT16(Config::kRc3SquareDeg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4SquareDeg, servos.rc4Deg);
 
     // Holding Square across additional ticks must NOT re-toggle
     RobotLogic::updateServoTargetsFromPs2(fSquare, servos, true, &push);
     TEST_ASSERT_TRUE(push.active);
     TEST_ASSERT_EQUAL_INT16(Config::kRc3SquareDeg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4SquareDeg, servos.rc4Deg);
 
     // Releasing Square latches (30, 30)
     RobotLogic::updateServoTargetsFromPs2(idle, servos, true, &push);
     TEST_ASSERT_TRUE(push.active);
     TEST_ASSERT_FALSE(push.prevSquare);
     TEST_ASSERT_EQUAL_INT16(Config::kRc3SquareDeg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4SquareDeg, servos.rc4Deg);
 
     // 2. 2nd Square press cancels and restores previous (30, 30)
     RobotLogic::updateServoTargetsFromPs2(fSquare, servos, true, &push);
     TEST_ASSERT_FALSE(push.active);
     TEST_ASSERT_TRUE(push.prevSquare);
     TEST_ASSERT_EQUAL_INT16(Config::kRc3InitDeg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4InitDeg, servos.rc4Deg);
 
     RobotLogic::updateServoTargetsFromPs2(idle, servos, true, &push);
     TEST_ASSERT_FALSE(push.prevSquare);
@@ -524,15 +535,18 @@ void test_square_push_ground_toggle_and_l1_r1_override(void) {
     fL1.l1 = true;
     RobotLogic::updateServoTargetsFromPs2(fL1, servos, true, &push);
     TEST_ASSERT_EQUAL_INT16(Config::kRc3L1Deg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4L1Deg, servos.rc4Deg);
 
     RobotLogic::updateServoTargetsFromPs2(fSquare, servos, true, &push);
     TEST_ASSERT_TRUE(push.active);
     TEST_ASSERT_EQUAL_INT16(Config::kRc3SquareDeg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4SquareDeg, servos.rc4Deg);
 
     RobotLogic::updateServoTargetsFromPs2(idle, servos, true, &push);
     RobotLogic::updateServoTargetsFromPs2(fSquare, servos, true, &push);
     TEST_ASSERT_FALSE(push.active);
     TEST_ASSERT_EQUAL_INT16(Config::kRc3L1Deg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4L1Deg, servos.rc4Deg);
     RobotLogic::updateServoTargetsFromPs2(idle, servos, true, &push);
 
     // 4. R1 override while push is active clears active state cleanly
@@ -545,12 +559,15 @@ void test_square_push_ground_toggle_and_l1_r1_override(void) {
     RobotLogic::updateServoTargetsFromPs2(fR1, servos, true, &push);
     TEST_ASSERT_FALSE(push.active);
     TEST_ASSERT_EQUAL_INT16(Config::kRc3R1Deg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4R1Deg, servos.rc4Deg);
 
     // Next Square press is a fresh 1st press: saves R1 (140, 140) and goes to (30, 30)
     RobotLogic::updateServoTargetsFromPs2(fSquare, servos, true, &push);
     TEST_ASSERT_TRUE(push.active);
     TEST_ASSERT_EQUAL_INT16(Config::kRc3R1Deg, push.savedRc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4R1Deg, push.savedRc4Deg);
     TEST_ASSERT_EQUAL_INT16(Config::kRc3SquareDeg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4SquareDeg, servos.rc4Deg);
     RobotLogic::updateServoTargetsFromPs2(idle, servos, true, &push);
 
     // 5. Simultaneous L1 + Square: L1 wins, active cleared, and releasing L1 while holding Square does not re-trigger
@@ -560,10 +577,12 @@ void test_square_push_ground_toggle_and_l1_r1_override(void) {
     TEST_ASSERT_FALSE(push.active);
     TEST_ASSERT_TRUE(push.prevSquare);
     TEST_ASSERT_EQUAL_INT16(Config::kRc3L1Deg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4L1Deg, servos.rc4Deg);
 
     RobotLogic::updateServoTargetsFromPs2(fSquare, servos, true, &push);
     TEST_ASSERT_FALSE(push.active);
     TEST_ASSERT_EQUAL_INT16(Config::kRc3L1Deg, servos.rc3Deg);
+    TEST_ASSERT_EQUAL_INT16(Config::kRc4L1Deg, servos.rc4Deg);
 }
 
 // ============================================================================
@@ -1275,9 +1294,9 @@ void test_serial_servo_commands_and_flip_exact_match(void) {
     TEST_ASSERT_EQUAL_INT16(135, act.directServoDeg);
 
     // Uppercase 'C', adversarial degree clamping
-    feedPoll(sc, "C 3, 99999\r\n", 1050UL, 60, act);
+    feedPoll(sc, "C 4, 99999\r\n", 1050UL, 60, act);
     TEST_ASSERT_TRUE(act.hasDirectServo);
-    TEST_ASSERT_EQUAL_UINT8(3U, act.directServoCh);
+    TEST_ASSERT_EQUAL_UINT8(4U, act.directServoCh);
     TEST_ASSERT_EQUAL_INT16(180, act.directServoDeg);
 
     feedPoll(sc, "c 2 -50  \n", 1100UL, 60, act);
@@ -1922,12 +1941,19 @@ void test_servo_direction_inversion(void) {
 
     // Config constants remain within valid servo range after direction mapping
     const int16_t rc3InitHw = RobotLogic::applyServoDirection(Config::kRc3InitDeg, Config::kRc3InvertDir);
+    const int16_t rc4InitHw = RobotLogic::applyServoDirection(Config::kRc4InitDeg, Config::kRc4InvertDir);
     TEST_ASSERT_GREATER_OR_EQUAL_INT16(Config::kServoMinDeg, rc3InitHw);
     TEST_ASSERT_LESS_OR_EQUAL_INT16(Config::kServoMaxDeg, rc3InitHw);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT16(Config::kServoMinDeg, rc4InitHw);
+    TEST_ASSERT_LESS_OR_EQUAL_INT16(Config::kServoMaxDeg, rc4InitHw);
     TEST_ASSERT_EQUAL_INT16(
         Config::kRc3InvertDir ? static_cast<int16_t>(Config::kServoMaxDeg - Config::kRc3InitDeg)
                               : Config::kRc3InitDeg,
         rc3InitHw);
+    TEST_ASSERT_EQUAL_INT16(
+        Config::kRc4InvertDir ? static_cast<int16_t>(Config::kServoMaxDeg - Config::kRc4InitDeg)
+                              : Config::kRc4InitDeg,
+        rc4InitHw);
 }
 
 void test_kinodynamic_envelope_and_overflow_safety(void) {

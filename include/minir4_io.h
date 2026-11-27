@@ -53,7 +53,7 @@ public:
     /** Restores PS2 pins, STM32 motor polarity/ranges, and stops all motors after Auto exits. */
     void restoreAfterAuto();
 
-    /** Sends servo targets RC1..RC3 when changed, unsynced, or on periodic keepalive. */
+    /** Sends servo targets RC1..RC4 when changed, unsynced, or on periodic keepalive. */
     void applyServos(const ServoTargets& targets, uint32_t nowMs);
 
     /** Enables or disables smooth trajectory slew limiting strictly for arm RC2. */

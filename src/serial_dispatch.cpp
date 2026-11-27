@@ -115,8 +115,10 @@ void applySerialServoActions(const SerialActions& act) {
 
     if (act.gripOpen) {
         setGripServo(servos.rc3Deg, Config::kRc3L1Deg);
+        setGripServo(servos.rc4Deg, Config::kRc4L1Deg);
     } else if (act.gripClose) {
         setGripServo(servos.rc3Deg, Config::kRc3R1Deg);
+        setGripServo(servos.rc4Deg, Config::kRc4R1Deg);
     }
 
     if (act.auxExtend) {
@@ -132,6 +134,7 @@ void applySerialServoActions(const SerialActions& act) {
             case 1: setPoseServo(servos.rc1Deg, act.directServoDeg); break;
             case 2: setPoseServo(servos.rc2Deg, act.directServoDeg); break;
             case 3: setGripServo(servos.rc3Deg, act.directServoDeg); break;
+            case 4: setGripServo(servos.rc4Deg, act.directServoDeg); break;
             default: break;
         }
     }
