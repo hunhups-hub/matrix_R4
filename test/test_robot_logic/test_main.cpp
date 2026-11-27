@@ -479,8 +479,8 @@ void test_servo_bounds_and_ps2_presets(void) {
 }
 
 void test_square_push_ground_toggle_and_l1_r1_override(void) {
-    TEST_ASSERT_EQUAL_INT16(180, Config::kRc3SquareDeg);
-    TEST_ASSERT_EQUAL_INT16(180, Config::kRc4SquareDeg);
+    TEST_ASSERT_EQUAL_INT16(30, Config::kRc3SquareDeg);
+    TEST_ASSERT_EQUAL_INT16(30, Config::kRc4SquareDeg);
     TEST_ASSERT_GREATER_OR_EQUAL_INT16(Config::kServoMinDeg, Config::kRc3SquareDeg);
     TEST_ASSERT_LESS_OR_EQUAL_INT16(Config::kServoMaxDeg, Config::kRc3SquareDeg);
     TEST_ASSERT_GREATER_OR_EQUAL_INT16(Config::kServoMinDeg, Config::kRc4SquareDeg);
@@ -1788,6 +1788,19 @@ void test_rc2_smooth_servo_slew(void) {
     TEST_ASSERT_EQUAL_INT16(Config::kRc2MaxDeg, RobotLogic::slewServoAngle(Config::kRc2MaxDeg - 2, 220, 6));
     TEST_ASSERT_EQUAL_INT16(0, RobotLogic::slewServoAngle(3, -20, 6));
     TEST_ASSERT_EQUAL_INT16(140, RobotLogic::slewServoAngle(70, 140, 0));
+
+    // Front arms RC3/RC4: same stepping but full 0..180 range (Square pose reaches 180)
+    TEST_ASSERT_EQUAL_INT16(98, RobotLogic::slewFrontArmAngle(90, 160, 8));
+    TEST_ASSERT_EQUAL_INT16(82, RobotLogic::slewFrontArmAngle(90, 20, 8));
+    TEST_ASSERT_EQUAL_INT16(180, RobotLogic::slewFrontArmAngle(176, 180, 8));
+    TEST_ASSERT_EQUAL_INT16(180, RobotLogic::slewFrontArmAngle(90, 220, 0));
+    TEST_ASSERT_EQUAL_INT16(0, RobotLogic::slewFrontArmAngle(3, -20, 8));
+    TEST_ASSERT_EQUAL_INT16(180, RobotLogic::slewFrontArmAngle(90, 180, 32767));
+    int16_t arm = 90;
+    for (int i = 0; i < 9; ++i) {
+        arm = RobotLogic::slewFrontArmAngle(arm, 160, 8);
+    }
+    TEST_ASSERT_EQUAL_INT16(160, arm);
 }
 
 void test_motor_balance_trim_and_stepping(void) {

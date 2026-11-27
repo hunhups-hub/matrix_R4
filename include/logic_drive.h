@@ -130,4 +130,11 @@ int16_t slewServoAngle(int16_t currentDeg,
                        int16_t targetDeg,
                        int16_t maxStepDeg = Config::kRc2SmoothStepDeg);
 
+/**
+ * Same stepping as slewServoAngle but clamps to the full servo range
+ * [kServoMinDeg, kServoMaxDeg]. Used for front arms RC3/RC4 (they reach 180).
+ * maxStepDeg <= 0 jumps straight to the target.
+ */
+int16_t slewFrontArmAngle(int16_t currentDeg, int16_t targetDeg, int16_t maxStepDeg);
+
 } // namespace RobotLogic

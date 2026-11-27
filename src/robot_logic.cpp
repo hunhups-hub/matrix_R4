@@ -328,6 +328,20 @@ int16_t slewServoAngle(int16_t currentDeg, int16_t targetDeg, int16_t maxStepDeg
     return (next < tgt) ? tgt : static_cast<int16_t>(next);
 }
 
+int16_t slewFrontArmAngle(int16_t currentDeg, int16_t targetDeg, int16_t maxStepDeg) {
+    const int16_t cur = clamp16(currentDeg, Config::kServoMinDeg, Config::kServoMaxDeg);
+    const int16_t tgt = clamp16(targetDeg, Config::kServoMinDeg, Config::kServoMaxDeg);
+    if (maxStepDeg <= 0 || cur == tgt) {
+        return tgt;
+    }
+    if (tgt > cur) {
+        const int32_t next = static_cast<int32_t>(cur) + maxStepDeg;
+        return (next > tgt) ? tgt : static_cast<int16_t>(next);
+    }
+    const int32_t next = static_cast<int32_t>(cur) - maxStepDeg;
+    return (next < tgt) ? tgt : static_cast<int16_t>(next);
+}
+
 namespace {
 
 /** Rounded v * pct / 100 in 32 bits (pct is a 0..100 style percentage). */

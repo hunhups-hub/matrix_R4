@@ -213,6 +213,8 @@ static_assert(inRange(kRc2StepDeg, 1, 90),
               "user_settings.h: kRc2StepDeg ต้องอยู่ในช่วง 1..90");
 static_assert(inRange(kRc2SmoothStepDeg, 1, 90),
               "user_settings.h: kRc2SmoothStepDeg ต้องอยู่ในช่วง 1..90");
+static_assert(inRange(kFrontArmSmoothStepDeg, 0, 180),
+              "user_settings.h: kFrontArmSmoothStepDeg ต้องอยู่ในช่วง 0..180");
 static_assert(kArmStepIntervalMs >= kControlPeriodMs,
               "user_settings.h: kArmStepIntervalMs ต้องไม่น้อยกว่าคาบลูป 25 ms");
 
